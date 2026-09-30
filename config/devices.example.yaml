@@ -1,0 +1,81 @@
+# Référentiel MobAlPlus : emplacements, capteurs et affectations.
+#
+# Copier ce fichier en config/devices.yaml (ignoré par Git) et remplacer les identifiants
+# XXXXXXXXXX par les vrais ID Mobile Alerts. Les ID ne doivent pas être publiés : avec l'API
+# publique, un ID suffit à lire les mesures du capteur.
+#
+# Chargement (idempotent) :  python -m mobalplus load-config config/devices.yaml
+#
+# Principe :
+#   - un capteur (device) a des canaux ; « col » = n° de colonne sur le site Mobile Alerts (1 = 1re mesure) ;
+#   - un emplacement (place) est une pièce ou une zone ;
+#   - une affectation (deployment) relie des canaux à un emplacement sur une période [from, to[.
+#     Déplacer un capteur : mettre une date « to » sur l'affectation et en ajouter une nouvelle.
+#     Remplacer un capteur : clôturer l'ancien, affecter le nouveau au même emplacement.
+#   - les courbes affichées sont celles des emplacements (une par grandeur).
+
+places:
+  - {code: maison,        name: Maison,              kind: building}
+  - {code: salon,         name: Salon,               parent: maison, kind: room, exposure: indoor}
+  - {code: ch-enfants,    name: Chambre enfants,     parent: maison, kind: room, exposure: indoor}
+  - {code: bureau,        name: Bureau,              parent: maison, kind: room, exposure: indoor}
+  - {code: ch-amis,       name: Chambre amis,        parent: maison, kind: room, exposure: indoor}
+  - {code: chambre,       name: Chambre,             parent: maison, kind: room, exposure: indoor}
+  - {code: veranda,       name: Véranda,             parent: maison, kind: room, exposure: indoor}
+  - {code: cave,          name: Cave,                parent: maison, kind: room, exposure: indoor}
+  - {code: garage,        name: Garage,              parent: maison, kind: room, exposure: indoor}
+  - {code: congel,        name: Congélateur,         parent: maison, kind: appliance, exposure: appliance}
+  - {code: congel-2,      name: Congélateur 2,       parent: maison, kind: appliance, exposure: appliance}
+  - {code: exterieur,     name: Extérieur,           kind: outdoor, exposure: outdoor}
+  - {code: bosquet,       name: Bosquet,             parent: exterieur, kind: outdoor, exposure: outdoor}
+  - {code: jardin-butte,  name: Jardin Est (butte),  parent: exterieur, kind: outdoor, exposure: outdoor}
+
+devices:
+  # Station : canal 1-2 = intérieur, canal 3-4 = sonde extérieure (onglets 01-Salon et 01-Ext)
+  - ma_id: 07XXXXXXXXXX
+    name: Station salon
+    channels:
+      - {col: 1, property: temperature, label: Température intérieure}
+      - {col: 2, property: humidity,    label: Hygrométrie intérieure}
+      - {col: 3, property: temperature, label: Température extérieure}
+      - {col: 4, property: humidity,    label: Hygrométrie extérieure}
+
+  # Thermo-hygromètres simples : canal 1 = température, canal 2 = humidité
+  - ma_id: 03XXXXXXXXX1
+    name: Thermo-hygro chambre enfants
+    channels: &th
+      - {col: 1, property: temperature, label: Température}
+      - {col: 2, property: humidity,    label: Hygrométrie}
+  - {ma_id: 03XXXXXXXXX2, name: Thermo-hygro garage,        channels: *th}
+  - {ma_id: 03XXXXXXXXX3, name: Thermo-hygro bureau,        channels: *th}
+  - {ma_id: 03XXXXXXXXX4, name: Thermo-hygro chambre amis,  channels: *th}
+  - {ma_id: 03XXXXXXXXX5, name: Thermo-hygro cave,          channels: *th}
+  - {ma_id: 03XXXXXXXXX6, name: Thermo-hygro véranda,       channels: *th}
+  - {ma_id: 03XXXXXXXXX7, name: Thermo-hygro bosquet,       channels: *th}
+  - {ma_id: 03XXXXXXXXX8, name: Thermo-hygro jardin butte,  channels: *th}
+  - {ma_id: 03XXXXXXXXX9, name: Thermo-hygro chambre,       channels: *th}
+  - {ma_id: 03XXXXXXXXXA, name: Thermo-hygro congélateur,   channels: *th}
+  - {ma_id: 03XXXXXXXXXB, name: Thermo-hygro congélateur 2, channels: *th}
+
+  # Pluviomètre : pas encore importé, canaux à confirmer à la première collecte
+  - {ma_id: 08XXXXXXXXXX, name: Pluviomètre, active: false}
+
+deployments:
+  # « from » absent = depuis toujours ; « to » absent = jusqu'à aujourd'hui (affectation en cours)
+  - {device: 07XXXXXXXXXX, channels: [1, 2], place: salon}
+  - {device: 07XXXXXXXXXX, channels: [3, 4], place: exterieur}
+  - {device: 03XXXXXXXXX1, channels: [1, 2], place: ch-enfants}
+  - {device: 03XXXXXXXXX2, channels: [1, 2], place: garage}
+  - {device: 03XXXXXXXXX3, channels: [1, 2], place: bureau}
+  - {device: 03XXXXXXXXX4, channels: [1, 2], place: ch-amis}
+  - {device: 03XXXXXXXXX5, channels: [1, 2], place: cave}
+  - {device: 03XXXXXXXXX6, channels: [1, 2], place: veranda}
+  - {device: 03XXXXXXXXX7, channels: [1, 2], place: bosquet}
+  - {device: 03XXXXXXXXX8, channels: [1, 2], place: jardin-butte}
+  - {device: 03XXXXXXXXX9, channels: [1, 2], place: chambre}
+  - {device: 03XXXXXXXXXA, channels: [1, 2], place: congel}
+  - {device: 03XXXXXXXXXB, channels: [1, 2], place: congel-2}
+
+  # Exemple de déplacement : le capteur était au garage jusqu'au 15/03/2023, puis à la cave
+  # - {device: 03XXXXXXXXX2, channels: [1, 2], place: garage, to: 2023-03-15}
+  # - {device: 03XXXXXXXXX2, channels: [1, 2], place: cave, from: 2023-03-15}
