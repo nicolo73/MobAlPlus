@@ -16,10 +16,17 @@ import { MAClient } from "../_shared/ma_client.ts";
 import { runCollect } from "./handler.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
+// Appel depuis la PWA (navigateur) : en-têtes CORS ; l'accès reste contrôlé par le jeton ci-dessous
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST attendu" }, 405);
 
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {

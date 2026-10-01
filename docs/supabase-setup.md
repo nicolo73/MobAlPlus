@@ -90,7 +90,7 @@ select d.ma_id, d.ma_name, s.status, s.last_ts, s.message
 from device d left join device_sync s on s.device_id = d.id order by 1;
 ```
 
-(L'interface d'administration remplacera ces requêtes.)
+(Ou, plus simplement, l'onglet **Admin** de l'application une fois en ligne.)
 
 ## 7. Reprendre l'historique des tableurs
 
@@ -112,7 +112,7 @@ de doublons.
    select id, email, 'admin' from auth.users where email = 'ton@email';
    ```
 
-Ce compte servira à se connecter à la PWA. D'autres comptes en lecture seule peuvent être ajoutés
+Ce compte servira à se connecter à la PWA (mise en ligne : [deploiement-web.md](deploiement-web.md)). D'autres comptes en lecture seule peuvent être ajoutés
 avec le rôle `viewer`.
 
 ## Bon à savoir

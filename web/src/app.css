@@ -1,0 +1,143 @@
+:root {
+  --bg: #f6f7f6;
+  --surface: #ffffff;
+  --surface-2: #eef1ef;
+  --text: #1b2421;
+  --muted: #5e6b66;
+  --border: #dde3e0;
+  --primary: #0f766e;
+  --primary-text: #ffffff;
+  --primary-soft: #d9efec;
+  --ok: #15803d;
+  --warn: #b45309;
+  --err: #b91c1c;
+  --warn-soft: #fdf1e2;
+  --err-soft: #fbe7e7;
+  --temp: #c2410c;
+  --hum: #1d4ed8;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px rgb(0 0 0 / 0.04);
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1412;
+    --surface: #171e1b;
+    --surface-2: #1f2824;
+    --text: #e6ece9;
+    --muted: #9aa8a2;
+    --border: #2b3632;
+    --primary: #2dd4bf;
+    --primary-text: #062a26;
+    --primary-soft: #133a35;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --warn-soft: #3a2c12;
+    --err-soft: #3b1717;
+    --temp: #fb923c;
+    --hum: #60a5fa;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 0.75rem; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; }
+h3 { font-size: 1rem; }
+p { margin: 0 0 0.75rem; }
+a { color: var(--primary); }
+small, .muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+.stack { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+button, .btn {
+  font: inherit;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.5rem 0.9rem;
+  min-height: 2.5rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+button:hover { background: var(--surface-2); }
+button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+button.primary:hover { filter: brightness(1.05); }
+button.danger { color: var(--err); }
+button:disabled { opacity: 0.55; cursor: default; }
+button.link { border: none; background: none; padding: 0.25rem; min-height: 0; color: var(--primary); }
+
+input, select {
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  min-height: 2.5rem;
+  max-width: 100%;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+label { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--muted); }
+label > input, label > select { color: var(--text); }
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge.ok { background: var(--primary-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.err { background: var(--err-soft); color: var(--err); }
+
+.notice { border-radius: 8px; padding: 0.6rem 0.8rem; background: var(--surface-2); }
+.notice.err { background: var(--err-soft); color: var(--err); }
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+td.r, th.r { text-align: right; }
+.table-wrap { overflow-x: auto; margin: 0 -0.25rem; }
+
+.bar { height: 0.6rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.bar.warn > span { background: var(--warn); }
+.bar.err > span { background: var(--err); }

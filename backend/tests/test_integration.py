@@ -292,3 +292,31 @@ def test_collect_targets_skips_silent_periods(conn):
     # Relecture forcée
     forced = dict(conn.execute("SELECT ma_id, since FROM collect_targets('3 days')").fetchall())
     assert abs((now - forced["07AAAAAAAAAA"]) - timedelta(days=3)) < timedelta(minutes=1)
+
+
+def test_admin_assign_and_retire(conn):
+    ch = channel_id(conn, "03BBBBBBBBBB", 1)
+    garage = conn.execute("SELECT id FROM place WHERE code = 'garage'").fetchone()[0]
+    salon = conn.execute("SELECT id FROM place WHERE code = 'salon'").fetchone()[0]
+    db.insert_readings(conn, [(ch, datetime(2026, 1, 1, tzinfo=UTC), 15.0),
+                              (ch, datetime(2026, 3, 1, tzinfo=UTC), 21.0)])
+
+    # Déplacement du garage au salon le 01/02/2026 : la station, source actuelle du salon, est clôturée
+    conn.execute("SELECT assign_channel(%s, %s, '2026-02-01')", (ch, salon))
+    assert [v for _, v, _ in observations(conn, "garage", "temperature", "2026-01-01")] == [15.0]
+    assert [v for _, v, _ in observations(conn, "salon", "temperature", "2026-01-01")] == [21.0]
+    station = channel_id(conn, "07AAAAAAAAAA", 1)
+    assert conn.execute("SELECT upper(valid) FROM deployment WHERE channel_id = %s", (station,)).fetchone()[0] \
+        == datetime(2026, 2, 1, tzinfo=UTC)
+
+    # Valeurs actuelles : le salon est désormais alimenté par le capteur 03
+    cur = {(r[3], r[4]): (r[7], r[8]) for r in conn.execute("SELECT * FROM current_values()").fetchall()}
+    assert cur[("Salon", "temperature")] == (21.0, "03BBBBBBBBBB")
+
+    # Retrait : plus d'affectation ouverte, capteur inactif
+    dev = conn.execute("SELECT id FROM device WHERE ma_id = '03BBBBBBBBBB'").fetchone()[0]
+    conn.execute("SELECT retire_device(%s, '2026-04-01')", (dev,))
+    assert conn.execute("SELECT active FROM device WHERE id = %s", (dev,)).fetchone()[0] is False
+    assert conn.execute("""SELECT count(*) FROM deployment d JOIN device_channel c ON c.id = d.channel_id
+                           WHERE c.device_id = %s AND upper_inf(d.valid)""", (dev,)).fetchone()[0] == 0
+    assert [v for _, v, _ in observations(conn, "salon", "temperature", "2026-01-01")] == [21.0]

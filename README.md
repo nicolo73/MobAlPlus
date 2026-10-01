@@ -5,6 +5,7 @@ au-delà des 3 mois conservés par le service officiel.
 
 - **Architecture** : [docs/architecture.md](docs/architecture.md)
 - **Mise en place Supabase** (pas à pas) : [docs/supabase-setup.md](docs/supabase-setup.md)
+- **Mise en ligne de l'application** (Cloudflare Pages) : [docs/deploiement-web.md](docs/deploiement-web.md)
 
 ## État
 
@@ -13,13 +14,15 @@ au-delà des 3 mois conservés par le service officiel.
 | Base de données Supabase (schéma, sécurité, stockage en 3 niveaux, simplification) | ✅ |
 | Collecteur serverless (Edge Function, toutes les 10 minutes) | ✅, à valider sur le vrai site |
 | Import de l'historique des Google Sheets | ✅ |
-| PWA : administration, puis courbes et time slider | à venir |
+| PWA : valeurs actuelles, administration (statistiques, capteurs, emplacements, maintenance) | ✅ (mode démo sans Supabase) |
+| PWA : courbes superposées, time slider, corrections, annotations | à venir |
 
 ## Organisation du dépôt
 
 ```
 supabase/migrations/     schéma, fonctions SQL, sécurité, tâches planifiées
 supabase/functions/      Edge Function « collect » (TypeScript / Deno)
+web/                     application PWA (Svelte + Vite), hébergée sur Cloudflare Pages
 backend/                 outils Python : import des tableurs, chargement de la config, rattrapage
 config/                  référentiel des capteurs (exemple ; le vrai fichier est ignoré par Git)
 docs/                    architecture et mise en place

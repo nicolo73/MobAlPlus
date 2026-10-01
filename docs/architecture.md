@@ -26,9 +26,9 @@ Uniquement des services cloud gérés, sur leurs offres gratuites : aucune machi
 | Base de données, sécurité, tâches planifiées | Supabase | `supabase/migrations/` |
 | Collecteur | Supabase Edge Function (Deno) | `supabase/functions/collect/` |
 | Import de l'historique, rattrapage manuel | PC (Python) | `backend/` |
-| Application web et mobile | Cloudflare Pages | à venir (`web/`) |
+| Application web et mobile (PWA) | Cloudflare Pages | `web/` |
 
-Mise en place : [supabase-setup.md](supabase-setup.md).
+Mise en place : [supabase-setup.md](supabase-setup.md), puis [deploiement-web.md](deploiement-web.md).
 
 ## Source des données
 
