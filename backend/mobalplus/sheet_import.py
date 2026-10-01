@@ -28,7 +28,7 @@ from typing import Iterable, Iterator
 
 import psycopg
 
-from .db import SOURCE_SHEET, ensure_channels, ensure_device, insert_readings
+from .db import compact, ensure_channels, ensure_device, insert_readings
 from .ma_parser import parse_value
 from .timeutil import excel_serial_to_datetime, localize_ascending, parse_local_timestamp
 
@@ -171,11 +171,20 @@ def import_sheet(conn: psycopg.Connection, sheet: SheetData, batch: int = 20000)
     for r in readings():
         buf.append(r)
         if len(buf) >= batch:
-            total += insert_readings(conn, buf, SOURCE_SHEET)
+            total += insert_readings(conn, buf)
             buf.clear()
     if buf:
-        total += insert_readings(conn, buf, SOURCE_SHEET)
+        total += insert_readings(conn, buf)
     conn.commit()
-    log.info("%s : %d lignes lues, %d valeurs insérées (capteur %s, canaux %s)",
-             sheet.source, len(naive_rows), total, sheet.ma_id, sheet.columns)
+    # Compactage immédiat des mesures anciennes : l'historique ne transite pas en entier par la table
+    # détaillée, ce qui garde la base sous le quota pendant l'import
+    moved = compact(conn)
+    # Rend l'espace de la table détaillée réutilisable avant l'onglet suivant
+    conn.autocommit = True
+    try:
+        conn.execute("VACUUM reading, reading_day")
+    finally:
+        conn.autocommit = False
+    log.info("%s : %d lignes lues, %d valeurs insérées, %d compactées (capteur %s, canaux %s)",
+             sheet.source, len(naive_rows), total, moved, sheet.ma_id, sheet.columns)
     return total

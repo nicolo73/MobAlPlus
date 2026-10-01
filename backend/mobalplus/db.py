@@ -8,13 +8,11 @@ from pathlib import Path
 from typing import Iterable
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from .ma_parser import guess_property
 
-SCHEMA_PATH = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
-
-SOURCE_COLLECTOR = 0
-SOURCE_SHEET = 1
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
 
 
 def connect(url: str | None = None) -> psycopg.Connection:
@@ -24,8 +22,10 @@ def connect(url: str | None = None) -> psycopg.Connection:
     return psycopg.connect(url)
 
 
-def apply_schema(conn: psycopg.Connection, path: Path = SCHEMA_PATH) -> None:
-    conn.execute(path.read_text(encoding="utf-8"))
+def apply_schema(conn: psycopg.Connection, directory: Path = MIGRATIONS_DIR) -> None:
+    """Applique les migrations dans l'ordre (hors Supabase : base locale ou de test)."""
+    for path in sorted(directory.glob("*.sql")):
+        conn.execute(path.read_text(encoding="utf-8"))
     conn.commit()
 
 
@@ -68,8 +68,7 @@ def ensure_channels(conn: psycopg.Connection, device_id: int, channel_nos: Itera
     return result
 
 
-def insert_readings(conn: psycopg.Connection,
-                    rows: Iterable[tuple[int, datetime, float]], source: int) -> int:
+def insert_readings(conn: psycopg.Connection, rows: Iterable[tuple[int, datetime, float]]) -> int:
     """Insère (channel_id, ts, value) en masse ; les doublons existants sont ignorés."""
     conn.execute("CREATE TEMP TABLE IF NOT EXISTS reading_stage "
                  "(channel_id int, ts timestamptz, value real) ON COMMIT DELETE ROWS")
@@ -78,20 +77,33 @@ def insert_readings(conn: psycopg.Connection,
             for row in rows:
                 copy.write_row(row)
         cur.execute(
-            """INSERT INTO reading (channel_id, ts, value, source)
-               SELECT DISTINCT ON (channel_id, ts) channel_id, ts, value, %s FROM reading_stage
-               ON CONFLICT (channel_id, ts) DO NOTHING""",
-            (source,),
+            """INSERT INTO reading (channel_id, ts, value)
+               SELECT DISTINCT ON (channel_id, ts) channel_id, ts, value FROM reading_stage
+               ON CONFLICT (channel_id, ts) DO NOTHING"""
         )
         inserted = cur.rowcount
         cur.execute("TRUNCATE reading_stage")
     return inserted
 
 
-def refresh_aggregates(conn: psycopg.Connection) -> None:
-    populated = conn.execute(
-        "SELECT ispopulated FROM pg_matviews WHERE matviewname = 'series_hourly'"
+def ingest(conn: psycopg.Connection, ma_id: str, device_name: str | None, headers: list[str],
+           rows: list[tuple[datetime, list[float | None]]], run_at: datetime,
+           synced_until: datetime | None = None) -> dict:
+    """Même point d'entrée SQL que l'Edge Function du collecteur."""
+    payload = [{"ts": ts.isoformat(), "v": values} for ts, values in rows]
+    return conn.execute(
+        "SELECT ingest_readings(%s, %s, %s, %s, %s, %s)",
+        (ma_id, device_name, headers, Jsonb(payload), run_at, synced_until or run_at),
     ).fetchone()[0]
-    conn.execute("REFRESH MATERIALIZED VIEW "
-                 + ("CONCURRENTLY " if populated else "") + "series_hourly")
+
+
+def compact(conn: psycopg.Connection) -> int:
+    moved = conn.execute("SELECT compact_readings()").fetchone()[0]
     conn.commit()
+    return moved
+
+
+def run_maintenance(conn: psycopg.Connection) -> dict:
+    result = conn.execute("SELECT run_maintenance()").fetchone()[0]
+    conn.commit()
+    return result

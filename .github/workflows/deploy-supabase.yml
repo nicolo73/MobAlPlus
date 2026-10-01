@@ -1,0 +1,31 @@
+name: Déploiement Supabase
+
+# Applique les migrations et déploie l'Edge Function « collect » sur le projet Supabase.
+# Lancement manuel : onglet Actions > Déploiement Supabase > Run workflow.
+#
+# Secrets du dépôt à créer (Settings > Secrets and variables > Actions) :
+#   SUPABASE_ACCESS_TOKEN   jeton personnel Supabase (supabase.com > Account > Access Tokens)
+#   SUPABASE_PROJECT_REF    identifiant du projet (ex. abcdefghijklmnop)
+#   SUPABASE_DB_PASSWORD    mot de passe de la base choisi à la création du projet
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Lier le projet
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - name: Appliquer les migrations
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Déployer l'Edge Function collect
+        run: supabase functions deploy collect --project-ref "$PROJECT_REF"

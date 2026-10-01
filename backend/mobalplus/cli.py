@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("files", type=Path, nargs="+")
     p = sub.add_parser("collect", help="collecte les nouvelles mesures sur le site Mobile Alerts")
     p.add_argument("--device", action="append", help="limiter à un capteur (ID Mobile Alerts)")
-    sub.add_parser("refresh", help="recalcule les agrégats horaires")
+    sub.add_parser("maintenance", help="compactage et simplification de l'historique")
     sub.add_parser("status", help="état de la collecte par capteur")
 
     args = parser.parse_args(argv)
@@ -56,15 +56,14 @@ def main(argv: list[str] | None = None) -> None:
             for f in args.files:
                 for sheet in iter_file_sheets(f):
                     total += import_sheet(conn, sheet)
-            db.refresh_aggregates(conn)
-            print(f"{total} valeurs insérées.")
+            print(f"{total} valeurs importées (les doublons avec l'historique déjà présent sont fusionnés).")
         elif args.cmd == "collect":
             vendor_id = os.environ.get("MA_VENDOR_ID")
             if not vendor_id:
                 raise SystemExit("MA_VENDOR_ID n'est pas défini (voir .env.example)")
             print(collect(conn, MAClient(vendor_id), only=args.device))
-        elif args.cmd == "refresh":
-            db.refresh_aggregates(conn)
+        elif args.cmd == "maintenance":
+            print(db.run_maintenance(conn))
         elif args.cmd == "status":
             rows = conn.execute(
                 """SELECT d.ma_id, coalesce(d.name, d.ma_name), s.last_ts, s.last_run, s.status, s.message

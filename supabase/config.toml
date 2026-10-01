@@ -1,0 +1,6 @@
+# Configuration Supabase CLI (extrait). Le reste prend les valeurs par défaut.
+project_id = "mobalplus"
+
+[functions.collect]
+# L'authentification est vérifiée dans la fonction (jeton pg_cron ou administrateur connecté)
+verify_jwt = false
