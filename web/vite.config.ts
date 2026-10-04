@@ -3,6 +3,8 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // ECharts (chargé à la demande) dépasse le seuil d'avertissement par défaut
+  build: { chunkSizeWarningLimit: 700 },
   plugins: [
     svelte(),
     VitePWA({

@@ -28,9 +28,9 @@
 
   /** Une carte par emplacement : température et humidité côte à côte */
   const byPlace = $derived.by(() => {
-    const groups = new Map<number, { name: string; items: CurrentValue[] }>();
+    const groups = new Map<number, { id: number; name: string; items: CurrentValue[] }>();
     for (const v of values ?? []) {
-      if (!groups.has(v.place_id)) groups.set(v.place_id, { name: v.place_name, items: [] });
+      if (!groups.has(v.place_id)) groups.set(v.place_id, { id: v.place_id, name: v.place_name, items: [] });
       groups.get(v.place_id)!.items.push(v);
     }
     return [...groups.values()];
@@ -54,11 +54,11 @@
   </div>
 {:else}
   <div class="grid">
-    {#each byPlace as place (place.name)}
+    {#each byPlace as place (place.id)}
       {@const ts = place.items[0].ts}
       {@const stale = isStale(ts, now)}
-      <article class="card place" class:stale>
-        <h2>{place.name}</h2>
+      <a class="card place" class:stale href="#/lieu/{place.id}" aria-label="{place.name} : historique et courbes">
+        <h2>{place.name} <span class="chev" aria-hidden="true">›</span></h2>
         <div class="values">
           {#each place.items as v (v.series_id)}
             <div class="value {v.property}">
@@ -71,13 +71,16 @@
           {#if stale}<span class="badge warn">ancienne</span>{/if}
           {fmtAgo(ts, now)}
         </small>
-      </article>
+      </a>
     {/each}
   </div>
 {/if}
 
 <style>
-  .place h2 { font-size: 1rem; color: var(--muted); font-weight: 600; }
+  .place { display: block; color: inherit; text-decoration: none; transition: border-color 0.15s; }
+  .place:hover { border-color: var(--primary); }
+  .place h2 { font-size: 1rem; color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; }
+  .chev { color: var(--primary); font-size: 1.3rem; line-height: 1; }
   .values { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
   .value { display: grid; }
   .big { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }

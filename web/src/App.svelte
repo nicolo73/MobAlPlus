@@ -9,6 +9,7 @@
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
   import Maintenance from "./pages/Maintenance.svelte";
+  import Place from "./pages/Place.svelte";
 
   let session = $state<{ email: string } | null | undefined>(undefined);
   let role = $state<Role | null>(null);
@@ -55,7 +56,8 @@
 
     <nav class="main-nav" aria-label="Navigation principale">
       {#each main as item (item.href)}
-        {@const active = item.href === "/admin" ? isAdminRoute : router.route === item.href}
+        {@const active = item.href === "/admin" ? isAdminRoute
+          : item.href === "/" ? router.route === "/" || router.route === "/lieu" : router.route === item.href}
         <a href={"#" + item.href} class:active aria-current={active ? "page" : undefined}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d={item.icon} /></svg>
           <span>{item.label}</span>
@@ -88,6 +90,8 @@
         {/if}
       {:else if router.route === "/courbes"}
         <Charts />
+      {:else if router.route === "/lieu" && router.param}
+        {#key router.param}<Place placeId={Number(router.param)} />{/key}
       {:else}
         <Now />
       {/if}

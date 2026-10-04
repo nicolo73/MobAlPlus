@@ -15,7 +15,8 @@ au-delà des 3 mois conservés par le service officiel.
 | Collecteur serverless (Edge Function, toutes les 10 minutes) | ✅, à valider sur le vrai site |
 | Import de l'historique des Google Sheets | ✅ |
 | PWA : valeurs actuelles, administration (statistiques, capteurs, emplacements, maintenance) | ✅ (mode démo sans Supabase) |
-| PWA : courbes superposées, time slider, corrections, annotations | à venir |
+| PWA : page par emplacement (courbes, statistiques, mesures, capteurs), courbes superposées avec périodes et glissement | ✅ |
+| PWA : marquage des valeurs aberrantes, annotations, météo | à venir |
 
 ## Organisation du dépôt
 

@@ -88,6 +88,49 @@ export interface CollectResult {
   error?: string;
 }
 
+export interface SeriesInfo {
+  id: number;
+  name: string;
+  place_id: number;
+  place_name: string;
+  exposure: Place["exposure"];
+  property: string;
+  property_name: string;
+  unit: string;
+}
+
+export interface Point {
+  ts: number;          // millisecondes
+  value: number;
+  quality: "ok" | "corrected" | "rejected";
+}
+
+export interface Observation extends Point {
+  series_id: number;
+}
+
+export interface SeriesStats {
+  n: number;
+  vmin: number | null;
+  tmin: string | null;
+  vmax: number | null;
+  tmax: string | null;
+  vavg: number | null;
+  first_ts: string | null;
+  last_ts: string | null;
+}
+
+export interface PlaceDeployment {
+  series_id: number;
+  property: string;
+  property_name: string;
+  ma_id: string;
+  device_name: string | null;
+  channel_no: number;
+  from: string | null;
+  to: string | null;
+}
+
 export interface Api {
   readonly demo: boolean;
   session(): Promise<{ email: string } | null>;
@@ -98,6 +141,13 @@ export interface Api {
   role(): Promise<Role | null>;
 
   currentValues(): Promise<CurrentValue[]>;
+  seriesList(): Promise<SeriesInfo[]>;
+  /** Points d'affichage (tous, ou min / max réels par intervalle au-delà de maxPoints) */
+  seriesData(ids: number[], from: number, to: number, maxPoints?: number): Promise<Map<number, Point[]>>;
+  seriesStats(id: number, from: number, to: number): Promise<SeriesStats>;
+  /** Mesures détaillées antérieures à « before », les plus récentes d'abord */
+  observations(ids: number[], from: number, before: number, limit: number): Promise<Observation[]>;
+  placeDeployments(placeId: number): Promise<PlaceDeployment[]>;
   stats(): Promise<Stats>;
   devices(): Promise<Device[]>;
   places(): Promise<Place[]>;

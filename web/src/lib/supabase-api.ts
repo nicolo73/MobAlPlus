@@ -1,5 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Api, Channel, CollectResult, Device, Place, Property, Role, Stats } from "./types";
+import type {
+  Api, Channel, CollectResult, Device, Observation, Place, PlaceDeployment, Point, Property, Role, SeriesInfo,
+  SeriesStats, Stats,
+} from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
 export function parseRange(range: string): [string | null, string | null] {
@@ -65,6 +68,65 @@ export class SupabaseApi implements Api {
 
   async currentValues() {
     return check(await this.sb.rpc("current_values")) ?? [];
+  }
+
+  async seriesList(): Promise<SeriesInfo[]> {
+    const rows = check(await this.sb.from("series")
+      .select("id, name, place_id, place(name, exposure), observed_property(code, name, unit)")
+      .order("id")) as unknown as {
+        id: number; name: string; place_id: number; place: { name: string; exposure: Place["exposure"] };
+        observed_property: { code: string; name: string; unit: string };
+      }[];
+    return rows.map((r) => ({
+      id: r.id, name: r.name, place_id: r.place_id, place_name: r.place.name, exposure: r.place.exposure,
+      property: r.observed_property.code, property_name: r.observed_property.name, unit: r.observed_property.unit,
+    }));
+  }
+
+  async seriesData(ids: number[], from: number, to: number, maxPoints = 1000) {
+    // Un appel par série : l'API Supabase plafonne chaque réponse (1000 lignes par défaut)
+    const lists = await Promise.all(ids.map(async (id) => {
+      const rows = check(await this.sb.rpc("series_data", {
+        p_series: id, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
+        p_max_points: Math.min(maxPoints, 1000),
+      })) as { ts: string; value: number; quality: Point["quality"] }[];
+      return [id, rows.map((r) => ({ ts: Date.parse(r.ts), value: r.value, quality: r.quality }))] as const;
+    }));
+    return new Map<number, Point[]>(lists);
+  }
+
+  async seriesStats(id: number, from: number, to: number) {
+    const rows = check(await this.sb.rpc("series_stats", {
+      p_series: id, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
+    })) as SeriesStats[];
+    return rows[0];
+  }
+
+  async observations(ids: number[], from: number, before: number, limit: number): Promise<Observation[]> {
+    const lists = await Promise.all(ids.map(async (id) => {
+      const rows = check(await this.sb.rpc("series_observations", {
+        p_series: id, p_from: new Date(from).toISOString(), p_to: new Date(before).toISOString(),
+      }).order("ts", { ascending: false }).limit(limit)) as { ts: string; value: number; quality: Point["quality"] }[];
+      return rows.map((r) => ({ series_id: id, ts: Date.parse(r.ts), value: r.value, quality: r.quality }));
+    }));
+    return lists.flat();
+  }
+
+  async placeDeployments(placeId: number): Promise<PlaceDeployment[]> {
+    const rows = check(await this.sb.from("series")
+      .select("id, observed_property(code, name), deployment(valid, device_channel(channel_no, device(ma_id, name, ma_name)))")
+      .eq("place_id", placeId)) as unknown as {
+        id: number; observed_property: { code: string; name: string };
+        deployment: { valid: string; device_channel: { channel_no: number; device: { ma_id: string; name: string | null; ma_name: string | null } } }[];
+      }[];
+    return rows.flatMap((s) => s.deployment.map((d) => {
+      const [from, to] = parseRange(d.valid);
+      return {
+        series_id: s.id, property: s.observed_property.code, property_name: s.observed_property.name,
+        ma_id: d.device_channel.device.ma_id, device_name: d.device_channel.device.name ?? d.device_channel.device.ma_name,
+        channel_no: d.device_channel.channel_no, from, to,
+      };
+    })).sort((a, b) => (b.from ?? "").localeCompare(a.from ?? ""));
   }
 
   async stats() {

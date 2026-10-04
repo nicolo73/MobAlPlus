@@ -1,6 +1,9 @@
 // Mode démo : données fictives en mémoire, pour essayer l'application sans projet Supabase.
 
-import type { Api, CollectResult, CurrentValue, Device, Place, Property, Stats } from "./types";
+import type {
+  Api, CollectResult, CurrentValue, Device, Observation, Place, PlaceDeployment, Point, Property, SeriesInfo,
+  SeriesStats, Stats,
+} from "./types";
 
 const PROPS: Property[] = [
   { id: 1, code: "temperature", name: "Température", unit: "°C", simplify_tolerance: 0.2 },
@@ -46,6 +49,43 @@ let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
   };
 }).filter((d): d is Device => d !== null);
 
+const STEP = 7 * 60_000;           // une mesure toutes les 7 minutes
+const HISTORY = 400 * 86_400_000;  // historique fictif disponible
+
+/** Valeur fictive mais plausible : cycle jour / nuit, saisons, lente dérive, résolution du capteur */
+function synth(seriesId: number, t: number): number {
+  const d = devices.flatMap((x) => x.channels).find((c) => c.id === seriesId);
+  const place = places.find((p) => p.id === d?.place_id);
+  const def = PLACE_DEFS.find((x) => x[0] === place?.code) ?? PLACE_DEFS[0];
+  const temp = d?.property !== "humidity";
+  const day = 86_400_000;
+  const outdoor = def[2] === "outdoor";
+  const daily = Math.sin((2 * Math.PI * (t % day)) / day - 2.2) * (outdoor ? 4 : def[2] === "appliance" ? 0.6 : 1.2);
+  const season = Math.sin((2 * Math.PI * t) / (365 * day) - 1.4) * (outdoor ? 7 : def[2] === "appliance" ? 0 : 2.5);
+  const drift = Math.sin(t / (3.7 * day) + seriesId) * (outdoor ? 2.5 : 0.6);
+  if (temp) return Math.round((def[3] + daily + season + drift) * 10) / 10;
+  return Math.round(Math.min(99, Math.max(20, def[4] - daily * 3 - drift * 2)));
+}
+
+function series(): SeriesInfo[] {
+  return devices.filter((d) => d.active).flatMap((d) => d.channels.filter((c) => c.place_id).map((c) => {
+    const place = places.find((p) => p.id === c.place_id)!;
+    return {
+      id: c.id, name: `${place.name} – ${c.property_name}`, place_id: place.id, place_name: place.name,
+      exposure: place.exposure, property: c.property, property_name: c.property_name, unit: c.unit,
+    };
+  }));
+}
+
+function rawPoints(id: number, from: number, to: number): Point[] {
+  const out: Point[] = [];
+  const start = Math.max(from, now - HISTORY);
+  for (let t = Math.ceil(start / STEP) * STEP; t < Math.min(to, now); t += STEP) {
+    out.push({ ts: t, value: synth(id, t), quality: "ok" });
+  }
+  return out;
+}
+
 const settings: Record<string, unknown> = { hot_days: 90, simplify_after_days: 1095, timezone: "Europe/Paris", db_quota_mb: 500 };
 const delay = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 150));
 
@@ -73,11 +113,61 @@ export class DemoApi implements Api {
         out.push({
           series_id: c.id, series_name: `${place.name} – ${c.property_name}`, place_id: place.id, place_name: place.name,
           property: c.property, unit: c.unit, ts: iso(stale ? 7 * 3600_000 : (3 + (c.id % 6)) * 60_000),
-          value: Math.round((base + Math.sin(c.id) * 0.4) * 10) / 10, ma_id: d.ma_id, device_name: d.name,
+          value: synth(c.id, now - (stale ? 7 * 3600_000 : 0)), ma_id: d.ma_id, device_name: d.name,
         });
       }
     }
     return delay(out.sort((a, b) => a.place_name.localeCompare(b.place_name)));
+  }
+
+  async seriesList() { return delay(series()); }
+
+  async seriesData(ids: number[], from: number, to: number, maxPoints = 1000) {
+    const out = new Map<number, Point[]>();
+    for (const id of ids) {
+      const pts = rawPoints(id, from, to);
+      if (pts.length <= maxPoints) { out.set(id, pts); continue; }
+      // Même principe que la base : minimum et maximum réels de chaque intervalle
+      const buckets = Math.max(1, Math.floor(maxPoints / 2));
+      const size = (to - from) / buckets;
+      const kept: Point[] = [];
+      let i = 0;
+      for (let b = 0; b < buckets; b++) {
+        const end = from + (b + 1) * size;
+        let lo: Point | null = null, hi: Point | null = null;
+        for (; i < pts.length && pts[i].ts < end; i++) {
+          if (!lo || pts[i].value < lo.value) lo = pts[i];
+          if (!hi || pts[i].value > hi.value) hi = pts[i];
+        }
+        if (lo && hi) kept.push(...(lo === hi ? [lo] : lo.ts < hi.ts ? [lo, hi] : [hi, lo]));
+      }
+      out.set(id, kept);
+    }
+    return delay(out);
+  }
+
+  async seriesStats(id: number, from: number, to: number): Promise<SeriesStats> {
+    const pts = rawPoints(id, from, to);
+    if (!pts.length) return { n: 0, vmin: null, tmin: null, vmax: null, tmax: null, vavg: null, first_ts: null, last_ts: null };
+    const lo = pts.reduce((a, b) => (b.value < a.value ? b : a));
+    const hi = pts.reduce((a, b) => (b.value > a.value ? b : a));
+    const isoT = (t: number) => new Date(t).toISOString();
+    return delay({
+      n: pts.length, vmin: lo.value, tmin: isoT(lo.ts), vmax: hi.value, tmax: isoT(hi.ts),
+      vavg: pts.reduce((n, p) => n + p.value, 0) / pts.length, first_ts: isoT(pts[0].ts), last_ts: isoT(pts.at(-1)!.ts),
+    });
+  }
+
+  async observations(ids: number[], from: number, before: number, limit: number): Promise<Observation[]> {
+    return delay(ids.flatMap((id) => rawPoints(id, Math.max(from, before - limit * STEP), before)
+      .reverse().slice(0, limit).map((p) => ({ ...p, series_id: id }))));
+  }
+
+  async placeDeployments(placeId: number): Promise<PlaceDeployment[]> {
+    return delay(devices.flatMap((d) => d.channels.filter((c) => c.place_id === placeId).map((c) => ({
+      series_id: c.id, property: c.property, property_name: c.property_name, ma_id: d.ma_id,
+      device_name: d.name, channel_no: c.channel_no, from: c.since, to: null,
+    }))));
   }
 
   async stats(): Promise<Stats> {

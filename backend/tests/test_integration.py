@@ -335,3 +335,25 @@ def test_admin_assign_and_retire(conn):
     assert conn.execute("""SELECT count(*) FROM deployment d JOIN device_channel c ON c.id = d.channel_id
                            WHERE c.device_id = %s AND upper_inf(d.valid)""", (dev,)).fetchone()[0] == 0
     assert [v for _, v, _ in observations(conn, "salon", "temperature", "2026-01-01")] == [21.0]
+
+
+def test_series_data_multi_and_stats(conn):
+    t0 = datetime(2026, 9, 1, tzinfo=UTC)
+    ch_t, ch_h = channel_id(conn, "07AAAAAAAAAA", 1), channel_id(conn, "07AAAAAAAAAA", 2)
+    temps = [20.0, 21.5, 19.0, 99.0, 20.5]
+    db.insert_readings(conn, [(ch_t, t0 + timedelta(minutes=7 * i), v) for i, v in enumerate(temps)]
+                       + [(ch_h, t0 + timedelta(minutes=7 * i), 50.0 + i) for i in range(5)])
+    conn.execute("INSERT INTO correction (channel_id, ts_range, action) VALUES (%s, tstzrange(%s, %s, '[]'), 'reject')",
+                 (ch_t, t0 + timedelta(minutes=21), t0 + timedelta(minutes=21)))
+    conn.commit()
+    st, sh = series_id(conn, "salon", "temperature"), series_id(conn, "salon", "humidity")
+    rows = conn.execute("SELECT series_id, count(*) FROM series_data_multi(%s, %s, %s) GROUP BY 1 ORDER BY 1",
+                        ([st, sh], t0, t0 + timedelta(hours=1))).fetchall()
+    assert dict(rows) == {st: 5, sh: 5}
+    n, vmin, tmin, vmax, tmax, vavg, first, last = conn.execute(
+        "SELECT * FROM series_stats(%s, %s, %s)", (st, t0, t0 + timedelta(hours=1))).fetchone()
+    assert (n, vmin, vmax) == (4, 19.0, 21.5)          # la valeur rejetée (99) est exclue
+    assert tmin == t0 + timedelta(minutes=14) and tmax == t0 + timedelta(minutes=7)
+    assert vavg == pytest.approx(20.25)
+    # Période vide
+    assert conn.execute("SELECT n, vmin FROM series_stats(%s, '2000-01-01', '2000-01-02')", (st,)).fetchone() == (0, None)
