@@ -119,8 +119,12 @@ déclaré, la collecte tourne à vide : c'est normal.
    select id, email, 'admin' from auth.users where email = 'ton@email';
    ```
 
-C'est ce compte qui se connecte à l'application. D'autres comptes en lecture seule peuvent être
-ajoutés de la même façon avec le rôle `viewer`.
+C'est ce compte qui se connecte à l'application. Les droits sont rattachés à l'**adresse e-mail** :
+supprimer / recréer l'utilisateur, ou se connecter avec Google, conserve le rôle. Pour autoriser
+une autre personne, même avant sa première connexion :
+```sql
+insert into app_user (email, role) values ('adresse@exemple.fr', 'viewer');   -- ou 'admin'
+```
 
 ## 6. Mettre l'application en ligne
 

@@ -12,10 +12,17 @@
 
   let session = $state<{ email: string } | null | undefined>(undefined);
   let role = $state<Role | null>(null);
+  let roleError = $state("");
 
   async function refreshSession() {
     session = await api.session();
-    role = session ? await api.role().catch(() => null) : null;
+    roleError = "";
+    try {
+      role = session ? await api.role() : null;
+    } catch (e) {
+      role = null;
+      roleError = e instanceof Error ? e.message : String(e);
+    }
   }
   refreshSession();
   api.onAuthChange(refreshSession);
@@ -57,6 +64,14 @@
     </nav>
 
     <main>
+      {#if roleError}
+        <div class="notice err" style="margin-bottom:1rem">Impossible de lire les droits du compte : {roleError}</div>
+      {:else if role === null}
+        <div class="notice warn" style="margin-bottom:1rem">
+          Le compte <strong>{session.email}</strong> est connecté mais n'est pas encore autorisé :
+          un administrateur doit l'ajouter (table <code>app_user</code>).
+        </div>
+      {/if}
       {#if isAdminRoute}
         {#if role !== "admin"}
           <div class="card notice warn">L'administration est réservée aux comptes administrateurs.</div>

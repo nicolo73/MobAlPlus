@@ -9,7 +9,7 @@
 //   MA_VENDOR_ID     identifiant vendorid du site Mobile Alerts
 //   COLLECT_TOKEN    jeton attendu de pg_cron (le même que mobalplus_collect_token dans Vault)
 //   MA_TIMEZONE      facultatif, Europe/Paris par défaut
-// Fournis automatiquement par Supabase : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+// Fournis automatiquement par Supabase : SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { MAClient } from "../_shared/ma_client.ts";
@@ -37,11 +37,13 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   let allowed = token !== "" && token === env("COLLECT_TOKEN");
   if (!allowed && token) {
-    const { data } = await db.auth.getUser(token);
-    if (data.user) {
-      const { data: row } = await db.from("app_user").select("role").eq("user_id", data.user.id).maybeSingle();
-      allowed = row?.role === "admin";
-    }
+    // Jeton de session d'un utilisateur : rôle lu avec ses propres droits (par identifiant ou e-mail)
+    const asUser = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: role } = await asUser.rpc("my_role");
+    allowed = role === "admin";
   }
   if (!allowed) return json({ error: "Non autorisé" }, 401);
 

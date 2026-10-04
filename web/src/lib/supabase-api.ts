@@ -38,7 +38,8 @@ export class SupabaseApi implements Api {
   }
 
   onAuthChange(cb: () => void) {
-    this.sb.auth.onAuthStateChange(() => cb());
+    // Rappel différé : appeler Supabase directement dans ce callback peut bloquer le client
+    this.sb.auth.onAuthStateChange(() => setTimeout(cb, 0));
   }
 
   async signIn(email: string, password: string) {
@@ -46,15 +47,20 @@ export class SupabaseApi implements Api {
     if (error) throw new Error(error.message === "Invalid login credentials" ? "Identifiants incorrects" : error.message);
   }
 
+  async signInWithGoogle() {
+    const { error } = await this.sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: location.origin + location.pathname },
+    });
+    if (error) throw new Error(error.message);
+  }
+
   async signOut() {
     await this.sb.auth.signOut();
   }
 
   async role(): Promise<Role | null> {
-    const { data: u } = await this.sb.auth.getUser();
-    if (!u.user) return null;
-    const row = check(await this.sb.from("app_user").select("role").eq("user_id", u.user.id).maybeSingle());
-    return (row?.role as Role) ?? null;
+    return (check(await this.sb.rpc("my_role")) as Role | null) ?? null;
   }
 
   async currentValues() {

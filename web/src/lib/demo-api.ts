@@ -57,6 +57,7 @@ export class DemoApi implements Api {
   async session() { return this.signedIn ? { email: "demo@mobalplus" } : null; }
   onAuthChange(cb: () => void) { this.listeners.push(cb); }
   async signIn() { this.signedIn = true; this.listeners.forEach((l) => l()); }
+  async signInWithGoogle() { return this.signIn(); }
   async signOut() { this.signedIn = false; this.listeners.forEach((l) => l()); }
   async role() { return "admin" as const; }
 

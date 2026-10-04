@@ -46,14 +46,38 @@ Row Level Security de la base.
 Supabase > **Authentication > URL Configuration** > *Site URL* : l'adresse Cloudflare
 (utile pour les e-mails de réinitialisation de mot de passe).
 
-## 3. Installer l'application sur le téléphone
+## 3. (Option) Connexion « avec Google »
+
+Le compte Google est reconnu par son adresse e-mail : il obtient les mêmes droits que l'entrée
+correspondante de la table `app_user`.
+
+1. **Google Cloud** : <https://console.cloud.google.com> > créer un projet `mobalplus`.
+   - **APIs & Services** > **OAuth consent screen** (ou *Google Auth Platform*) : nom de
+     l'application `MobAlPlus`, e-mail d'assistance, audience **External**. En mode *Testing*,
+     ajouter ton adresse dans **Test users** (ou cliquer sur *Publish app*).
+   - **Clients** (ou *Credentials*) > **Create client** > type **Web application** :
+     - *Authorized JavaScript origins* : `https://mobalplus.pages.dev`
+     - *Authorized redirect URIs* : `https://<ref>.supabase.co/auth/v1/callback`
+   - Copier le **Client ID** et le **Client secret** 🔒.
+2. **Supabase** : **Authentication** > **Sign In / Providers** > **Google** : activer, coller le
+   Client ID et le Client secret, **Save**.
+3. **Supabase** : **Authentication** > **URL Configuration** :
+   - *Site URL* : `https://mobalplus.pages.dev`
+   - *Redirect URLs* > **Add URL** : `https://mobalplus.pages.dev/**`
+4. **Cloudflare** : projet `mobalplus` > **Settings** > **Variables and Secrets** : ajouter
+   `VITE_AUTH_GOOGLE` = `true`, puis **Deployments** > dernier déploiement > **Retry deployment**
+   (la variable est lue à la construction du site).
+
+Le bouton **Continuer avec Google** apparaît alors sur la page de connexion.
+
+## 4. Installer l'application sur le téléphone
 
 - **Android (Chrome)** : ouvrir l'adresse, menu ⋮ > **Installer l'application**.
 - **iPhone (Safari)** : bouton Partager > **Sur l'écran d'accueil**.
 
 L'application se met à jour automatiquement à chaque nouvelle version publiée.
 
-## Plus tard : Play Store
+## 5. Plus tard : Play Store
 
 La PWA peut être encapsulée en application Android (TWA) avec <https://www.pwabuilder.com> :
 saisir l'adresse du site, générer le paquet Android, puis le publier depuis un compte développeur

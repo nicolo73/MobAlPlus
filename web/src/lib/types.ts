@@ -93,6 +93,7 @@ export interface Api {
   session(): Promise<{ email: string } | null>;
   onAuthChange(cb: () => void): void;
   signIn(email: string, password: string): Promise<void>;
+  signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
   role(): Promise<Role | null>;
 

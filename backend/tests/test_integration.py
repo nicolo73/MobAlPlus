@@ -254,14 +254,17 @@ def test_row_level_security(conn, workbook):
     for s in iter_file_sheets(workbook):
         import_sheet(conn, s)
     member, outsider = uuid.uuid4(), uuid.uuid4()
-    conn.execute("INSERT INTO app_user (user_id, role) VALUES (%s, 'viewer')", (member,))
+    conn.execute("INSERT INTO app_user (user_id, email, role) VALUES (%s, 'membre@exemple.fr', 'viewer')", (member,))
+    conn.execute("INSERT INTO app_user (email, role) VALUES ('Admin@Exemple.fr', 'admin')")
     conn.execute("GRANT USAGE ON SCHEMA public, auth TO authenticated; "
-                 "GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO authenticated")
+                 "GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO authenticated; "
+                 "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated")
     conn.commit()
 
-    def as_user(uid):
+    def as_user(uid, email="inconnu@exemple.fr"):
         conn.execute("SET ROLE authenticated")
         conn.execute("SELECT set_config('request.jwt.claim.sub', %s, false)", (str(uid),))
+        conn.execute("SELECT set_config('request.jwt.claims', %s, false)", (f'{{"email": "{email}"}}',))
 
     try:
         as_user(outsider)
@@ -272,8 +275,20 @@ def test_row_level_security(conn, workbook):
             conn.execute("INSERT INTO place (code, name) VALUES ('x', 'x')")
         conn.rollback()
         as_user(member)
+        assert conn.execute("SELECT my_role()").fetchone()[0] == "viewer"
         with pytest.raises(psycopg.errors.RaiseException):
             conn.execute("SELECT admin_stats()")
+        conn.rollback()
+        # Autorisé par e-mail seul (compte recréé, ou connexion Google) : reconnu comme admin
+        as_user(uuid.uuid4(), "admin@exemple.fr")
+        assert conn.execute("SELECT my_role()").fetchone()[0] == "admin"
+        assert conn.execute("SELECT admin_stats() -> 'counts' ->> 'devices'").fetchone()[0] == "2"
+        conn.execute("INSERT INTO place (code, name) VALUES ('x', 'x')")
+        # Sans session : aucun rôle, même avec un e-mail connu
+        conn.execute("RESET ROLE")
+        conn.execute("SET ROLE authenticated")
+        conn.execute("SELECT set_config('request.jwt.claim.sub', '', false)")
+        assert conn.execute("SELECT my_role()").fetchone()[0] is None
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
