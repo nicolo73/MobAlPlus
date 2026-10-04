@@ -27,7 +27,7 @@ Dans le tableau de bord du projet :
 | **Project ref** | Project Settings > General > *Project ID* (16 lettres) | déploiement |
 | **Project URL** | Project Settings > Data API (`https://<ref>.supabase.co`) | PWA, collecte |
 | **Clé publique** (*anon* / *publishable*) | Project Settings > API Keys | PWA (publique par nature) |
-| **Chaîne de connexion** 🔒 | bouton **Connect** (en haut) > *Session pooler* > URI | import depuis le PC |
+| **Chaîne de connexion** 🔒 | bouton **Connect** (en haut) > *Session pooler* > URI (pas la *Direct connection* `db.<ref>.supabase.co`, accessible seulement en IPv6) | import depuis le PC |
 
 La clé *service_role* / *secret* 🔒 n'est utilisée que par l'Edge Function, qui la reçoit
 automatiquement : il n'y a pas à la copier.
@@ -63,7 +63,15 @@ select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'moba
 select decrypted_secret from vault.decrypted_secrets where name = 'mobalplus_collect_token';
 ```
 
-Le dernier résultat est le jeton de collecte 🔒. Puis **Edge Functions > Secrets** (ou
+Le dernier résultat est le jeton de collecte 🔒.
+
+> En cas d'erreur de saisie, `create_secret` ne peut pas être rejoué (*duplicate key*) : corriger
+> la valeur avec `update_secret` :
+> ```sql
+> select vault.update_secret((select id from vault.secrets where name = 'mobalplus_project_url'),
+>                            'https://<ref>.supabase.co');
+> select name, decrypted_secret from vault.decrypted_secrets where name like 'mobalplus%';
+> ``` Puis **Edge Functions > Secrets** (ou
 *Project Settings > Edge Functions*), ajouter :
 
 | Nom | Valeur |
