@@ -6,18 +6,26 @@ chaque `git push`, en HTTPS (obligatoire pour une PWA).
 ## 1. Créer le site
 
 1. Créer un compte gratuit sur <https://dash.cloudflare.com/sign-up>.
-2. **Workers & Pages > Create > Pages > Connect to Git**, autoriser GitHub, choisir le dépôt `MobAlPlus`.
-3. Paramètres de build :
+2. Ouvrir la création d'un projet **Pages** :
+   - lien direct : <https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages> ;
+   - ou, dans le menu de gauche, **Compute (Workers)** (parfois **Build > Compute**) > **Workers & Pages**
+     > bouton **Create** > onglet **Pages** (ou lien *Looking to deploy Pages? Get started* en bas
+     de page).
+
+   ⚠️ Bien choisir **Pages**, pas *Workers* : l'écran propose Workers par défaut.
+3. **Connect to Git** (ou *Import an existing Git repository*) > **Connect GitHub** : autoriser
+   Cloudflare (accès au seul dépôt `MobAlPlus` suffit), choisir le dépôt, **Begin setup**.
+4. Paramètres de build :
 
    | Champ | Valeur |
    |---|---|
-   | Production branch | `main` (ou la branche de travail) |
+   | Production branch | la branche où se trouve le code (`ccr-38f7ce98-sk714f` tant qu'elle n'est pas fusionnée dans `main`) |
    | Framework preset | None |
    | Build command | `npm run build` |
    | Build output directory | `dist` |
    | Root directory (avancé) | `web` |
 
-4. **Environment variables** (Production et Preview) :
+5. **Environment variables** (Production et Preview) :
 
    | Nom | Valeur |
    |---|---|
@@ -28,7 +36,7 @@ chaque `git push`, en HTTPS (obligatoire pour une PWA).
    Sans les deux variables Supabase, l'application démarre en **mode démo** (données fictives) :
    pratique pour l'essayer avant que le projet Supabase soit prêt.
 
-5. **Save and Deploy**. L'adresse est du type `https://mobalplus.pages.dev`.
+6. **Save and Deploy**. L'adresse est du type `https://mobalplus.pages.dev`.
 
 La clé *anon* est publique par nature : la protection des données repose sur la connexion et la
 Row Level Security de la base.
