@@ -13,6 +13,10 @@
   import Sharing from "./pages/Sharing.svelte";
   import Welcome from "./pages/Welcome.svelte";
   import Data from "./pages/Data.svelte";
+  import About from "./pages/About.svelte";
+  import { hasUnseenNews } from "./lib/content";
+
+  let unseen = $state(hasUnseenNews());
 
   let session = $state<{ email: string } | null | undefined>(undefined);
   let ctxError = $state("");
@@ -76,6 +80,11 @@
       {/if}
       <span class="spacer"></span>
       <span class="user muted">{session.email}</span>
+      <a href="#/a-propos" class="about" class:active={router.route === "/a-propos"}
+         aria-label={unseen ? "À propos (nouveautés)" : "À propos"} title="À propos et nouveautés">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+        {#if unseen}<span class="news-dot" aria-hidden="true"></span>{/if}
+      </a>
       <button class="link" onclick={() => api.signOut()}>Déconnexion</button>
     </header>
 
@@ -114,6 +123,8 @@
             {/if}
           {:else if router.route === "/courbes"}
             <Charts />
+          {:else if router.route === "/a-propos"}
+            <About onseen={() => (unseen = false)} />
           {:else if router.route === "/donnees"}
             {#key router.query.toString()}<Data />{/key}
           {:else if router.route === "/lieu" && router.param}
@@ -147,6 +158,11 @@
   .home { min-height: 2rem; padding: 0.2rem 0.5rem; font-size: 0.9rem; max-width: 45vw; min-width: 0; flex: 0 1 auto; }
   @media (max-width: 600px) { .brand span { display: none; } }
   .home-name { font-size: 0.9rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .about { position: relative; display: inline-flex; color: var(--muted); padding: 0.25rem; border-radius: 6px; }
+  .about.active, .about:hover { color: var(--primary); }
+  .about svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .news-dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%;
+              background: var(--primary); box-shadow: 0 0 0 2px var(--surface); }
   .user { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
   @media (max-width: 600px) { .user { display: none; } }
   main { grid-area: main; padding: 1rem; width: 100%; max-width: 72rem; margin: 0 auto; min-width: 0; }

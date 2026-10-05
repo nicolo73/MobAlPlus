@@ -2,7 +2,20 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
 
+import { execSync } from "node:child_process";
+
+// Version affichée dans « À propos » : commit fourni par Cloudflare Pages, sinon celui du dépôt local
+const commit = (process.env.CF_PAGES_COMMIT_SHA ?? (() => {
+  try { return execSync("git rev-parse HEAD").toString().trim(); } catch { return ""; }
+})()).slice(0, 7);
+
 export default defineConfig({
+  define: {
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    __COMMIT__: JSON.stringify(commit),
+  },
+  // Les textes de la page « À propos » sont dans docs/ (hors du dossier web)
+  server: { fs: { allow: [".."] } },
   // ECharts (chargé à la demande) dépasse le seuil d'avertissement par défaut
   build: { chunkSizeWarningLimit: 700 },
   plugins: [

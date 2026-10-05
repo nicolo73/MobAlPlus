@@ -21,6 +21,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
     "echarts": "^6.1.0",
+    "marked": "^16.4.2",
     "read-excel-file": "^9.3.10"
   }
 }

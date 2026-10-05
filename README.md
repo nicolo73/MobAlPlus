@@ -7,6 +7,9 @@ au-delà des 3 mois conservés par le service officiel.
 - **Mise en place Supabase** (pas à pas) : [docs/supabase-setup.md](docs/supabase-setup.md)
 - **Mise en ligne de l'application** (Cloudflare Pages) : [docs/deploiement-web.md](docs/deploiement-web.md)
 - **Évolutions prévues** : [docs/ROADMAP.md](docs/ROADMAP.md)
+- **Page « À propos » de l'application** : textes modifiables directement sur GitHub,
+  [docs/a-propos.md](docs/a-propos.md) (présentation) et [docs/nouveautes.md](docs/nouveautes.md)
+  (nouveautés, les plus récentes en haut) ; l'application est reconstruite automatiquement.
 
 ## État
 
