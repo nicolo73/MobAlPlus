@@ -357,3 +357,9 @@ def test_series_data_multi_and_stats(conn):
     assert vavg == pytest.approx(20.25)
     # Période vide
     assert conn.execute("SELECT n, vmin FROM series_stats(%s, '2000-01-01', '2000-01-02')", (st,)).fetchone() == (0, None)
+
+
+def test_policies_evaluated_once_per_query(conn):
+    # Une règle « is_member() » nue est réévaluée à chaque ligne : délai dépassé sur Supabase
+    quals = conn.execute("SELECT tablename, qual FROM pg_policies WHERE schemaname = 'public'").fetchall()
+    assert quals and all("SELECT is_" in (q or "") for _, q in quals), quals

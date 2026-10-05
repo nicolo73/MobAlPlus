@@ -46,7 +46,10 @@
       series = all.filter((s) => s.place_id === placeId);
       current = cur.filter((c) => c.place_id === placeId);
       deployments = deps;
-      await Promise.all([load(), loadRows(true), loadStats()]);
+      // Courbes, statistiques et liste indépendantes : l'échec de l'une n'empêche pas les autres
+      const results = await Promise.allSettled([load(), loadRows(true), loadStats()]);
+      const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      if (failed) error = failed.reason instanceof Error ? failed.reason.message : String(failed.reason);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
