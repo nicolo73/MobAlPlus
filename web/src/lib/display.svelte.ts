@@ -1,18 +1,51 @@
-// Préférences d'affichage des courbes, mémorisées sur l'appareil et communes à toutes les pages :
-// rendu (escalier, lissé, simplifié) et grandeurs masquées (ex. l'humidité).
+// Préférences d'affichage, mémorisées sur l'appareil et communes à toutes les pages : rendu des
+// courbes (escalier, lissé, simplifié), grandeurs masquées (ex. l'humidité), taille du texte et
+// densité (pour voir plus de fiches à la fois).
 
 import type { CurveMode } from "./curve";
 
 const STORE = "mobalplus.display";
 const MODES: CurveMode[] = ["step", "smooth", "simple"];
 
-export const display = $state({ curve: "smooth" as CurveMode, hidden: [] as string[] });
+export type TextSize = "normal" | "small" | "smaller";
+export type Density = "comfort" | "compact";
+const TEXTS: TextSize[] = ["normal", "small", "smaller"];
+const DENSITIES: Density[] = ["comfort", "compact"];
+
+export const display = $state({
+  curve: "smooth" as CurveMode,
+  hidden: [] as string[],
+  text: "normal" as TextSize,
+  density: "comfort" as Density,
+});
 
 try {
   const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}");
   if (MODES.includes(saved.curve)) display.curve = saved.curve;
+  if (TEXTS.includes(saved.text)) display.text = saved.text;
+  if (DENSITIES.includes(saved.density)) display.density = saved.density;
   if (Array.isArray(saved.hidden)) display.hidden = saved.hidden.filter((h: unknown) => typeof h === "string");
 } catch { /* stockage indisponible : valeurs par défaut */ }
+apply();
+
+/** Taille du texte et densité : attributs de <html>, exploités par app.css */
+function apply() {
+  const root = document.documentElement;
+  root.dataset.text = display.text;
+  root.dataset.density = display.density;
+}
+
+export function setText(size: TextSize) {
+  display.text = size;
+  apply();
+  save();
+}
+
+export function setDensity(density: Density) {
+  display.density = density;
+  apply();
+  save();
+}
 
 function save() {
   try { localStorage.setItem(STORE, JSON.stringify(display)); } catch { /* ignoré */ }

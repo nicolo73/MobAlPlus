@@ -5,6 +5,7 @@ export const routes = {
   "/courbes": "Courbes",
   "/donnees": "Données",
   "/a-propos": "À propos",
+  "/options": "Options",
   "/lieu": "Emplacement",
   "/admin": "Tableau de bord",
   "/admin/capteurs": "Capteurs",

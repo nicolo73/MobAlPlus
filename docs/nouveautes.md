@@ -6,6 +6,9 @@
 
 
 ## 3-4-5 octobre 2026
+- Page **Maintenant** : bouton discret « Temp. / Hum. » pour n'afficher que la température.
+- Nouvelle page **Options d'affichage** (icône à réglettes en haut) : taille du texte et
+  présentation **compacte** (2 colonnes de fiches sur téléphone), grandeurs et rendu des courbes.
 - **Plein écran** pour chaque courbe (bouton en haut à droite ; en paysage sur Android).
 - Courbes plus faciles à lire au doigt : glisser dans la courbe déplace seulement le curseur des
   valeurs ; on se déplace dans le temps avec la barre sous la courbe, on zoome à deux doigts ou à

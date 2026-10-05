@@ -2,7 +2,14 @@
   import { display, setCurve, toggleProp, visibleProps } from "../lib/display.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
-  let { properties }: { properties: { code: string; name: string }[] } = $props();
+  interface Props {
+    properties: { code: string; name: string }[];
+    /** Choix du rendu des courbes (absent sur la page « Maintenant ») */
+    curves?: boolean;
+    /** Version discrète, plus petite */
+    small?: boolean;
+  }
+  let { properties, curves = true, small = false }: Props = $props();
 
   const codes = $derived(properties.map((p) => p.code));
   const visible = $derived(visibleProps(codes));
@@ -13,7 +20,7 @@
   ] as const;
 </script>
 
-<div class="display">
+<div class="display" class:small>
   {#if properties.length > 1}
     <div class="seg" role="group" aria-label="Grandeurs affichées">
       {#each properties as p (p.code)}
@@ -28,12 +35,14 @@
       {/each}
     </div>
   {/if}
+  {#if curves}
   <div class="seg" role="group" aria-label="Rendu des courbes">
     {#each CURVES as c (c.mode)}
       <button class:active={display.curve === c.mode} aria-pressed={display.curve === c.mode}
               onclick={() => setCurve(c.mode)} title="{c.help} (affichage seulement, les données ne changent pas)">{c.label}</button>
     {/each}
   </div>
+  {/if}
 </div>
 
 <style>
@@ -43,5 +52,6 @@
                 white-space: nowrap; color: var(--muted); gap: 0.3rem; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button.active { background: var(--primary-soft); color: var(--text); font-weight: 600; }
+  .small .seg button { min-height: 1.8rem; padding: 0.15rem 0.55rem; font-size: 0.8rem; }
   svg { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 </style>

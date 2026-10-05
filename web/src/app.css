@@ -141,3 +141,11 @@ td.r, th.r { text-align: right; }
 .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
 .bar.warn > span { background: var(--warn); }
 .bar.err > span { background: var(--err); }
+
+/* Préférences d'affichage (page Options) : texte plus petit, présentation compacte */
+:root[data-text="small"] { font-size: 14.5px; }
+:root[data-text="smaller"] { font-size: 13px; }
+:root[data-density="compact"] .card { padding: 0.6rem 0.75rem; }
+:root[data-density="compact"] .stack { gap: 0.6rem; }
+:root[data-density="compact"] .grid { gap: 0.5rem; }
+:root[data-density="compact"] h1 { font-size: 1.25rem; }
