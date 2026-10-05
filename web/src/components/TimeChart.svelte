@@ -41,6 +41,9 @@
   let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step" }: Props = $props();
 
   let el: HTMLDivElement;
+  let box: HTMLDivElement;
+  /** Plein écran : API du navigateur quand elle existe (et paysage sur Android), sinon superposition */
+  let full = $state(false);
   let chart: ECharts | null = null;
   let applied: Window = [0, 0];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,7 +60,8 @@
   function option() {
     const text = cssVar("--text"), muted = cssVar("--muted"), border = cssVar("--border"), surface = cssVar("--surface");
     // Étiquettes en bout de courbe de 2 à 4 séries ; une seule série est nommée par le titre
-    const endLabels = series.length >= 2 && series.length <= 4;
+    // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
+    const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
     return {
       animation: false,
@@ -81,6 +85,7 @@
       tooltip: {
         trigger: "axis",
         backgroundColor: surface, borderColor: border, textStyle: { color: text },
+        confine: true,
         axisPointer: { type: "line", lineStyle: { color: muted, width: 1 } },
         formatter: (params: { axisValue: number; seriesName: string; color: string; value: [number, number | null] }[]) => {
           const rows = params
@@ -94,10 +99,12 @@
         },
       },
       dataZoom: [
+        // Dans le graphique : zoom seulement (molette, deux doigts) ; un glissement déplace le curseur
+        // des valeurs. On se déplace dans le temps avec la barre du dessous et ses poignées.
         { type: "inside", xAxisIndex: 0, filterMode: "none", startValue: window[0], endValue: window[1],
-          zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+          zoomOnMouseWheel: true, moveOnMouseMove: false, moveOnMouseWheel: false, preventDefaultMouseMove: false },
         { type: "slider", xAxisIndex: 0, filterMode: "none", startValue: window[0], endValue: window[1],
-          height: 24, bottom: 8, borderColor: border, fillerColor: "rgba(127,127,127,0.12)",
+          height: 28, bottom: 8, left: 40, right: 40, handleSize: "120%", borderColor: border, fillerColor: "rgba(127,127,127,0.12)",
           dataBackground: { lineStyle: { color: muted, opacity: 0.5 }, areaStyle: { opacity: 0 } },
           selectedDataBackground: { lineStyle: { color: muted }, areaStyle: { opacity: 0 } },
           handleStyle: { color: surface, borderColor: muted }, moveHandleStyle: { color: muted, opacity: 0.4 },
@@ -125,9 +132,34 @@
     applied = [window[0], window[1]];
   }
 
+  async function toggleFull() {
+    if (full) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      full = false;
+      return;
+    }
+    full = true;
+    try {
+      await box.requestFullscreen?.({ navigationUI: "hide" });
+      await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
+    } catch { /* iPhone, ou paysage refusé : la superposition suffit */ }
+  }
+
   onMount(() => {
+    // Sortie du plein écran par le système (bouton retour, Échap)
+    const onFs = () => { if (!document.fullscreenElement && full) full = false; };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && full && !document.fullscreenElement) full = false; };
+    document.addEventListener("fullscreenchange", onFs);
+    addEventListener("keydown", onKey);
     let disposed = false;
-    const ro = new ResizeObserver(() => chart?.resize());
+    let wide: boolean | null = null;
+    const ro = new ResizeObserver(() => {
+      if (!chart) return;
+      chart.resize();
+      // Étiquettes en bout de courbe selon la largeur disponible
+      if (wide !== null && wide !== el.clientWidth >= 500) render();
+      wide = el.clientWidth >= 500;
+    });
     const scheme = matchMedia("(prefers-color-scheme: dark)");
     const onScheme = () => render();
     loadLib().then(({ echarts }) => {
@@ -150,6 +182,8 @@
       clearTimeout(timer);
       ro.disconnect();
       scheme.removeEventListener("change", onScheme);
+      document.removeEventListener("fullscreenchange", onFs);
+      removeEventListener("keydown", onKey);
       chart?.dispose();
     };
   });
@@ -169,9 +203,29 @@
   });
 </script>
 
-<div class="chart" class:loading style="height:{height}px" bind:this={el} role="img" aria-label={label}></div>
+<div class="box" class:full bind:this={box}>
+  {#if full}<div class="full-title">{label}</div>{/if}
+  <div class="chart" class:loading style={full ? "" : `height:${height}px`} bind:this={el} role="img" aria-label={label}></div>
+  <button class="fs" onclick={toggleFull} title={full ? "Quitter le plein écran" : "Plein écran"}
+          aria-label={full ? "Quitter le plein écran" : `Plein écran : ${label}`}>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      {#if full}<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />{:else}<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />{/if}
+    </svg>
+  </button>
+</div>
 
 <style>
+  .box { position: relative; }
   .chart { width: 100%; transition: opacity 0.2s; touch-action: pan-y; }
   .loading { opacity: 0.55; }
+  .fs { position: absolute; top: 0; right: 0; min-height: 0; padding: 0.3rem; border-radius: 6px;
+        background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--muted); z-index: 2; }
+  .fs:hover { color: var(--text); }
+  .fs svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .full { position: fixed; inset: 0; z-index: 100; background: var(--surface); display: flex; flex-direction: column;
+          padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+                   max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left)); }
+  .full .chart { flex: 1; min-height: 0; touch-action: none; }
+  .full .fs { top: max(0.5rem, env(safe-area-inset-top)); right: max(0.5rem, env(safe-area-inset-right)); }
+  .full-title { font-weight: 600; padding: 0.2rem 2.5rem 0.4rem 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

@@ -6,6 +6,10 @@
 
 
 ## 3-4-5 octobre 2026
+- **Plein écran** pour chaque courbe (bouton en haut à droite ; en paysage sur Android).
+- Courbes plus faciles à lire au doigt : glisser dans la courbe déplace seulement le curseur des
+  valeurs ; on se déplace dans le temps avec la barre sous la courbe, on zoome à deux doigts ou à
+  la molette.
 - Page **Courbes** : les emplacements apparaissent avec leur imbrication. Un emplacement parent
   (bouton en pointillé) affiche la **moyenne** de ses sous-emplacements, tracée en tirets ; ses
   sous-emplacements suivent sur la même ligne, ou en retrait dessous s'il n'y a pas la place.

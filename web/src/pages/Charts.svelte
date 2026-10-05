@@ -251,8 +251,9 @@
                      curve={display.curve} group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
         </section>
       {/each}
-      <small class="muted">Glisser sur une courbe pour se déplacer dans le temps, molette ou poignées du curseur
-        pour zoomer. Les courbes de la page bougent ensemble.</small>
+      <small class="muted">Toucher ou survoler une courbe pour lire les valeurs ; zoomer à deux doigts ou à la molette ;
+        se déplacer dans le temps avec la barre sous la courbe et ses poignées. Les courbes de la page bougent ensemble.
+        Bouton en haut à droite : plein écran.</small>
 
       <section class="card">
         <h2>Sur la période affichée</h2>
