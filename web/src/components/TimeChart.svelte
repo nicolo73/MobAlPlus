@@ -31,9 +31,11 @@
     /** Courbes synchronisées (curseur et glissement communs) */
     group?: string;
     label: string;
+    /** Rendu lissé (affichage seulement) au lieu des marches fidèles */
+    smooth?: boolean;
   }
 
-  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label }: Props = $props();
+  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, smooth = false }: Props = $props();
 
   let el: HTMLDivElement;
   let chart: ECharts | null = null;
@@ -114,7 +116,9 @@
           brushSelect: false },
       ],
       series: series.map((s) => ({
-        id: String(s.id), name: s.name, type: "line", step: "end",
+        id: String(s.id), name: s.name, type: "line",
+        // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
+        ...(smooth ? { step: false, smooth: 0.35, smoothMonotone: "x" } : { step: "end", smooth: false }),
         showSymbol: false, symbolSize: 8, sampling: undefined,
         lineStyle: { width: 2, color: s.color }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
         emphasis: { focus: "series", lineStyle: { width: 2 } },
@@ -162,7 +166,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit;
+    void series; void loaded; void unit; void smooth;
     render();
   });
 

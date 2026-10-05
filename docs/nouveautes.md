@@ -4,6 +4,13 @@
   apparaît dès que ce fichier change.
 -->
 
+## 9 octobre 2026
+
+- **Courbes lissées** en option (bouton « Escalier / Lissé ») : rendu adouci entre les mesures,
+  sans créer de faux pics ; les marches restent le rendu par défaut, fidèle aux mesures.
+- **Masquer une grandeur** (par exemple l'humidité) : le choix vaut pour la page Courbes et pour
+  les pages des emplacements, et il est mémorisé sur l'appareil.
+
 ## 8 octobre 2026
 
 - **Import plus sûr** : les mesures déjà présentes à quelques minutes près sont reconnues, les

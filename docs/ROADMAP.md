@@ -8,7 +8,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | # | Évolution | Priorité | Taille | Statut |
 |---|---|---|---|---|
 | 1 | [Couleur des courbes par emplacement](#1-couleur-des-courbes-par-emplacement) | P1 | S | à faire |
-| 2 | [Courbes lissées (option d'affichage)](#2-courbes-lissées-option-daffichage) | P1 | S | à faire |
+| 2 | [Courbes lissées (option d'affichage)](#2-courbes-lissées-option-daffichage) | P1 | S | ✅ fait |
 | 3 | [Rapport de diagnostic « pour Claude »](#3-rapport-de-diagnostic-pour-claude) | P1 | S | à faire |
 | 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | ✅ fait (reste : identifiants Mobile Alerts par maison) |
 | 5 | [Corrections et annotations](#5-corrections-et-annotations) | P2 | M | à faire |
@@ -44,6 +44,10 @@ rendu fidèle : Mobile Alerts n'enregistre qu'aux changements de valeur).
 
 **Pistes** : bascule « Escalier / Lissé » mémorisée par appareil ; lissage d'affichage seulement
 (interpolation monotone, qui ne crée pas de faux pics), les données ne changent pas.
+
+**Fait** : bascule « Escalier / Lissé » et choix des grandeurs affichées (température, humidité),
+communs à la page Courbes et aux pages des emplacements, mémorisés par appareil ; les grandeurs
+masquées ne sont pas chargées.
 
 ## 3. Rapport de diagnostic « pour Claude »
 
@@ -216,3 +220,4 @@ décalées d'exactement 1 h ou 2 h (fuseau probablement erroné).
 | 05/10/2026 | Correctif de performance des règles d'accès (délai dépassé sur les courbes) |
 | 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
 | 07/10/2026 | Import / export CSV et Excel depuis l'application |
+| 09/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |

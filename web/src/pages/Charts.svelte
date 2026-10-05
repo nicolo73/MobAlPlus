@@ -6,6 +6,8 @@
   import type { Point, SeriesInfo } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
+  import DisplayBar from "../components/DisplayBar.svelte";
+  import { display, visibleProps } from "../lib/display.svelte";
 
   import { ctx } from "../lib/home.svelte";
 
@@ -56,6 +58,15 @@
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
   const selected = $derived(places.filter((p) => p.id in slots));
+  const ORDER = ["temperature", "humidity"];
+  const rank = (prop: string) => (ORDER.indexOf(prop) + 9) % 9;
+  /** Grandeurs de la maison (température d'abord), et celles qui sont affichées */
+  const properties = $derived.by(() => {
+    const m = new Map<string, string>();
+    for (const s of all ?? []) m.set(s.property, s.property_name);
+    return [...m].map(([code, name]) => ({ code, name })).sort((a, b) => rank(a.code) - rank(b.code));
+  });
+  const visible = $derived(visibleProps(properties.map((p) => p.code)));
   const full = $derived(selected.length >= MAX_SERIES);
 
   async function init() {
@@ -86,7 +97,8 @@
   }
 
   async function load(range = loadRange(win)) {
-    const ids = selected.flatMap((p) => p.series.map((s) => s.id));
+    // Les grandeurs masquées ne sont pas chargées
+    const ids = selected.flatMap((p) => p.series.filter((s) => visible.includes(s.property)).map((s) => s.id));
     const id = ++reqId;
     loading = true;
     try {
@@ -107,19 +119,27 @@
     if (needsReload(w, loaded)) load(loadRange(w));
   }
 
-  /** Une courbe par grandeur (jamais deux unités sur un même axe) */
+  // Grandeur réaffichée : ses mesures n'ont pas été chargées
+  let shown = "";
+  $effect(() => {
+    const key = visible.join(",");
+    if (all && shown && key !== shown && visible.some((v) => !shown.split(",").includes(v))) load();
+    shown = key;
+  });
+
+  /** Une courbe par grandeur affichée (jamais deux unités sur un même axe) */
   const charts = $derived.by(() => {
     const byProp = new Map<string, { title: string; unit: string; series: ChartSeries[] }>();
     for (const p of selected) {
       for (const s of p.series) {
+        if (!visible.includes(s.property)) continue;
         if (!byProp.has(s.property)) byProp.set(s.property, { title: s.property_name, unit: s.unit, series: [] });
         byProp.get(s.property)!.series.push({
           id: s.id, name: p.name, color: slotColor(slots[p.id], dark), points: data.get(s.id) ?? [],
         });
       }
     }
-    const order = ["temperature", "humidity"];
-    return [...byProp.entries()].sort(([a], [b]) => (order.indexOf(a) + 9) % 9 - (order.indexOf(b) + 9) % 9);
+    return [...byProp.entries()].sort(([a], [b]) => rank(a) - rank(b));
   });
 
   /** Tableau récapitulatif de la fenêtre visible : dernière valeur, minimum, maximum */
@@ -165,6 +185,7 @@
         </button>
       {/each}
     </div>
+    <DisplayBar {properties} />
     {#if full}<small class="muted">{MAX_SERIES} emplacements au plus en même temps : retirez-en un pour en ajouter un autre.</small>{/if}
 
     {#if selected.length === 0}
@@ -174,7 +195,7 @@
         <section class="card">
           <h2>{c.title} <small class="muted">({c.unit})</small></h2>
           <TimeChart series={c.series} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
-                     group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
+                     smooth={display.smooth} group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
         </section>
       {/each}
       <small class="muted">Glisser sur une courbe pour se déplacer dans le temps, molette ou poignées du curseur

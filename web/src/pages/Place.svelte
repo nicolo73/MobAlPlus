@@ -6,6 +6,8 @@
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
+  import DisplayBar from "../components/DisplayBar.svelte";
+  import { display, visibleProps } from "../lib/display.svelte";
 
   let { placeId }: { placeId: number } = $props();
 
@@ -30,6 +32,10 @@
   const order = ["temperature", "humidity"];
   const sorted = $derived([...(series ?? [])].sort((a, b) =>
     (order.indexOf(a.property) + 9) % 9 - (order.indexOf(b.property) + 9) % 9));
+  const properties = $derived(sorted.map((s) => ({ code: s.property, name: s.property_name })));
+  const visible = $derived(visibleProps(properties.map((p) => p.code)));
+  /** Séries dont la courbe est affichée (les grandeurs masquées ne sont ni chargées ni tracées) */
+  const shownSeries = $derived(sorted.filter((s) => visible.includes(s.property)));
   const name = $derived(series?.[0]?.place_name ?? current[0]?.place_name ?? "Emplacement");
   const lastTs = $derived(current.map((c) => c.ts).filter(Boolean).sort().at(-1) ?? null);
 
@@ -60,7 +66,7 @@
     const id = ++reqId;
     loading = true;
     try {
-      const res = await api.seriesData((series ?? []).map((s) => s.id), range[0], range[1]);
+      const res = await api.seriesData(shownSeries.map((s) => s.id), range[0], range[1]);
       if (id !== reqId) return;
       data = res;
       loaded = range;
@@ -73,7 +79,7 @@
 
   async function loadStats() {
     const w = win;
-    const entries = await Promise.all((series ?? []).map(async (s) => [s.id, await api.seriesStats(s.id, w[0], w[1])] as const));
+    const entries = await Promise.all(shownSeries.map(async (s) => [s.id, await api.seriesStats(s.id, w[0], w[1])] as const));
     if (w === win) stats = new Map(entries);
   }
 
@@ -91,6 +97,14 @@
     clearTimeout(statsTimer);
     statsTimer = setTimeout(() => { loadStats(); loadRows(true); }, 400);
   }
+
+  // Grandeur réaffichée : ses courbes et statistiques n'ont pas été chargées
+  let shown = "";
+  $effect(() => {
+    const key = visible.join(",");
+    if (series && shown && key !== shown && visible.some((v) => !shown.split(",").includes(v))) { load(); loadStats(); }
+    shown = key;
+  });
 
   /** Une ligne par horodatage : température et humidité côte à côte */
   const table = $derived.by(() => {
@@ -143,17 +157,19 @@
   </section>
 
   <PeriodBar window={win} onchange={setWindow} {loading} />
+  {#if sorted.length}<DisplayBar {properties} />{/if}
 
   {#if series && series.length === 0}
     <div class="card muted">Aucun capteur n'est affecté à cet emplacement.</div>
   {/if}
 
-  {#each sorted as s (s.id)}
+  {#each shownSeries as s (s.id)}
     {@const st = stats.get(s.id)}
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] }]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
+                 smooth={display.smooth}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
       {#if st}
         <dl class="stats">
