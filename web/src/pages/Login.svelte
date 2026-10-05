@@ -5,6 +5,8 @@
   let password = $state("");
   let error = $state("");
   let busy = $state(false);
+  let mode = $state<"signin" | "signup">("signin");
+  let info = $state("");
   // Bouton Google affiché seulement si le fournisseur est activé dans Supabase (variable de build)
   const google = import.meta.env.VITE_AUTH_GOOGLE === "true";
 
@@ -21,8 +23,14 @@
     e.preventDefault();
     busy = true;
     error = "";
+    info = "";
     try {
-      await api.signIn(email, password);
+      if (mode === "signin") {
+        await api.signIn(email, password);
+      } else if ((await api.signUp(email, password)) === "confirm") {
+        info = `Compte créé : un e-mail de confirmation a été envoyé à ${email}. Cliquez sur le lien qu'il contient, puis connectez-vous.`;
+        mode = "signin";
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -37,7 +45,8 @@
       <img src="/icon.svg" alt="" width="40" height="40" />
       <h1 style="margin:0">MobAlPlus</h1>
     </div>
-    <p class="muted">Connectez-vous pour consulter vos capteurs.</p>
+    <p class="muted">{mode === "signin" ? "Connectez-vous pour consulter vos capteurs."
+      : "Créez votre compte : vous verrez les maisons que l'on vous partage."}</p>
     {#if google}
       <button type="button" class="google" onclick={withGoogle}>
         <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
@@ -51,9 +60,18 @@
       <div class="sep"><span>ou</span></div>
     {/if}
     <label>E-mail <input type="email" autocomplete="email" required bind:value={email} /></label>
-    <label>Mot de passe <input type="password" autocomplete="current-password" required bind:value={password} /></label>
+    <label>Mot de passe
+      <input type="password" autocomplete={mode === "signin" ? "current-password" : "new-password"} required
+             minlength={mode === "signup" ? 8 : undefined} bind:value={password} />
+    </label>
     {#if error}<div class="notice err" role="alert">{error}</div>{/if}
-    <button class="primary" type="submit" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</button>
+    {#if info}<div class="notice" role="status">{info}</div>{/if}
+    <button class="primary" type="submit" disabled={busy}>
+      {busy ? "Un instant…" : mode === "signin" ? "Se connecter" : "Créer mon compte"}
+    </button>
+    <button type="button" class="link" onclick={() => { mode = mode === "signin" ? "signup" : "signin"; error = ""; }}>
+      {mode === "signin" ? "Pas encore de compte ? En créer un" : "J'ai déjà un compte : me connecter"}
+    </button>
   </form>
 </div>
 

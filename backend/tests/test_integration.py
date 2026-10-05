@@ -250,48 +250,123 @@ def test_stats(conn, workbook):
     assert {d["ma_id"]: d["values"] for d in st["devices"]} == {"03BBBBBBBBBB": 2, "07AAAAAAAAAA": 8}
 
 
+def grant_api_roles(conn):
+    """Droits que Supabase accorde par défaut aux rôles de l'API (la RLS fait le reste)."""
+    conn.execute("GRANT USAGE ON SCHEMA public, auth TO authenticated; "
+                 "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated; "
+                 "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated")
+
+
+def as_user(conn, uid, email="inconnu@exemple.fr"):
+    conn.execute("RESET ROLE")
+    conn.execute("SET ROLE authenticated")
+    conn.execute("SELECT set_config('request.jwt.claim.sub', %s, false)", ("" if uid is None else str(uid),))
+    conn.execute("SELECT set_config('request.jwt.claims', %s, false)", (f'{{"email": "{email}"}}',))
+
+
 def test_row_level_security(conn, workbook):
     for s in iter_file_sheets(workbook):
         import_sheet(conn, s)
     member, outsider = uuid.uuid4(), uuid.uuid4()
-    conn.execute("INSERT INTO app_user (user_id, email, role) VALUES (%s, 'membre@exemple.fr', 'viewer')", (member,))
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'membre@exemple.fr', %s, 'viewer')",
+                 (home, member))
     conn.execute("INSERT INTO app_user (email, role) VALUES ('Admin@Exemple.fr', 'admin')")
-    conn.execute("GRANT USAGE ON SCHEMA public, auth TO authenticated; "
-                 "GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO authenticated; "
-                 "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated")
+    grant_api_roles(conn)
     conn.commit()
-
-    def as_user(uid, email="inconnu@exemple.fr"):
-        conn.execute("SET ROLE authenticated")
-        conn.execute("SELECT set_config('request.jwt.claim.sub', %s, false)", (str(uid),))
-        conn.execute("SELECT set_config('request.jwt.claims', %s, false)", (f'{{"email": "{email}"}}',))
-
     try:
-        as_user(outsider)
+        as_user(conn, outsider)
         assert conn.execute("SELECT count(*) FROM reading_day").fetchone()[0] == 0
-        as_user(member)
+        assert conn.execute("SELECT my_context() -> 'homes'").fetchone()[0] == []
+        # Compte sans aucun droit : les fonctions d'administration refusent (is_admin() jamais NULL)
+        assert conn.execute("SELECT is_admin()").fetchone()[0] is False
+        for fn in ("admin_stats", "admin_run_maintenance"):
+            with pytest.raises(psycopg.errors.RaiseException):
+                conn.execute(f"SELECT {fn}()")
+            conn.rollback()
+            as_user(conn, outsider)
+        as_user(conn, member, "membre@exemple.fr")
         assert conn.execute("SELECT count(*) FROM reading_day").fetchone()[0] > 0
+        ctx = conn.execute("SELECT my_context()").fetchone()[0]
+        assert ctx["platform_admin"] is False and [h["role"] for h in ctx["homes"]] == ["viewer"]
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("INSERT INTO place (code, name) VALUES ('x', 'x')")
         conn.rollback()
-        as_user(member)
-        assert conn.execute("SELECT my_role()").fetchone()[0] == "viewer"
+        as_user(conn, member, "membre@exemple.fr")
         with pytest.raises(psycopg.errors.RaiseException):
             conn.execute("SELECT admin_stats()")
         conn.rollback()
-        # Autorisé par e-mail seul (compte recréé, ou connexion Google) : reconnu comme admin
-        as_user(uuid.uuid4(), "admin@exemple.fr")
+        # Administrateur de la plateforme, reconnu par son e-mail (compte recréé, ou connexion Google)
+        as_user(conn, uuid.uuid4(), "admin@exemple.fr")
         assert conn.execute("SELECT my_role()").fetchone()[0] == "admin"
         assert conn.execute("SELECT admin_stats() -> 'counts' ->> 'devices'").fetchone()[0] == "2"
         conn.execute("INSERT INTO place (code, name) VALUES ('x', 'x')")
         # Sans session : aucun rôle, même avec un e-mail connu
-        conn.execute("RESET ROLE")
-        conn.execute("SET ROLE authenticated")
-        conn.execute("SELECT set_config('request.jwt.claim.sub', '', false)")
+        as_user(conn, None, "admin@exemple.fr")
         assert conn.execute("SELECT my_role()").fetchone()[0] is None
+        assert conn.execute("SELECT count(*) FROM place").fetchone()[0] == 0
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
+
+
+def test_homes_isolation_and_sharing(conn, workbook):
+    for s in iter_file_sheets(workbook):
+        import_sheet(conn, s)
+    home1 = conn.execute("SELECT default_home_id()").fetchone()[0]
+    home2 = conn.execute("INSERT INTO home (name) VALUES ('Chalet') RETURNING id").fetchone()[0]
+    conn.execute("INSERT INTO place (home_id, code, name) VALUES (%s, 'sejour', 'Séjour')", (home2,))
+    owner, friend, owner2 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'moi@ex.fr', %s, 'owner'), "
+                 "(%s, 'voisin@ex.fr', %s, 'owner')", (home1, owner, home2, owner2))
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        # Le propriétaire de la maison 1 ne voit pas la maison 2
+        as_user(conn, owner, "moi@ex.fr")
+        assert [r[0] for r in conn.execute("SELECT name FROM home").fetchall()] == ["Ma maison"]
+        assert "Séjour" not in [r[0] for r in conn.execute("SELECT name FROM place").fetchall()]
+        n_values = conn.execute("SELECT count(*) FROM reading_day").fetchone()[0]
+        assert n_values > 0
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("INSERT INTO place (home_id, code, name) VALUES (%s, 'y', 'y')", (home2,))
+        conn.rollback()
+
+        # Il invite un ami en lecture, par e-mail, avant sa première connexion
+        as_user(conn, owner, "moi@ex.fr")
+        conn.execute("INSERT INTO home_member (home_id, email, role) VALUES (%s, 'ami@ex.fr', 'viewer')", (home1,))
+        conn.commit()
+        as_user(conn, friend, "ami@ex.fr")
+        assert conn.execute("SELECT claim_invitations()").fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM reading_day").fetchone()[0] == n_values
+        assert conn.execute("SELECT count(*) FROM current_values(%s)", (home1,)).fetchone()[0] > 0
+        # Un lecteur ne voit pas la liste des membres (seulement sa propre invitation) et ne modifie rien
+        assert [r[0] for r in conn.execute("SELECT email FROM home_member").fetchall()] == ["ami@ex.fr"]
+        assert conn.execute("UPDATE place SET name = 'piraté' RETURNING id").fetchall() == []
+        assert conn.execute("SELECT can_collect(ARRAY['07AAAAAAAAAA'])").fetchone()[0] is False
+        conn.rollback()
+
+        # Promu éditeur : il peut gérer les emplacements et déclencher la collecte, pas le partage
+        as_user(conn, owner, "moi@ex.fr")
+        conn.execute("UPDATE home_member SET role = 'editor' WHERE email = 'ami@ex.fr'")
+        conn.commit()
+        as_user(conn, friend, "ami@ex.fr")
+        conn.execute("INSERT INTO place (home_id, code, name) VALUES (%s, 'grenier', 'Grenier')", (home1,))
+        assert conn.execute("SELECT can_collect(ARRAY['07AAAAAAAAAA'])").fetchone()[0] is True
+        assert conn.execute("SELECT can_collect(ARRAY['07AAAAAAAAAA', 'FFFFFFFFFFFF'])").fetchone()[0] is False
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("INSERT INTO home_member (home_id, email, role) VALUES (%s, 'x@ex.fr', 'owner')", (home1,))
+        conn.rollback()
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")
+
+    # Un capteur de la maison 1 ne peut pas alimenter un emplacement de la maison 2
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sejour = conn.execute("SELECT id FROM place WHERE code = 'sejour'").fetchone()[0]
+    with pytest.raises(psycopg.errors.RaiseException):
+        conn.execute("SELECT assign_channel(%s, %s, '2030-01-01')", (ch, sejour))
+    conn.rollback()
 
 
 def test_collect_targets_skips_silent_periods(conn):
@@ -361,5 +436,22 @@ def test_series_data_multi_and_stats(conn):
 
 def test_policies_evaluated_once_per_query(conn):
     # Une règle « is_member() » nue est réévaluée à chaque ligne : délai dépassé sur Supabase
-    quals = conn.execute("SELECT tablename, qual FROM pg_policies WHERE schemaname = 'public'").fetchall()
-    assert quals and all("SELECT is_" in (q or "") for _, q in quals), quals
+    quals = conn.execute("SELECT tablename, coalesce(qual, with_check) FROM pg_policies WHERE schemaname = 'public'").fetchall()
+    assert quals and all(q == "true" or "SELECT" in q for _, q in quals), quals
+
+
+def test_home_keeps_an_owner(conn):
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    conn.execute("INSERT INTO home_member (home_id, email, role) VALUES (%s, 'moi@ex.fr', 'owner'), (%s, 'ami@ex.fr', 'viewer')",
+                 (home, home))
+    conn.commit()
+    with pytest.raises(psycopg.errors.RaiseException):
+        conn.execute("UPDATE home_member SET role = 'viewer' WHERE email = 'moi@ex.fr'")
+    conn.rollback()
+    with pytest.raises(psycopg.errors.RaiseException):
+        conn.execute("DELETE FROM home_member WHERE email = 'moi@ex.fr'")
+    conn.rollback()
+    conn.execute("DELETE FROM home_member WHERE email = 'ami@ex.fr'")
+    # Supprimer la maison entière reste possible
+    conn.execute("DELETE FROM home WHERE id = %s", (home,))
+    conn.rollback()

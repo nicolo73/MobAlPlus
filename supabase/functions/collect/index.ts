@@ -33,22 +33,24 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
 
-  // Autorisé : pg_cron (jeton partagé) ou un administrateur connecté (jeton de session)
+  const body = await req.json().catch(() => ({}));
+  const devices: string[] | undefined = Array.isArray(body.devices) ? body.devices.map(String) : undefined;
+
+  // Autorisé : pg_cron (jeton partagé), l'administrateur de la plateforme, ou le gestionnaire
+  // (propriétaire / éditeur) d'une maison pour ses propres capteurs
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   let allowed = token !== "" && token === env("COLLECT_TOKEN");
   if (!allowed && token) {
-    // Jeton de session d'un utilisateur : rôle lu avec ses propres droits (par identifiant ou e-mail)
     const asUser = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    const { data: role } = await asUser.rpc("my_role");
-    allowed = role === "admin";
+    const { data } = await asUser.rpc("can_collect", { p_ma_ids: devices ?? [] });
+    allowed = data === true;
   }
   if (!allowed) return json({ error: "Non autorisé" }, 401);
 
   if (!env("MA_VENDOR_ID")) return json({ error: "Secret MA_VENDOR_ID manquant" }, 500);
-  const body = await req.json().catch(() => ({}));
   const client = new MAClient({
     vendorId: env("MA_VENDOR_ID"),
     tz: env("MA_TIMEZONE") || "Europe/Paris",
@@ -57,7 +59,7 @@ Deno.serve(async (req) => {
 
   try {
     const results = await runCollect(db, client, {
-      devices: Array.isArray(body.devices) ? body.devices : undefined,
+      devices,
       lookbackDays: Number(body.lookback_days) || undefined,
     });
     return json({ results });

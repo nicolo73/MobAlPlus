@@ -10,8 +10,9 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 1 | [Couleur des courbes par emplacement](#1-couleur-des-courbes-par-emplacement) | P1 | S | à faire |
 | 2 | [Courbes lissées (option d'affichage)](#2-courbes-lissées-option-daffichage) | P1 | S | à faire |
 | 3 | [Rapport de diagnostic « pour Claude »](#3-rapport-de-diagnostic-pour-claude) | P1 | S | à faire |
-| 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | à faire |
+| 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | ✅ fait (reste : identifiants Mobile Alerts par maison) |
 | 5 | [Corrections et annotations](#5-corrections-et-annotations) | P2 | M | à faire |
+| 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | à faire |
 | 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | à faire |
 | 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | à faire |
 | 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | à faire |
@@ -84,6 +85,12 @@ pour analyser un problème, anticiper la volumétrie ou une montée en charge.
 - page Admin > Partage : liste des membres, inviter, retirer, changer le rôle.
 
 À faire **avant** les alertes et la météo, qui dépendent de la maison (destinataires, localisation).
+
+**Fait (06/10/2026)** : maisons, membres (propriétaire / gestion / lecture), invitation par e-mail
+avant la première connexion, création de compte, écran d'accueil sans maison, sélecteur de maison,
+page Admin > Partage, règles d'accès par maison. **Reste** : identifiants Mobile Alerts propres à
+chaque maison (aujourd'hui un seul compte, celui du collecteur) ; création de maison par un
+utilisateur non administrateur ; tableau de bord par maison pour les propriétaires.
 
 ## 5. Corrections et annotations
 
@@ -162,6 +169,23 @@ emplacement (colonnes déjà prévues) ; PostGIS si nécessaire.
 - publication optionnelle de capteurs extérieurs sur **openSenseMap** (open data) ;
 - **Play Store** : encapsulation de la PWA (TWA, PWABuilder).
 
+## 13. Import et export CSV / Excel depuis l'interface
+
+**Besoin** : importer un historique depuis l'application (version web), sans outil en ligne de
+commande ; exporter les données d'un capteur ou d'un emplacement en un gros fichier CSV, pour se
+rassurer et sauvegarder.
+
+**Pistes** :
+- **format standard documenté** : `date;emplacement;grandeur;valeur` (ou une colonne par grandeur),
+  dates ISO ou `jj/mm/aaaa hh:mm:ss` heure de Paris, séparateur `;` ou `,`, décimale `,` ou `.` ;
+  modèle téléchargeable ; le format des anciens Google Sheets reconnu aussi ;
+- import : lecture du fichier **dans le navigateur** (Excel via SheetJS), aperçu des premières
+  lignes et de la correspondance des colonnes, puis envoi par lots à une fonction SQL d'import
+  (droits « gestion » de la maison), compactage au fil de l'eau, dédoublonnage ;
+- export : page d'un emplacement > **Exporter** (période au choix ou tout l'historique), CSV
+  produit par lots dans le navigateur, valeurs rejetées signalées dans une colonne « qualité » ;
+- export complet d'une maison (tous ses emplacements) pour sauvegarde.
+
 ---
 
 ## Fait
@@ -173,3 +197,4 @@ emplacement (colonnes déjà prévues) ; PostGIS si nécessaire.
 | 04/10/2026 | Droits rattachés à l'e-mail, connexion Google en option |
 | 04/10/2026 | Page par emplacement, page Courbes (périodes, glissement, zoom, curseur temporel) |
 | 05/10/2026 | Correctif de performance des règles d'accès (délai dépassé sur les courbes) |
+| 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |

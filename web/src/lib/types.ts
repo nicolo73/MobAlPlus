@@ -1,4 +1,27 @@
 export type Role = "admin" | "viewer";
+export type HomeRole = "owner" | "editor" | "viewer";
+
+export interface HomeInfo {
+  id: number;
+  name: string;
+  role: HomeRole;
+}
+
+/** Ce que le compte connecté peut voir et faire */
+export interface Context {
+  email: string | null;
+  platform_admin: boolean;
+  homes: HomeInfo[];
+}
+
+export interface Member {
+  id: number;
+  home_id: number;
+  email: string;
+  user_id: string | null;
+  role: HomeRole;
+  created_at: string;
+}
 
 export interface CurrentValue {
   series_id: number;
@@ -136,9 +159,20 @@ export interface Api {
   session(): Promise<{ email: string } | null>;
   onAuthChange(cb: () => void): void;
   signIn(email: string, password: string): Promise<void>;
+  /** Crée un compte ; « confirm » si un e-mail de confirmation a été envoyé */
+  signUp(email: string, password: string): Promise<"ok" | "confirm">;
   signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
-  role(): Promise<Role | null>;
+  /** Rattache les invitations en attente puis renvoie les maisons accessibles */
+  context(): Promise<Context>;
+  /** Maison courante : toutes les lectures et créations ci-dessous s'y rapportent */
+  setHome(homeId: number | null): void;
+  createHome(name: string): Promise<number>;
+  renameHome(id: number, name: string): Promise<void>;
+  members(homeId: number): Promise<Member[]>;
+  addMember(homeId: number, email: string, role: HomeRole): Promise<void>;
+  setMemberRole(id: number, role: HomeRole): Promise<void>;
+  removeMember(id: number): Promise<void>;
 
   currentValues(): Promise<CurrentValue[]>;
   seriesList(): Promise<SeriesInfo[]>;

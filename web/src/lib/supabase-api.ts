@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
-  Api, Channel, CollectResult, Device, Observation, Place, PlaceDeployment, Point, Property, Role, SeriesInfo,
-  SeriesStats, Stats,
+  Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
+  Property, SeriesInfo, SeriesStats, Stats,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -30,6 +30,7 @@ interface DeviceRow {
 export class SupabaseApi implements Api {
   readonly demo = false;
   private sb: SupabaseClient;
+  private homeId: number | null = null;
 
   constructor(url: string, key: string) {
     this.sb = createClient(url, key);
@@ -62,17 +63,59 @@ export class SupabaseApi implements Api {
     await this.sb.auth.signOut();
   }
 
-  async role(): Promise<Role | null> {
-    return (check(await this.sb.rpc("my_role")) as Role | null) ?? null;
+  async signUp(email: string, password: string): Promise<"ok" | "confirm"> {
+    const { data, error } = await this.sb.auth.signUp({
+      email, password, options: { emailRedirectTo: location.origin + location.pathname },
+    });
+    if (error) throw new Error(error.message);
+    return data.session ? "ok" : "confirm";
+  }
+
+  async context(): Promise<Context> {
+    await this.sb.rpc("claim_invitations");
+    return check(await this.sb.rpc("my_context")) as Context;
+  }
+
+  setHome(homeId: number | null) {
+    this.homeId = homeId;
+  }
+
+  async createHome(name: string) {
+    return check(await this.sb.rpc("create_home", { p_name: name })) as number;
+  }
+
+  async renameHome(id: number, name: string) {
+    check(await this.sb.from("home").update({ name }).eq("id", id));
+  }
+
+  async members(homeId: number) {
+    return check(await this.sb.from("home_member").select("id, home_id, email, user_id, role, created_at")
+      .eq("home_id", homeId).order("email")) as Member[];
+  }
+
+  async addMember(homeId: number, email: string, role: HomeRole) {
+    const { data } = await this.sb.auth.getSession();
+    check(await this.sb.from("home_member").insert({
+      home_id: homeId, email: email.trim().toLowerCase(), role, invited_by: data.session?.user.email ?? null,
+    }));
+  }
+
+  async setMemberRole(id: number, role: HomeRole) {
+    check(await this.sb.from("home_member").update({ role }).eq("id", id));
+  }
+
+  async removeMember(id: number) {
+    check(await this.sb.from("home_member").delete().eq("id", id));
   }
 
   async currentValues() {
-    return check(await this.sb.rpc("current_values")) ?? [];
+    return check(await this.sb.rpc("current_values", { p_home: this.homeId })) ?? [];
   }
 
   async seriesList(): Promise<SeriesInfo[]> {
     const rows = check(await this.sb.from("series")
-      .select("id, name, place_id, place(name, exposure), observed_property(code, name, unit)")
+      .select("id, name, place_id, place!inner(name, exposure, home_id), observed_property(code, name, unit)")
+      .eq("place.home_id", this.homeId ?? -1)
       .order("id")) as unknown as {
         id: number; name: string; place_id: number; place: { name: string; exposure: Place["exposure"] };
         observed_property: { code: string; name: string; unit: string };
@@ -138,6 +181,7 @@ export class SupabaseApi implements Api {
       .select("id, ma_id, name, ma_name, model, active, added_at, retired_at, " +
               "device_channel(id, channel_no, label, observed_property(code, name, unit), " +
               "deployment(valid, series(place_id)))")
+      .eq("home_id", this.homeId ?? -1)
       .order("ma_id")) as unknown as DeviceRow[];
     return rows.map((d) => ({
       ...d,
@@ -157,7 +201,8 @@ export class SupabaseApi implements Api {
   }
 
   async places() {
-    return check(await this.sb.from("place").select("id, code, name, parent_id, kind, exposure").order("name")) as Place[];
+    return check(await this.sb.from("place").select("id, code, name, parent_id, kind, exposure")
+      .eq("home_id", this.homeId ?? -1).order("name")) as Place[];
   }
 
   async properties() {
@@ -165,7 +210,9 @@ export class SupabaseApi implements Api {
   }
 
   async addDevice(maId: string, name: string) {
-    check(await this.sb.from("device").insert({ ma_id: maId.trim().toUpperCase(), name: name || null }));
+    const res = await this.sb.from("device").insert({ ma_id: maId.trim().toUpperCase(), name: name || null, home_id: this.homeId });
+    if (res.error?.code === "23505") throw new Error("Ce capteur est déjà déclaré (peut-être dans une autre maison).");
+    check(res);
   }
 
   async renameDevice(id: number, name: string) {
@@ -187,7 +234,7 @@ export class SupabaseApi implements Api {
   async savePlace(place: Omit<Place, "id"> & { id?: number }) {
     const { id, ...fields } = place;
     if (id) check(await this.sb.from("place").update(fields).eq("id", id));
-    else check(await this.sb.from("place").insert(fields));
+    else check(await this.sb.from("place").insert({ ...fields, home_id: this.homeId }));
   }
 
   async deletePlace(id: number) {

@@ -1,8 +1,8 @@
 // Mode démo : données fictives en mémoire, pour essayer l'application sans projet Supabase.
 
 import type {
-  Api, CollectResult, CurrentValue, Device, Observation, Place, PlaceDeployment, Point, Property, SeriesInfo,
-  SeriesStats, Stats,
+  Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
+  Property, SeriesInfo, SeriesStats, Stats,
 } from "./types";
 
 const PROPS: Property[] = [
@@ -99,7 +99,47 @@ export class DemoApi implements Api {
   async signIn() { this.signedIn = true; this.listeners.forEach((l) => l()); }
   async signInWithGoogle() { return this.signIn(); }
   async signOut() { this.signedIn = false; this.listeners.forEach((l) => l()); }
-  async role() { return "admin" as const; }
+  async signUp() { await this.signIn(); return "ok" as const; }
+
+  private homes = [{ id: 1, name: "Maison démo", role: "owner" as HomeRole }];
+  private memberList: Member[] = [
+    { id: 1, home_id: 1, email: "demo@mobalplus", user_id: "demo", role: "owner", created_at: iso(30 * 86_400_000) },
+    { id: 2, home_id: 1, email: "famille@exemple.fr", user_id: null, role: "viewer", created_at: iso(86_400_000) },
+  ];
+
+  async context(): Promise<Context> {
+    return delay({ email: "demo@mobalplus", platform_admin: true, homes: structuredClone(this.homes) });
+  }
+  setHome() { /* une seule maison en démo */ }
+  async createHome(name: string) {
+    const id = Math.max(...this.homes.map((h) => h.id)) + 1;
+    this.homes.push({ id, name, role: "owner" });
+    this.memberList.push({ id: Math.max(...this.memberList.map((m) => m.id)) + 1, home_id: id, email: "demo@mobalplus",
+                           user_id: "demo", role: "owner", created_at: new Date().toISOString() });
+    return id;
+  }
+  async renameHome(id: number, name: string) { this.homes = this.homes.map((h) => (h.id === id ? { ...h, name } : h)); }
+  async members(homeId: number) { return delay(this.memberList.filter((m) => m.home_id === homeId)); }
+  async addMember(homeId: number, email: string, role: HomeRole) {
+    if (this.memberList.some((m) => m.home_id === homeId && m.email === email.toLowerCase())) {
+      throw new Error("Cette adresse est déjà membre de la maison.");
+    }
+    this.memberList.push({ id: Math.max(...this.memberList.map((m) => m.id)) + 1, home_id: homeId,
+                           email: email.toLowerCase(), user_id: null, role, created_at: new Date().toISOString() });
+  }
+  private checkOwner(next: Member[], homeId: number) {
+    if (!next.some((m) => m.home_id === homeId && m.role === "owner")) throw new Error("Une maison doit garder au moins un propriétaire");
+  }
+  async setMemberRole(id: number, role: HomeRole) {
+    const next = this.memberList.map((m) => (m.id === id ? { ...m, role } : m));
+    this.checkOwner(next, this.memberList.find((m) => m.id === id)!.home_id);
+    this.memberList = next;
+  }
+  async removeMember(id: number) {
+    const next = this.memberList.filter((m) => m.id !== id);
+    this.checkOwner(next, this.memberList.find((m) => m.id === id)!.home_id);
+    this.memberList = next;
+  }
 
   async currentValues(): Promise<CurrentValue[]> {
     const out: CurrentValue[] = [];

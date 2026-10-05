@@ -126,6 +126,33 @@ une autre personne, même avant sa première connexion :
 insert into app_user (email, role) values ('adresse@exemple.fr', 'viewer');   -- ou 'admin'
 ```
 
+## 5 bis. Partager une maison (famille, amis)
+
+Les données sont rangées par **maison** (les capteurs existants sont dans « Ma maison », dont tu es
+propriétaire). Chaque compte ne voit que les maisons qui lui sont partagées.
+
+| Droits | Peut… |
+|---|---|
+| **Propriétaire** | tout, y compris inviter, retirer, changer les droits |
+| **Gestion** | gérer capteurs, emplacements, corrections ; lancer une collecte de ses capteurs |
+| **Lecture** | consulter valeurs et courbes |
+
+Dans l'application : **Admin** > **Partage** > saisir l'e-mail de la personne et ses droits >
+**Inviter**. Elle se connecte ensuite avec cette adresse et voit la maison immédiatement.
+
+Pour que la personne puisse se connecter :
+- **avec Google** (le plus simple) : activer le fournisseur Google (voir
+  [deploiement-web.md](deploiement-web.md), section 3) ;
+- **avec e-mail et mot de passe** : elle crée son compte depuis l'écran de connexion
+  (« Pas encore de compte ? »). ⚠️ Le service d'e-mail fourni par défaut par Supabase n'envoie les
+  e-mails de confirmation qu'aux membres de l'équipe du projet : pour la famille, configurer un
+  service d'envoi (🟩 **Authentication** > **Emails** > **SMTP Settings**, par exemple Resend ou
+  Brevo, offres gratuites), ou créer le compte toi-même (**Authentication** > **Users** >
+  **Add user**, en cochant *Auto Confirm User*) et lui transmettre le mot de passe.
+
+Laisser activée l'option **Confirm email** (🟩 **Authentication** > **Sign In / Providers** >
+**Email**) : c'est elle qui garantit qu'une adresse appartient bien à la personne qui se connecte.
+
 ## 6. Mettre l'application en ligne
 
 Voir [deploiement-web.md](deploiement-web.md) (Cloudflare Pages, une dizaine de minutes).

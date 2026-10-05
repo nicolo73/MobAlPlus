@@ -7,6 +7,7 @@ export const routes = {
   "/admin": "Tableau de bord",
   "/admin/capteurs": "Capteurs",
   "/admin/emplacements": "Emplacements",
+  "/admin/partage": "Partage",
   "/admin/maintenance": "Maintenance",
 } as const;
 

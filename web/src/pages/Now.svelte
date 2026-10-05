@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
+  import { canEdit } from "../lib/home.svelte";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import type { CurrentValue } from "../lib/types";
 
@@ -49,8 +50,8 @@
   <p class="muted">Chargement…</p>
 {:else if values.length === 0}
   <div class="card">
-    <p>Aucun capteur n'est encore affecté à un emplacement.</p>
-    <a href="#/admin/capteurs">Configurer les capteurs</a>
+    <p>Aucun capteur n'est encore affecté à un emplacement de cette maison.</p>
+    {#if canEdit()}<a href="#/admin/capteurs">Configurer les capteurs</a>{/if}
   </div>
 {:else}
   <div class="grid">

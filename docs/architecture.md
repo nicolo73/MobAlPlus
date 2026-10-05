@@ -90,8 +90,15 @@ quelle que soit l'échelle, et ce sont toujours des mesures réelles.
 
 ## Sécurité
 
-- Row Level Security sur toutes les tables : lecture pour les utilisateurs déclarés dans
-  `app_user`, écriture pour le rôle `admin`.
-- Le collecteur utilise la clé *service_role* (fournie à l'Edge Function par Supabase) ; il
-  n'accepte que le jeton de pg_cron ou un administrateur connecté.
+- **Maisons** : emplacements et capteurs appartiennent à une maison (`home`). Les membres
+  (`home_member`, désignés par leur e-mail, invitables avant leur première connexion) ont un rôle
+  `owner`, `editor` ou `viewer`. L'administrateur de la plateforme (`app_user.role = 'admin'`) voit
+  toutes les maisons et seul il accède aux statistiques globales et à la maintenance.
+- **Row Level Security** sur toutes les tables : chaque règle compare l'identifiant de la ligne à
+  la liste des maisons / capteurs / séries accessibles, calculée **une fois par requête**
+  (`(SELECT my_channel_ids())::int[]`), jamais par ligne.
+- Cohérence : un capteur ne peut alimenter qu'un emplacement de sa maison ; une maison garde
+  toujours au moins un propriétaire.
+- Le collecteur utilise la clé *service_role* ; il n'accepte que le jeton de pg_cron,
+  l'administrateur, ou un gestionnaire de maison pour ses propres capteurs (`can_collect`).
 - Identifiants Mobile Alerts : secrets de l'Edge Function et fichiers locaux ignorés par Git.

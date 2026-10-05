@@ -27,7 +27,7 @@ def load_config(conn: psycopg.Connection, path: Path) -> dict[str, int]:
         row = conn.execute(
             """INSERT INTO place (code, name, parent_id, kind, exposure, lon, lat)
                VALUES (%(code)s, %(name)s, %(parent)s, %(kind)s, %(exposure)s, %(lon)s, %(lat)s)
-               ON CONFLICT (code) DO UPDATE SET
+               ON CONFLICT (home_id, code) DO UPDATE SET
                  name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, kind = EXCLUDED.kind,
                  exposure = EXCLUDED.exposure, lon = EXCLUDED.lon, lat = EXCLUDED.lat
                RETURNING id""",

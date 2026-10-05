@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api } from "./lib/api";
   import { router, routes, type Route } from "./lib/router.svelte";
-  import type { Role } from "./lib/types";
+  import { canEdit, ctx, isOwner, loadContext, resetContext, selectHome } from "./lib/home.svelte";
   import Login from "./pages/Login.svelte";
   import Now from "./pages/Now.svelte";
   import Charts from "./pages/Charts.svelte";
@@ -10,20 +10,26 @@
   import Places from "./pages/Places.svelte";
   import Maintenance from "./pages/Maintenance.svelte";
   import Place from "./pages/Place.svelte";
+  import Sharing from "./pages/Sharing.svelte";
+  import Welcome from "./pages/Welcome.svelte";
 
   let session = $state<{ email: string } | null | undefined>(undefined);
-  let role = $state<Role | null>(null);
-  let roleError = $state("");
+  let ctxError = $state("");
 
   async function refreshSession() {
-    session = await api.session();
-    roleError = "";
-    try {
-      role = session ? await api.role() : null;
-    } catch (e) {
-      role = null;
-      roleError = e instanceof Error ? e.message : String(e);
+    const next = await api.session();
+    ctxError = "";
+    if (!next) {
+      resetContext();
+      session = null;
+      return;
     }
+    try {
+      await loadContext();
+    } catch (e) {
+      ctxError = e instanceof Error ? e.message : String(e);
+    }
+    session = next;
   }
   refreshSession();
   api.onAuthChange(refreshSession);
@@ -34,7 +40,16 @@
     { href: "/courbes", label: "Courbes", icon: "M3 17l5-6 4 3 5-7 4 4" },
     { href: "/admin", label: "Admin", icon: "M4 6h16M4 12h16M4 18h10" },
   ];
-  const adminTabs: Route[] = ["/admin", "/admin/capteurs", "/admin/emplacements", "/admin/maintenance"];
+  /** Onglets d'administration accessibles au compte, selon ses droits dans la maison courante */
+  const adminTabs = $derived(([
+    ["/admin", ctx.platformAdmin],
+    ["/admin/capteurs", canEdit()],
+    ["/admin/emplacements", canEdit()],
+    ["/admin/partage", isOwner()],
+    ["/admin/maintenance", ctx.platformAdmin],
+  ] as [Route, boolean][]).filter(([, ok]) => ok).map(([r]) => r));
+  // « Admin » ouvre le premier onglet accessible
+  const adminRoute = $derived(adminTabs.includes(router.route) ? router.route : adminTabs[0]);
 </script>
 
 {#if session === undefined}
@@ -49,13 +64,21 @@
         <span>MobAlPlus</span>
       </a>
       {#if api.demo}<span class="badge warn" title="Aucun projet Supabase configuré : données fictives">Démo</span>{/if}
+      {#if ctx.homes.length > 1}
+        <select class="home" aria-label="Maison" value={ctx.homeId}
+                onchange={(e) => selectHome(Number((e.currentTarget as HTMLSelectElement).value))}>
+          {#each ctx.homes as h (h.id)}<option value={h.id}>{h.name}</option>{/each}
+        </select>
+      {:else if ctx.homes.length === 1}
+        <span class="home-name">{ctx.homes[0].name}</span>
+      {/if}
       <span class="spacer"></span>
       <span class="user muted">{session.email}</span>
       <button class="link" onclick={() => api.signOut()}>Déconnexion</button>
     </header>
 
     <nav class="main-nav" aria-label="Navigation principale">
-      {#each main as item (item.href)}
+      {#each main.filter((m) => m.href !== "/admin" || adminTabs.length) as item (item.href)}
         {@const active = item.href === "/admin" ? isAdminRoute
           : item.href === "/" ? router.route === "/" || router.route === "/lieu" : router.route === item.href}
         <a href={"#" + item.href} class:active aria-current={active ? "page" : undefined}>
@@ -66,34 +89,35 @@
     </nav>
 
     <main>
-      {#if roleError}
-        <div class="notice err" style="margin-bottom:1rem">Impossible de lire les droits du compte : {roleError}</div>
-      {:else if role === null}
-        <div class="notice warn" style="margin-bottom:1rem">
-          Le compte <strong>{session.email}</strong> est connecté mais n'est pas encore autorisé :
-          un administrateur doit l'ajouter (table <code>app_user</code>).
-        </div>
-      {/if}
-      {#if isAdminRoute}
-        {#if role !== "admin"}
-          <div class="card notice warn">L'administration est réservée aux comptes administrateurs.</div>
-        {:else}
-          <nav class="tabs" aria-label="Administration">
-            {#each adminTabs as tab (tab)}
-              <a href={"#" + tab} class:active={router.route === tab}>{routes[tab]}</a>
-            {/each}
-          </nav>
-          {#if router.route === "/admin"}<Dashboard />
-          {:else if router.route === "/admin/capteurs"}<Devices />
-          {:else if router.route === "/admin/emplacements"}<Places />
-          {:else}<Maintenance />{/if}
-        {/if}
-      {:else if router.route === "/courbes"}
-        <Charts />
-      {:else if router.route === "/lieu" && router.param}
-        {#key router.param}<Place placeId={Number(router.param)} />{/key}
+      {#if ctxError}
+        <div class="notice err" style="margin-bottom:1rem">Impossible de lire les droits du compte : {ctxError}</div>
+      {:else if !ctx.homes.length}
+        <Welcome />
       {:else}
-        <Now />
+        {#key ctx.homeId}
+          {#if isAdminRoute}
+            {#if !adminRoute}
+              <div class="card notice warn">Vous consultez cette maison en lecture : rien à administrer.</div>
+            {:else}
+              <nav class="tabs" aria-label="Administration">
+                {#each adminTabs as tab (tab)}
+                  <a href={"#" + tab} class:active={adminRoute === tab}>{routes[tab]}</a>
+                {/each}
+              </nav>
+              {#if adminRoute === "/admin"}<Dashboard />
+              {:else if adminRoute === "/admin/capteurs"}<Devices />
+              {:else if adminRoute === "/admin/emplacements"}<Places />
+              {:else if adminRoute === "/admin/partage"}<Sharing />
+              {:else}<Maintenance />{/if}
+            {/if}
+          {:else if router.route === "/courbes"}
+            <Charts />
+          {:else if router.route === "/lieu" && router.param}
+            {#key router.param}<Place placeId={Number(router.param)} />{/key}
+          {:else}
+            <Now />
+          {/if}
+        {/key}
       {/if}
     </main>
   </div>
@@ -116,6 +140,9 @@
     position: sticky; top: 0; z-index: 10;
   }
   .brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--text); text-decoration: none; }
+  .home { min-height: 2rem; padding: 0.2rem 0.5rem; font-size: 0.9rem; max-width: 45vw; min-width: 0; flex: 0 1 auto; }
+  @media (max-width: 600px) { .brand span { display: none; } }
+  .home-name { font-size: 0.9rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .user { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
   @media (max-width: 600px) { .user { display: none; } }
   main { grid-area: main; padding: 1rem; width: 100%; max-width: 72rem; margin: 0 auto; min-width: 0; }

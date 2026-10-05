@@ -7,7 +7,10 @@
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
 
-  const STORE = "mobalplus.charts";
+  import { ctx } from "../lib/home.svelte";
+
+  // Sélection mémorisée par maison
+  const STORE = `mobalplus.charts.${ctx.homeId}`;
 
   let all = $state<SeriesInfo[] | null>(null);
   let error = $state("");
