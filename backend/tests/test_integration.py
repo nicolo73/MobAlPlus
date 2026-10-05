@@ -482,7 +482,8 @@ def test_export_import_round_trip(conn):
     rows = [{"s": sid, "t": l.split(";")[0], "v": float(l.split(";")[3].replace(",", ".")), "q": l.split(";")[5]}
             for l in lines]
     out = conn.execute("SELECT import_values('series', %s)", (Jsonb(rows),)).fetchone()[0]
-    assert out == {"received": 5, "inserted": 5, "skipped": 0, "extended": 0, "rejected": 1}
+    assert out == {"received": 5, "inserted": 5, "identical": 0, "conflicts": 0, "replaced": 0,
+                   "skipped": 0, "extended": 0, "rejected": 1}
     assert conn.execute("SELECT export_csv(%s, %s, %s)", ([sid], t0, t0 + timedelta(hours=1))).fetchone()[0] == csv
     # Réimport : aucun doublon
     again = conn.execute("SELECT import_values('series', %s)", (Jsonb(rows),)).fetchone()[0]
@@ -540,3 +541,43 @@ def test_import_requires_editor(conn):
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
+
+
+def test_import_near_duplicates_and_conflicts(conn):
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sid = series_id(conn, "salon", "temperature")
+    recent = datetime.now(UTC).replace(microsecond=0) - timedelta(days=2)     # détail
+    old = datetime(2026, 5, 1, 12, 0, 13, tzinfo=UTC)                           # historique compacté
+    db.insert_readings(conn, [(ch, recent, 20.0), (ch, recent + timedelta(minutes=7), 21.0),
+                              (ch, old, 15.0), (ch, old + timedelta(minutes=7), 16.0)])
+    conn.commit()
+    db.compact(conn)
+    rows = [
+        {"s": sid, "t": (recent + timedelta(seconds=47)).isoformat(), "v": 20.0},            # identique (arrondi)
+        {"s": sid, "t": (recent + timedelta(minutes=7, seconds=-30)).isoformat(), "v": 22.5},  # conflit
+        {"s": sid, "t": (old - timedelta(seconds=13)).isoformat(), "v": 15.5},                # conflit (compacté)
+        {"s": sid, "t": (recent + timedelta(minutes=3, seconds=30)).isoformat(), "v": 20.5},  # nouvelle (hors marge)
+    ]
+    prev = conn.execute("SELECT import_preview('series', %s, 120)", (Jsonb(rows),)).fetchone()[0]
+    g = prev["groups"][0]
+    assert (g["new"], g["identical"], g["conflict"]) == (1, 1, 2)
+    assert {s["ev"] for s in g["samples"]} == {21.0, 15.0}
+    # L'aperçu n'a rien écrit
+    assert conn.execute("SELECT count(*) FROM reading WHERE channel_id = %s", (ch,)).fetchone()[0] == 2
+
+    keep = conn.execute("SELECT import_values('series', %s, 120, 'keep')", (Jsonb(rows),)).fetchone()[0]
+    assert (keep["inserted"], keep["identical"], keep["conflicts"], keep["replaced"]) == (1, 1, 2, 0)
+    vals = lambda: [v for _, v, _ in observations(conn, "salon", "temperature", "2026-01-01", "2100-01-01")]
+    assert vals() == [15.0, 16.0, 20.0, 20.5, 21.0]
+
+    rep = conn.execute("SELECT import_values('series', %s, 120, 'replace')", (Jsonb(rows),)).fetchone()[0]
+    assert (rep["replaced"], rep["conflicts"]) == (2, 0)
+    assert vals() == [15.5, 16.0, 20.0, 20.5, 22.5]
+    log = conn.execute("SELECT details FROM maintenance_log WHERE task = 'import_replace'").fetchone()[0]
+    assert log["removed"] == 2 and log["conflicts"] == 2
+
+    # Fuseau suspect : le même fichier décalé d'une heure retrouve les mesures existantes
+    shifted = [{"s": sid, "t": (recent + timedelta(hours=1)).isoformat(), "v": 20.0},
+               {"s": sid, "t": (recent + timedelta(hours=1, minutes=3, seconds=30)).isoformat(), "v": 20.5}]
+    prev = conn.execute("SELECT import_preview('series', %s, 120)", (Jsonb(shifted),)).fetchone()[0]
+    assert prev["tz_sampled"] == 2 and prev["tz_shifted"] == 2

@@ -194,6 +194,15 @@ Mobile Alerts, avec choix du fuseau des dates sans fuseau, analyse avant envoi, 
 doublons ignorés, valeurs « rejetées » restaurées, affectations étendues vers le passé quand
 l'historique est plus ancien que l'affectation du capteur.
 
+**Fait (08/10/2026)** : doublons proches et conflits. Marge réglable (± 2 min par défaut, en
+dessous de l'intervalle d'émission d'environ 7 min) ; l'analyse compare le fichier à l'existant
+sans rien écrire et compte, par emplacement et grandeur, les valeurs nouvelles, identiques et en
+conflit, avec des exemples (valeur actuelle / valeur du fichier) ; en cas de conflit, choix
+« conserver » (par défaut) ou « remplacer » avec confirmation (la mesure existante la plus proche
+est supprimée, y compris dans l'historique compacté) ; chaque remplacement est journalisé
+(`maintenance_log`, tâche `import_replace`) ; avertissement si de nombreuses valeurs se retrouvent
+décalées d'exactement 1 h ou 2 h (fuseau probablement erroné).
+
 ---
 
 ## Fait

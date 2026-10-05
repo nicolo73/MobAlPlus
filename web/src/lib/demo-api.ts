@@ -2,7 +2,7 @@
 
 import type {
   Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
-  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportResult,
+  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
 } from "./types";
 
 const PROPS: Property[] = [
@@ -232,8 +232,32 @@ export class DemoApi implements Api {
     return delay(lines.slice(0, opts.limit ?? undefined).map((l) => l[1]).join("\n"));
   }
 
-  async importValues(_kind: "series" | "channel", rows: unknown[]): Promise<ImportResult> {
-    return delay({ received: rows.length, inserted: rows.length, skipped: 0, extended: 0, rejected: 0 });
+  /** Démo : les valeurs déjà présentes dans la série fictive sont « identiques » ou « en conflit » */
+  async importPreview(_kind: "series" | "channel", rows: ImportRows, tolerance: number): Promise<ImportPreview> {
+    const groups = new Map<number, ImportPreview["groups"][number]>();
+    for (const r of rows) {
+      const key = r.s ?? r.c!;
+      if (!groups.has(key)) groups.set(key, { key, new: 0, identical: 0, conflict: 0, unassigned: 0, samples: [] });
+      const g = groups.get(key)!;
+      const t = Date.parse(r.t);
+      const near = Math.round(t / STEP) * STEP;
+      if (Math.abs(near - t) > tolerance * 1000 || near > now || near < now - HISTORY) { g.new++; continue; }
+      const ev = synth(key, near);
+      if (Math.abs(ev - r.v) < 0.0005) g.identical++;
+      else {
+        g.conflict++;
+        if (g.samples.length < 5) g.samples.push({ t: r.t, v: r.v, et: new Date(near).toISOString(), ev });
+      }
+    }
+    return delay({ groups: [...groups.values()], tz_sampled: 0, tz_shifted: 0 });
+  }
+
+  async importValues(kind: "series" | "channel", rows: ImportRows, tolerance: number, mode: ImportMode): Promise<ImportResult> {
+    const p = await this.importPreview(kind, rows, tolerance);
+    const sum = (k: "new" | "identical" | "conflict") => p.groups.reduce((n, g) => n + g[k], 0);
+    return { received: rows.length, inserted: sum("new") + (mode === "replace" ? sum("conflict") : 0),
+             identical: sum("identical"), conflicts: mode === "keep" ? sum("conflict") : 0,
+             replaced: mode === "replace" ? sum("conflict") : 0, skipped: 0, extended: 0, rejected: 0 };
   }
 
   async stats(): Promise<Stats> {

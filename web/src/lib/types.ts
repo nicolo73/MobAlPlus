@@ -157,10 +157,23 @@ export interface PlaceDeployment {
 export interface ImportResult {
   received: number;
   inserted: number;
+  identical: number;   // déjà présentes (dans la marge, même valeur)
+  conflicts: number;   // valeurs existantes différentes, conservées
+  replaced: number;    // valeurs existantes remplacées par celles du fichier
   skipped: number;     // hors de toute affectation
   extended: number;    // affectations étendues vers le passé
   rejected: number;    // corrections recréées
 }
+
+export interface ConflictSample { t: string; v: number; et: string; ev: number }
+
+export interface ImportPreview {
+  groups: { key: number; new: number; identical: number; conflict: number; unassigned: number; samples: ConflictSample[] }[];
+  tz_sampled: number;
+  tz_shifted: number;
+}
+
+export type ImportMode = "keep" | "replace";
 
 export interface ExportOptions {
   tz: "Europe/Paris" | "UTC";
@@ -168,6 +181,8 @@ export interface ExportOptions {
   decimal: "," | ".";
   limit?: number | null;
 }
+
+export type ImportRows = { s?: number; c?: number; t: string; v: number; q?: string }[];
 
 export interface Api {
   readonly demo: boolean;
@@ -201,7 +216,9 @@ export interface Api {
   seriesBounds(ids: number[]): Promise<{ first: number | null; last: number | null }>;
   /** Lignes CSV (format MobAlPlus, sans en-tête) de [from, to[ */
   exportCsv(ids: number[], from: number, to: number, opts: ExportOptions): Promise<string>;
-  importValues(kind: "series" | "channel", rows: { s?: number; c?: number; t: string; v: number; q?: string }[]): Promise<ImportResult>;
+  /** Classe les valeurs (nouvelles, identiques, en conflit) sans rien écrire ; marge en secondes */
+  importPreview(kind: "series" | "channel", rows: ImportRows, tolerance: number): Promise<ImportPreview>;
+  importValues(kind: "series" | "channel", rows: ImportRows, tolerance: number, mode: ImportMode): Promise<ImportResult>;
   stats(): Promise<Stats>;
   devices(): Promise<Device[]>;
   places(): Promise<Place[]>;

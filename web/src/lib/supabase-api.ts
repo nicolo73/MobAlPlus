@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
-  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportResult,
+  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -185,8 +185,14 @@ export class SupabaseApi implements Api {
     })) as string) ?? "";
   }
 
-  async importValues(kind: "series" | "channel", rows: { s?: number; c?: number; t: string; v: number; q?: string }[]) {
-    return check(await this.sb.rpc("import_values", { p_kind: kind, p_rows: rows })) as ImportResult;
+  async importPreview(kind: "series" | "channel", rows: ImportRows, tolerance: number) {
+    return check(await this.sb.rpc("import_preview", { p_kind: kind, p_rows: rows, p_tolerance: tolerance })) as ImportPreview;
+  }
+
+  async importValues(kind: "series" | "channel", rows: ImportRows, tolerance: number, mode: ImportMode) {
+    return check(await this.sb.rpc("import_values", {
+      p_kind: kind, p_rows: rows, p_tolerance: tolerance, p_mode: mode,
+    })) as ImportResult;
   }
 
   async stats() {

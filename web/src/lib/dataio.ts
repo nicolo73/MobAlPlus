@@ -14,6 +14,7 @@ export interface ImportRow { s?: number; c?: number; t: string; v: number; q?: s
 
 export interface ImportGroup {
   label: string;               // « Salon – température » ou « 01-Salon : canaux 1, 2 »
+  keys: number[];              // séries (format MobAlPlus) ou canaux (ancien tableur) concernés
   rows: number;
   first: number | null;
   last: number | null;
@@ -181,7 +182,7 @@ function planStandard(sheets: Sheet[], tz: ImportTz, series: SeriesInfo[]): Impo
   for (const g of groups.values()) {
     const times = resolveTimes(g.whens, tz);
     const [first, last] = bounds(times);
-    out.push({ label: g.label, rows: times.length, first, last, ok: !!g.serie,
+    out.push({ label: g.label, keys: g.serie ? [g.serie.id] : [], rows: times.length, first, last, ok: !!g.serie,
                problem: g.serie ? undefined : "emplacement ou grandeur inconnus dans cette maison" });
     if (!g.serie) { ignored += times.length; continue; }
     times.forEach((t, i) => rows.push({ s: g.serie!.id, t: new Date(t).toISOString(), v: g.values[i],
@@ -223,7 +224,7 @@ function planOld(sheets: Sheet[], tz: ImportTz, devices: Device[]): ImportPlan {
     const problem = !device ? "capteur absent de cette maison (ajoutez-le d'abord dans Admin › Capteurs)"
       : channels.some((c) => !c) ? "canaux pas encore détectés (lancez une collecte de ce capteur)" : undefined;
     const [first, last] = bounds(times);
-    out.push({ label, rows: times.length, first, last, ok: !problem, problem });
+    out.push({ label, keys: problem ? [] : channels.map((c) => c!.id), rows: times.length, first, last, ok: !problem, problem });
     if (problem) { ignored += times.length; continue; }
     times.forEach((t, i) => vals[i].forEach((v, j) => {
       if (v !== null) rows.push({ c: channels[j]!.id, t: new Date(t).toISOString(), v });
