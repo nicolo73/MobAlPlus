@@ -30,6 +30,10 @@ const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
 const places: Place[] = PLACE_DEFS.map(([code, name, exposure], i) => ({
   id: i + 1, code, name, exposure, parent_id: null, kind: exposure === "outdoor" ? "outdoor" : "room",
 }));
+// Emplacements parents, sans capteur propre : Jardin (Extérieur, Jardin Est), Étage (Chambre, Bureau)
+places.push({ id: 10, code: "jardin", name: "Jardin", exposure: "outdoor", parent_id: null, kind: "zone" },
+            { id: 11, code: "etage", name: "Étage", exposure: "indoor", parent_id: null, kind: "zone" });
+for (const [child, parent] of [[2, 10], [8, 10], [3, 11], [4, 11]]) places[child - 1].parent_id = parent;
 
 let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
   const station = code === "salon";

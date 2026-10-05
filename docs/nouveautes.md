@@ -6,6 +6,9 @@
 
 
 ## 3-4-5 octobre 2026
+- Page **Courbes** : les emplacements apparaissent avec leur imbrication (emplacement parent et
+  sous-emplacements). Un emplacement parent propose une courbe **moyenne** de ses
+  sous-emplacements, tracée en tirets ; les emplacements sans aucune mesure sont grisés.
 - Nouveau rendu **Simplifié** : un point au milieu de chaque palier de valeurs identiques, pour
   des courbes vraiment lisses (le capteur arrondit au dixième, ce qui dessinait des marches même
   en « Lissé »). Trois rendus au choix : Escalier, Lissé (par défaut), Simplifié.

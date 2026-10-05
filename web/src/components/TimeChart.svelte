@@ -13,10 +13,12 @@
   import { curveData, type CurveMode } from "../lib/curve";
 
   export interface ChartSeries {
-    id: number;
+    id: number | string;
     name: string;
     color: string;
     points: Point[];
+    /** Courbe calculée (moyenne d'un groupe) : tracé en tirets */
+    dashed?: boolean;
   }
 
   interface Props {
@@ -56,6 +58,7 @@
     const text = cssVar("--text"), muted = cssVar("--muted"), border = cssVar("--border"), surface = cssVar("--surface");
     // Étiquettes en bout de courbe de 2 à 4 séries ; une seule série est nommée par le titre
     const endLabels = series.length >= 2 && series.length <= 4;
+    const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
     return {
       animation: false,
       backgroundColor: "transparent",
@@ -83,7 +86,7 @@
           const rows = params
             .filter((p) => p.value[1] != null)
             .map((p) => `<div style="display:flex;align-items:center;gap:.5rem">
-              <span style="display:inline-block;width:14px;height:2px;background:${p.color}"></span>
+              <span style="display:inline-block;width:14px;border-top:2px ${dashed.has(p.seriesName) ? "dashed" : "solid"} ${p.color}"></span>
               <b style="min-width:4.5rem">${fmt(p.value[1]!)} ${escapeHtml(unit)}</b>
               <span style="color:${muted}">${escapeHtml(p.seriesName)}</span></div>`)
             .join("");
@@ -107,7 +110,7 @@
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
         showSymbol: false, symbolSize: 8, sampling: undefined,
-        lineStyle: { width: 2, color: s.color }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
+        lineStyle: { width: 2, color: s.color, type: s.dashed ? [6, 4] : "solid" }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
         emphasis: { focus: "series", lineStyle: { width: 2 } },
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },

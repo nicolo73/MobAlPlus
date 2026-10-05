@@ -16,7 +16,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | à faire |
 | 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | à faire |
 | 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | à faire |
-| 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P3 | M | idée |
+| 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P2 | M | en partie : moyenne d'un emplacement parent sur les courbes |
 | 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outils prêts (application ou PC), à lancer |
 | 11 | [Module carto / plan intérieur](#11-module-carto--plan-intérieur) | P3 | L | idée |
 | 12 | [Ouverture : SensorThings, openSenseMap, Play Store](#12-ouverture--sensorthings-opensensemap-play-store) | P3 | M | idée |
@@ -53,7 +53,7 @@ rendu fidèle : Mobile Alerts n'enregistre qu'aux changements de valeur).
 communs à la page Courbes et aux pages des emplacements, mémorisés par appareil ; les grandeurs
 masquées ne sont pas chargées.
 
-**Fait (10/10/2026)** : troisième rendu **Simplifié** : le capteur arrondit au dixième, si bien
+**Fait (05/10/2026)** : troisième rendu **Simplifié** : le capteur arrondit au dixième, si bien
 qu'une montée lente forme des paliers (18,2 18,2 18,2 puis 18,3…) et des marches même lissées.
 Chaque palier de valeurs identiques est remplacé par un point au milieu du palier (plus le premier
 et le dernier point), puis lissé ; les pics isolés sont conservés. « Lissé » devient le rendu par
@@ -104,7 +104,7 @@ pour analyser un problème, anticiper la volumétrie ou une montée en charge.
 
 À faire **avant** les alertes et la météo, qui dépendent de la maison (destinataires, localisation).
 
-**Fait (06/10/2026)** : maisons, membres (propriétaire / gestion / lecture), invitation par e-mail
+**Fait (05/10/2026)** : maisons, membres (propriétaire / gestion / lecture), invitation par e-mail
 avant la première connexion, création de compte, écran d'accueil sans maison, sélecteur de maison,
 page Admin > Partage, règles d'accès par maison. **Reste** : identifiants Mobile Alerts propres à
 chaque maison (aujourd'hui un seul compte, celui du collecteur) ; création de maison par un
@@ -162,6 +162,12 @@ pour l'urgent, quotidien pour les avertissements).
 
 ## 9. Statistiques par groupe d'emplacements
 
+**Fait en partie (05/10/2026)** : page Courbes organisée selon l'imbrication des emplacements ;
+courbe **moyenne** d'un emplacement parent (moyenne, à chaque changement, des dernières valeurs
+de ses sous-emplacements mesurés), en tirets, avec sa ligne dans le tableau récapitulatif ;
+emplacements sans mesure grisés. Pistes : bande min – max du groupe autour de la moyenne, page
+d'un emplacement parent (courbes de ses sous-emplacements), statistiques du groupe.
+
 **Besoin** : profiter de la hiérarchie des emplacements (Maison > étage > pièces) pour des moyennes
 et extrêmes par groupe (« moyenne de l'étage », « toute la maison »).
 
@@ -204,7 +210,7 @@ rassurer et sauvegarder.
   produit par lots dans le navigateur, valeurs rejetées signalées dans une colonne « qualité » ;
 - export complet d'une maison (tous ses emplacements) pour sauvegarde.
 
-**Fait (07/10/2026)** : page **Données** (menu principal). Export CSV par emplacements, grandeurs,
+**Fait (05/10/2026)** : page **Données** (menu principal). Export CSV par emplacements, grandeurs,
 période (24 h, 7 j, 30 j, tout l'historique, personnalisée), nombre de lignes maximal, fichier
 exemple de 10 lignes, dates en heure de Paris avec décalage ou en UTC, format Excel français ou
 international. Import (droits « gestion ») du même format en CSV ou Excel, ou de l'ancien tableur
@@ -212,7 +218,7 @@ Mobile Alerts, avec choix du fuseau des dates sans fuseau, analyse avant envoi, 
 doublons ignorés, valeurs « rejetées » restaurées, affectations étendues vers le passé quand
 l'historique est plus ancien que l'affectation du capteur.
 
-**Fait (08/10/2026)** : doublons proches et conflits. Marge réglable (± 2 min par défaut, en
+**Fait (05/10/2026)** : doublons proches et conflits. Marge réglable (± 2 min par défaut, en
 dessous de l'intervalle d'émission d'environ 7 min) ; l'analyse compare le fichier à l'existant
 sans rien écrire et compte, par emplacement et grandeur, les valeurs nouvelles, identiques et en
 conflit, avec des exemples (valeur actuelle / valeur du fichier) ; en cas de conflit, choix
@@ -242,7 +248,7 @@ d'autres capteurs (voir 16). Trouver un nom parlant, sympa, libre, avec son doma
 **Besoin** : prévenir les personnes invitées, envoyer les alertes (voir 7), permettre la création
 de compte par e-mail (confirmation), plus tard recevoir des commandes par e-mail.
 
-**Fait (09/10/2026)** : en attendant, page **Partage** : après une invitation (ou depuis un membre
+**Fait (05/10/2026)** : en attendant, page **Partage** : après une invitation (ou depuis un membre
 « en attente »), message d'invitation modifiable à envoyer par **WhatsApp**, par le partage du
 téléphone (SMS…), par e-mail (messagerie de l'appareil) ou à copier.
 
@@ -301,8 +307,9 @@ frais que l'intérieur.
 | 04/10/2026 | Droits rattachés à l'e-mail, connexion Google en option |
 | 04/10/2026 | Page par emplacement, page Courbes (périodes, glissement, zoom, curseur temporel) |
 | 05/10/2026 | Correctif de performance des règles d'accès (délai dépassé sur les courbes) |
-| 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
-| 07/10/2026 | Import / export CSV et Excel depuis l'application |
-| 09/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
-| 10/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |
-| 09/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |
+| 05/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
+| 05/10/2026 | Import / export CSV et Excel depuis l'application |
+| 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
+| 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 05/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |
+| 05/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |

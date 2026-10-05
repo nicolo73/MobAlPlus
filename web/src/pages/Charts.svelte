@@ -3,7 +3,8 @@
   import { MAX_SERIES, isDark, slotColor } from "../lib/colors";
   import { DAY, loadRange, needsReload, type Window } from "../lib/period";
   import { fmtValue } from "../lib/format";
-  import type { Point, SeriesInfo } from "../lib/types";
+  import type { Place, Point, SeriesInfo } from "../lib/types";
+  import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -15,8 +16,10 @@
   const STORE = `mobalplus.charts.${ctx.homeId}`;
 
   let all = $state<SeriesInfo[] | null>(null);
+  let placeList = $state<Place[]>([]);
   let error = $state("");
-  // Emplacement sélectionné -> numéro de couleur (conservé tant qu'il reste sélectionné)
+  // Courbe sélectionnée -> numéro de couleur (conservé tant qu'elle reste sélectionnée).
+  // Clé : identifiant de l'emplacement (ses mesures), ou son opposé (moyenne de sa branche).
   let slots = $state<Record<number, number>>({});
   const initial = ((): Window => {
     try {
@@ -48,16 +51,27 @@
     return () => m.removeEventListener("change", f);
   });
 
-  /** Emplacements disposant de séries, avec leurs séries par grandeur */
-  const places = $derived.by(() => {
-    const map = new Map<number, { id: number; name: string; series: SeriesInfo[] }>();
-    for (const s of all ?? []) {
-      if (!map.has(s.place_id)) map.set(s.place_id, { id: s.place_id, name: s.place_name, series: [] });
-      map.get(s.place_id)!.series.push(s);
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  /** Arbre des emplacements, et courbes possibles : mesures d'un emplacement, moyenne d'une branche */
+  const tree = $derived(placeTree(placeList, all ?? []));
+  const nodes = $derived(flatten(tree));
+  const byId = $derived(new Map(nodes.map((n) => [n.id, n])));
+  const seriesByPlace = $derived.by(() => {
+    const m = new Map<number, SeriesInfo[]>();
+    for (const s of all ?? []) m.set(s.place_id, [...(m.get(s.place_id) ?? []), s]);
+    return m;
   });
-  const selected = $derived(places.filter((p) => p.id in slots));
+  const hasAvg = (n: PlaceNode) => n.children.length > 0 && n.measured.length >= 2;
+  const validKey = (k: number) => { const n = byId.get(Math.abs(k)); return !!n && (k > 0 ? n.series.length > 0 : hasAvg(n)); };
+  interface Selected { key: number; node: PlaceNode; avg: boolean; name: string; places: number[] }
+  const selected = $derived<Selected[]>(Object.keys(slots).map(Number).filter(validKey).map((key) => {
+    const node = byId.get(Math.abs(key))!;
+    const avg = key < 0;
+    return { key, node, avg, name: avg ? `${node.name} (moyenne de ${node.measured.length})` : node.name,
+             places: avg ? node.measured : [node.id] };
+  }).sort((a, b) => nodes.indexOf(a.node) - nodes.indexOf(b.node) || b.key - a.key));
+  const full = $derived(selected.length >= MAX_SERIES);
+  const leaves = $derived(tree.filter((n) => !n.children.length));
+  const groups = $derived(tree.filter((n) => n.children.length));
   const ORDER = ["temperature", "humidity"];
   const rank = (prop: string) => (ORDER.indexOf(prop) + 9) % 9;
   /** Grandeurs de la maison (température d'abord), et celles qui sont affichées */
@@ -67,15 +81,15 @@
     return [...m].map(([code, name]) => ({ code, name })).sort((a, b) => rank(a.code) - rank(b.code));
   });
   const visible = $derived(visibleProps(properties.map((p) => p.code)));
-  const full = $derived(selected.length >= MAX_SERIES);
 
   async function init() {
     try {
-      all = await api.seriesList();
-      // Première visite : les premiers emplacements (4 au plus, pour garder des courbes lisibles)
-      const known = new Set(places.map((p) => p.id));
-      slots = Object.fromEntries(Object.entries(slots).filter(([id]) => known.has(Number(id))));
-      if (!Object.keys(slots).length) places.slice(0, 4).forEach((p, i) => (slots[p.id] = i));
+      const [series, pl] = await Promise.all([api.seriesList(), api.places()]);
+      placeList = pl;
+      all = series;
+      // Première visite : les premiers emplacements mesurés (4 au plus, pour garder des courbes lisibles)
+      slots = Object.fromEntries(Object.entries(slots).filter(([k]) => validKey(Number(k))));
+      if (!Object.keys(slots).length) nodes.filter((n) => n.series.length).slice(0, 4).forEach((n, i) => (slots[n.id] = i));
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -83,22 +97,23 @@
   }
   init();
 
-  function toggle(placeId: number) {
-    if (placeId in slots) {
-      const { [placeId]: _, ...rest } = slots;
+  function toggle(key: number) {
+    if (key in slots) {
+      const { [key]: _, ...rest } = slots;
       slots = rest;
     } else if (!full) {
       const used = new Set(Object.values(slots));
       let slot = 0;
       while (used.has(slot)) slot++;
-      slots = { ...slots, [placeId]: slot };
+      slots = { ...slots, [key]: slot };
       load();
     }
   }
 
   async function load(range = loadRange(win)) {
     // Les grandeurs masquées ne sont pas chargées
-    const ids = selected.flatMap((p) => p.series.filter((s) => visible.includes(s.property)).map((s) => s.id));
+    const ids = [...new Set(selected.flatMap((c) => c.places.flatMap((id) => seriesByPlace.get(id) ?? []))
+      .filter((s) => visible.includes(s.property)).map((s) => s.id))];
     const id = ++reqId;
     loading = true;
     try {
@@ -127,30 +142,37 @@
     shown = key;
   });
 
+  /** Points d'une courbe pour une grandeur : mesures de l'emplacement, ou moyenne de la branche */
+  function curvePoints(c: Selected, prop: string): Point[] | null {
+    const lists = c.places.flatMap((id) => (seriesByPlace.get(id) ?? []).filter((s) => s.property === prop))
+      .map((s) => data.get(s.id) ?? []);
+    if (!lists.length) return null;
+    return c.avg ? averagePoints(lists) : lists[0];
+  }
+
   /** Une courbe par grandeur affichée (jamais deux unités sur un même axe) */
   const charts = $derived.by(() => {
     const byProp = new Map<string, { title: string; unit: string; series: ChartSeries[] }>();
-    for (const p of selected) {
-      for (const s of p.series) {
-        if (!visible.includes(s.property)) continue;
-        if (!byProp.has(s.property)) byProp.set(s.property, { title: s.property_name, unit: s.unit, series: [] });
-        byProp.get(s.property)!.series.push({
-          id: s.id, name: p.name, color: slotColor(slots[p.id], dark), points: data.get(s.id) ?? [],
-        });
+    for (const s of all ?? []) {
+      if (visible.includes(s.property) && !byProp.has(s.property))
+        byProp.set(s.property, { title: s.property_name, unit: s.unit, series: [] });
+    }
+    for (const c of selected) {
+      for (const [prop, chart] of byProp) {
+        const points = curvePoints(c, prop);
+        if (points) chart.series.push({ id: c.key, name: c.name, color: slotColor(slots[c.key], dark), points, dashed: c.avg });
       }
     }
-    return [...byProp.entries()].sort(([a], [b]) => rank(a) - rank(b));
+    return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
   });
 
   /** Tableau récapitulatif de la fenêtre visible : dernière valeur, minimum, maximum */
   function summary(points: Point[]) {
     const inWin = points.filter((p) => p.quality !== "rejected" && p.ts >= win[0] && p.ts <= win[1]);
     if (!inWin.length) return null;
-    return {
-      last: inWin.at(-1)!.value,
-      min: Math.min(...inWin.map((p) => p.value)),
-      max: Math.max(...inWin.map((p) => p.value)),
-    };
+    let min = Infinity, max = -Infinity;
+    for (const p of inWin) { min = Math.min(min, p.value); max = Math.max(max, p.value); }
+    return { last: inWin.at(-1)!.value, min, max };
   }
 
   // Fenêtre calée sur « maintenant » : suit le temps qui passe (toutes les 5 minutes, page visible)
@@ -172,24 +194,48 @@
 
   {#if all === null}
     <p class="muted">Chargement…</p>
-  {:else if places.length === 0}
+  {:else if !nodes.some((n) => n.series.length)}
     <div class="card">Aucune série : affectez d'abord des capteurs à des emplacements (Admin › Capteurs).</div>
   {:else}
-    <div class="chips" role="group" aria-label="Emplacements affichés">
-      {#each places as p (p.id)}
-        {@const on = p.id in slots}
-        <button class="chip" class:on aria-pressed={on} disabled={!on && full} onclick={() => toggle(p.id)}
-                title={!on && full ? `${MAX_SERIES} emplacements au plus en même temps` : ""}>
-          {#if on}<span class="key" style="background:{slotColor(slots[p.id], dark)}"></span>{/if}
-          {p.name}
-        </button>
+    {#snippet chip(key: number, label: string, help = "")}
+      {@const on = key in slots}
+      <button class="chip" class:on class:avg={key < 0} aria-pressed={on} disabled={!on && full} onclick={() => toggle(key)}
+              title={!on && full ? `${MAX_SERIES} courbes au plus en même temps` : help}>
+        {#if on}<span class="key" class:dashed={key < 0} style="--c:{slotColor(slots[key], dark)}"></span>{/if}
+        {label}
+      </button>
+    {/snippet}
+    {#snippet item(n: PlaceNode, prefix: string)}
+      {#if n.series.length}{@render chip(n.id, prefix + n.name)}
+      {:else if !hasAvg(n)}
+        <span class="chip none" title="Aucune mesure : ni capteur, ni sous-emplacement mesuré">{prefix + n.name}</span>
+      {/if}
+      {#if hasAvg(n)}{@render chip(-n.id, `${prefix + n.name} · moyenne`, `Moyenne de ${n.measured.length} emplacements`)}{/if}
+      {#each n.children as c (c.id)}{@render item(c, `${prefix}${n.name} › `)}{/each}
+    {/snippet}
+
+    <div class="places" role="group" aria-label="Courbes affichées">
+      {#if leaves.length}
+        <div class="chips">{#each leaves as n (n.id)}{@render item(n, "")}{/each}</div>
+      {/if}
+      {#each groups as g (g.id)}
+        <div class="group">
+          <div class="group-head">
+            {#if g.series.length}{@render chip(g.id, g.name, "Capteur placé directement dans cet emplacement")}
+            {:else}<span class="group-name">{g.name}</span>{/if}
+            {#if hasAvg(g)}{@render chip(-g.id, "moyenne", `Moyenne des ${g.measured.length} emplacements mesurés de « ${g.name} »`)}{/if}
+          </div>
+          <div class="chips">
+            {#each g.children as c (c.id)}{@render item(c, "")}{/each}
+          </div>
+        </div>
       {/each}
     </div>
     <DisplayBar {properties} />
-    {#if full}<small class="muted">{MAX_SERIES} emplacements au plus en même temps : retirez-en un pour en ajouter un autre.</small>{/if}
+    {#if full}<small class="muted">{MAX_SERIES} courbes au plus en même temps : retirez-en une pour en ajouter une autre.</small>{/if}
 
     {#if selected.length === 0}
-      <div class="card muted">Choisissez un ou plusieurs emplacements ci-dessus.</div>
+      <div class="card muted">Choisissez un ou plusieurs emplacements ci-dessus (ou la moyenne d'un groupe).</div>
     {:else}
       {#each charts as [prop, c] (prop)}
         <section class="card">
@@ -211,13 +257,13 @@
               </tr>
             </thead>
             <tbody>
-              {#each selected as p (p.id)}
+              {#each selected as p (p.key)}
                 <tr>
-                  <td><span class="key" style="background:{slotColor(slots[p.id], dark)}"></span>
-                    <a href="#/lieu/{p.id}">{p.name}</a></td>
+                  <td><span class="key" class:dashed={p.avg} style="--c:{slotColor(slots[p.key], dark)}"></span>
+                    {#if p.avg}{p.name}{:else}<a href="#/lieu/{p.node.id}">{p.name}</a>{/if}</td>
                   {#each charts as [prop, c] (prop)}
-                    {@const s = p.series.find((x) => x.property === prop)}
-                    {@const sum = s ? summary(data.get(s.id) ?? []) : null}
+                    {@const pts = curvePoints(p, prop)}
+                    {@const sum = pts ? summary(pts) : null}
                     <td class="r num">{sum ? fmtValue(sum.last, c.unit) : "–"}</td>
                     <td class="r num">{sum ? `${fmtValue(sum.min, c.unit)} – ${fmtValue(sum.max, c.unit)}` : "–"}</td>
                   {/each}
@@ -232,9 +278,18 @@
 </div>
 
 <style>
+  td.num { white-space: nowrap; }
+  .places { display: grid; gap: 0.6rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   .chip { border-radius: 999px; min-height: 2.1rem; padding: 0.3rem 0.8rem; font-size: 0.9rem; color: var(--muted); }
   .chip.on { color: var(--text); border-color: var(--text); font-weight: 600; }
-  .key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 0.35rem; }
+  .chip.avg { border-style: dashed; }
+  .chip.none { display: inline-flex; align-items: center; border: 1px dotted var(--border); background: none;
+               color: var(--muted); opacity: 0.7; cursor: default; }
+  .group { display: grid; gap: 0.4rem; padding-left: 0.75rem; border-left: 3px solid var(--border); }
+  .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+  .group-name { font-weight: 600; margin-right: 0.2rem; }
+  .key { display: inline-block; width: 14px; height: 0; border-top: 3px solid var(--c); vertical-align: middle; margin-right: 0.35rem; }
+  .key.dashed { border-top-style: dashed; width: 16px; }
   h2 small { font-weight: 400; }
 </style>
