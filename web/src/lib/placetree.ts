@@ -14,7 +14,23 @@ export interface PlaceNode {
   children: PlaceNode[];
 }
 
-/** Arbre des emplacements, trié par nom à chaque niveau */
+/** Ordre des emplacements de même parent : ordre choisi, puis nom */
+export const placeOrder = (a: Place, b: Place) =>
+  (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, "fr");
+export const sortPlaces = (places: Place[]) => [...places].sort(placeOrder);
+
+/** Vrai si `id` est `ancestor` ou l'un de ses sous-emplacements */
+export function isWithin(places: Place[], id: number | null, ancestor: number): boolean {
+  const parent = new Map(places.map((p) => [p.id, p.parent_id]));
+  const seen = new Set<number>();
+  for (let cur = id; cur !== null && cur !== undefined && !seen.has(cur); cur = parent.get(cur) ?? null) {
+    if (cur === ancestor) return true;
+    seen.add(cur);
+  }
+  return false;
+}
+
+/** Arbre des emplacements, dans l'ordre choisi à chaque niveau */
 export function placeTree(places: Place[], series: SeriesInfo[]): PlaceNode[] {
   const byPlace = new Map<number, SeriesInfo[]>();
   for (const s of series) byPlace.set(s.place_id, [...(byPlace.get(s.place_id) ?? []), s]);
@@ -25,7 +41,7 @@ export function placeTree(places: Place[], series: SeriesInfo[]): PlaceNode[] {
 
   const build = (parent: number | null, depth: number, seen: Set<number>): PlaceNode[] =>
     all.filter((p) => (parent === null ? p.parent_id === null || !ids.has(p.parent_id) : p.parent_id === parent) && !seen.has(p.id))
-      .sort((a, b) => a.name.localeCompare(b.name, "fr"))
+      .sort(placeOrder)
       .map((p) => {
         const children = build(p.id, depth + 1, new Set([...seen, p.id]));
         const own = byPlace.get(p.id) ?? [];

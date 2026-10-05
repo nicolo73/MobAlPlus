@@ -581,3 +581,31 @@ def test_import_near_duplicates_and_conflicts(conn):
                {"s": sid, "t": (recent + timedelta(hours=1, minutes=3, seconds=30)).isoformat(), "v": 20.5}]
     prev = conn.execute("SELECT import_preview('series', %s, 120)", (Jsonb(shifted),)).fetchone()[0]
     assert prev["tz_sampled"] == 2 and prev["tz_shifted"] == 2
+
+
+def test_place_order_and_tree(conn, workbook):
+    conn.execute("INSERT INTO place (code, name) VALUES ('jardin', 'Jardin'), ('est', 'Est'), ('ouest', 'Ouest')")
+    ids = dict(conn.execute("SELECT code, id FROM place WHERE code IN ('jardin', 'est', 'ouest')").fetchall())
+    conn.execute("SELECT reorder_places(%s, %s)", (ids["jardin"], [ids["ouest"], ids["est"]]))
+    rows = conn.execute("SELECT code, parent_id, sort_order FROM place WHERE parent_id = %s ORDER BY sort_order",
+                        (ids["jardin"],)).fetchall()
+    assert rows == [("ouest", ids["jardin"], 1), ("est", ids["jardin"], 2)]
+    conn.commit()
+    # Pas de boucle : le parent ne peut pas entrer dans son propre sous-emplacement
+    with pytest.raises(psycopg.errors.RaiseException):
+        conn.execute("SELECT reorder_places(%s, %s)", (ids["est"], [ids["jardin"]]))
+    conn.rollback()
+    # Un compte en lecture ne peut pas réorganiser
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    viewer = uuid.uuid4()
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'lecteur@ex.fr', %s, 'viewer')",
+                 (home, viewer))
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, viewer, "lecteur@ex.fr")
+        with pytest.raises(psycopg.errors.RaiseException):
+            conn.execute("SELECT reorder_places(NULL, %s)", ([ids["est"]],))
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
@@ -224,8 +225,12 @@ export class SupabaseApi implements Api {
   }
 
   async places() {
-    return check(await this.sb.from("place").select("id, code, name, parent_id, kind, exposure")
-      .eq("home_id", this.homeId ?? -1).order("name")) as Place[];
+    const rows = check(await this.sb.from("place").select("*").eq("home_id", this.homeId ?? -1)) as Place[];
+    return sortPlaces(rows);
+  }
+
+  async reorderPlaces(parentId: number | null, ids: number[]) {
+    check(await this.sb.rpc("reorder_places", { p_parent: parentId, p_ids: ids }));
   }
 
   async properties() {

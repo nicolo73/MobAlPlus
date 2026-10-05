@@ -43,6 +43,8 @@ export interface Place {
   parent_id: number | null;
   kind: string | null;
   exposure: "indoor" | "outdoor" | "appliance" | null;
+  /** Ordre parmi les emplacements de même parent */
+  sort_order?: number;
 }
 
 export interface Channel {
@@ -229,6 +231,8 @@ export interface Api {
   retireDevice(id: number): Promise<void>;
   reactivateDevice(id: number): Promise<void>;
   assignChannel(channelId: number, placeId: number | null, from: Date): Promise<void>;
+  /** Range ces emplacements, dans cet ordre, sous ce parent (null : premier niveau) */
+  reorderPlaces(parentId: number | null, ids: number[]): Promise<void>;
   savePlace(place: Omit<Place, "id"> & { id?: number }): Promise<void>;
   deletePlace(id: number): Promise<void>;
   saveSetting(key: string, value: unknown): Promise<void>;

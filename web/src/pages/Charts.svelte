@@ -60,18 +60,23 @@
     for (const s of all ?? []) m.set(s.place_id, [...(m.get(s.place_id) ?? []), s]);
     return m;
   });
-  const hasAvg = (n: PlaceNode) => n.children.length > 0 && n.measured.length >= 2;
-  const validKey = (k: number) => { const n = byId.get(Math.abs(k)); return !!n && (k > 0 ? n.series.length > 0 : hasAvg(n)); };
+  // Un emplacement parent se sélectionne en entier : moyenne de ses emplacements mesurés (lui compris)
+  const isParent = (n: PlaceNode) => n.children.length > 0;
+  const hasAvg = (n: PlaceNode) => isParent(n) && n.measured.length > 0;
+  const validKey = (k: number) => {
+    const n = byId.get(Math.abs(k));
+    return !!n && (k > 0 ? n.series.length > 0 && !isParent(n) : hasAvg(n));
+  };
   interface Selected { key: number; node: PlaceNode; avg: boolean; name: string; places: number[] }
   const selected = $derived<Selected[]>(Object.keys(slots).map(Number).filter(validKey).map((key) => {
     const node = byId.get(Math.abs(key))!;
     const avg = key < 0;
-    return { key, node, avg, name: avg ? `${node.name} (moyenne de ${node.measured.length})` : node.name,
+    return { key, node, avg, name: avg && node.measured.length > 1 ? `${node.name} (moyenne de ${node.measured.length})` : node.name,
              places: avg ? node.measured : [node.id] };
   }).sort((a, b) => nodes.indexOf(a.node) - nodes.indexOf(b.node) || b.key - a.key));
   const full = $derived(selected.length >= MAX_SERIES);
-  const leaves = $derived(tree.filter((n) => !n.children.length));
-  const groups = $derived(tree.filter((n) => n.children.length));
+  const leaves = $derived(tree.filter((n) => !isParent(n)));
+  const groups = $derived(tree.filter(isParent));
   const ORDER = ["temperature", "humidity"];
   const rank = (prop: string) => (ORDER.indexOf(prop) + 9) % 9;
   /** Grandeurs de la maison (température d'abord), et celles qui sont affichées */
@@ -89,7 +94,8 @@
       all = series;
       // Première visite : les premiers emplacements mesurés (4 au plus, pour garder des courbes lisibles)
       slots = Object.fromEntries(Object.entries(slots).filter(([k]) => validKey(Number(k))));
-      if (!Object.keys(slots).length) nodes.filter((n) => n.series.length).slice(0, 4).forEach((n, i) => (slots[n.id] = i));
+      if (!Object.keys(slots).length)
+        nodes.filter((n) => n.series.length && !isParent(n)).slice(0, 4).forEach((n, i) => (slots[n.id] = i));
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -205,31 +211,32 @@
         {label}
       </button>
     {/snippet}
-    {#snippet item(n: PlaceNode, prefix: string)}
-      {#if n.series.length}{@render chip(n.id, prefix + n.name)}
-      {:else if !hasAvg(n)}
-        <span class="chip none" title="Aucune mesure : ni capteur, ni sous-emplacement mesuré">{prefix + n.name}</span>
+    {#snippet item(n: PlaceNode)}
+      {#if isParent(n)}
+        <!-- Parent, puis ses sous-emplacements à la suite, ou en retrait dessous s'ils ne tiennent pas -->
+        <div class="group">
+          {#if hasAvg(n)}
+            {@render chip(-n.id, n.name, n.measured.length > 1 ? `Moyenne des ${n.measured.length} emplacements mesurés de « ${n.name} »` : `Mesures de « ${n.name} »`)}
+          {:else}
+            <span class="chip avg none" title="Aucune mesure dans cet emplacement ni ses sous-emplacements">{n.name}</span>
+          {/if}
+          <div class="kids">{#each n.children as c (c.id)}{@render item(c)}{/each}</div>
+        </div>
+      {:else if n.series.length}
+        {@render chip(n.id, n.name)}
+      {:else}
+        <span class="chip none" title="Aucune mesure : aucun capteur affecté">{n.name}</span>
       {/if}
-      {#if hasAvg(n)}{@render chip(-n.id, `${prefix + n.name} · moyenne`, `Moyenne de ${n.measured.length} emplacements`)}{/if}
-      {#each n.children as c (c.id)}{@render item(c, `${prefix}${n.name} › `)}{/each}
     {/snippet}
 
     <div class="places" role="group" aria-label="Courbes affichées">
       {#if leaves.length}
-        <div class="chips">{#each leaves as n (n.id)}{@render item(n, "")}{/each}</div>
+        <div class="chips">{#each leaves as n (n.id)}{@render item(n)}{/each}</div>
       {/if}
-      {#each groups as g (g.id)}
-        <div class="group">
-          <div class="group-head">
-            {#if g.series.length}{@render chip(g.id, g.name, "Capteur placé directement dans cet emplacement")}
-            {:else}<span class="group-name">{g.name}</span>{/if}
-            {#if hasAvg(g)}{@render chip(-g.id, "moyenne", `Moyenne des ${g.measured.length} emplacements mesurés de « ${g.name} »`)}{/if}
-          </div>
-          <div class="chips">
-            {#each g.children as c (c.id)}{@render item(c, "")}{/each}
-          </div>
-        </div>
-      {/each}
+      {#each groups as g (g.id)}{@render item(g)}{/each}
+      {#if groups.length}
+        <small class="muted"><span class="legend-avg"></span> emplacement parent : moyenne de ses sous-emplacements</small>
+      {/if}
     </div>
     <DisplayBar {properties} />
     {#if full}<small class="muted">{MAX_SERIES} courbes au plus en même temps : retirez-en une pour en ajouter une autre.</small>{/if}
@@ -279,16 +286,22 @@
 
 <style>
   td.num { white-space: nowrap; }
-  .places { display: grid; gap: 0.6rem; }
+  .places { display: grid; gap: 0.5rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   .chip { border-radius: 999px; min-height: 2.1rem; padding: 0.3rem 0.8rem; font-size: 0.9rem; color: var(--muted); }
   .chip.on { color: var(--text); border-color: var(--text); font-weight: 600; }
-  .chip.avg { border-style: dashed; }
+  .chip.avg { border: 1.5px dashed var(--muted); font-weight: 600; color: var(--text); }
+  .chip.avg.on { border-color: var(--text); }
   .chip.none { display: inline-flex; align-items: center; border: 1px dotted var(--border); background: none;
-               color: var(--muted); opacity: 0.7; cursor: default; }
-  .group { display: grid; gap: 0.4rem; padding-left: 0.75rem; border-left: 3px solid var(--border); }
-  .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
-  .group-name { font-weight: 600; margin-right: 0.2rem; }
+               color: var(--muted); opacity: 0.6; cursor: default; font-weight: 400; }
+  /* Retrait « suspendu » : le parent en tête, les sous-emplacements à la suite ou décalés à la ligne */
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding-left: 1.5rem; }
+  .group > .chip { margin-left: -1.5rem; }
+  .kids { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-width: 0;
+          border-left: 2px solid var(--border); padding-left: 0.5rem; }
+  .kids > .group { padding-left: 1.5rem; margin-right: 0.4rem; }
+  .legend-avg { display: inline-block; width: 1.4rem; height: 0.9rem; border: 1.5px dashed var(--muted); border-radius: 999px;
+                vertical-align: middle; }
   .key { display: inline-block; width: 14px; height: 0; border-top: 3px solid var(--c); vertical-align: middle; margin-right: 0.35rem; }
   .key.dashed { border-top-style: dashed; width: 16px; }
   h2 small { font-weight: 400; }

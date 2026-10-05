@@ -1,5 +1,6 @@
 // Mode démo : données fictives en mémoire, pour essayer l'application sans projet Supabase.
 
+import { isWithin, sortPlaces } from "./placetree";
 import type {
   Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
@@ -30,10 +31,12 @@ const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
 const places: Place[] = PLACE_DEFS.map(([code, name, exposure], i) => ({
   id: i + 1, code, name, exposure, parent_id: null, kind: exposure === "outdoor" ? "outdoor" : "room",
 }));
-// Emplacements parents, sans capteur propre : Jardin (Extérieur, Jardin Est), Étage (Chambre, Bureau)
+// Emplacements parents, sans capteur propre : Jardin (Extérieur, Jardin Est), Maison > Étage, RDC
 places.push({ id: 10, code: "jardin", name: "Jardin", exposure: "outdoor", parent_id: null, kind: "zone" },
-            { id: 11, code: "etage", name: "Étage", exposure: "indoor", parent_id: null, kind: "zone" });
-for (const [child, parent] of [[2, 10], [8, 10], [3, 11], [4, 11]]) places[child - 1].parent_id = parent;
+            { id: 11, code: "etage", name: "Étage", exposure: "indoor", parent_id: 13, kind: "zone" },
+            { id: 12, code: "rdc", name: "RDC", exposure: "indoor", parent_id: 13, kind: "zone" },
+            { id: 13, code: "maison", name: "Maison", exposure: "indoor", parent_id: null, kind: "zone" });
+for (const [child, parent] of [[2, 10], [8, 10], [3, 11], [4, 11], [1, 12], [6, 12], [7, 12]]) places[child - 1].parent_id = parent;
 
 let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
   const station = code === "salon";
@@ -285,7 +288,13 @@ export class DemoApi implements Api {
   }
 
   async devices() { return delay(structuredClone(devices)); }
-  async places() { return delay(structuredClone(places)); }
+  async places() { return delay(sortPlaces(structuredClone(places))); }
+  async reorderPlaces(parentId: number | null, ids: number[]) {
+    if (parentId !== null && ids.some((id) => isWithin(places, parentId, id)))
+      throw new Error("Un emplacement ne peut pas être placé dans l'un de ses sous-emplacements");
+    ids.forEach((id, i) => { const p = places.find((x) => x.id === id)!; p.parent_id = parentId; p.sort_order = i + 1; });
+    await delay(null);
+  }
   async properties() { return delay(structuredClone(PROPS)); }
 
   async addDevice(maId: string, name: string) {

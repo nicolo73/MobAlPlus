@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { averagePoints, flatten, placeTree } from "../src/lib/placetree.ts";
+import { averagePoints, flatten, isWithin, placeTree } from "../src/lib/placetree.ts";
 
 const place = (id: number, name: string, parent_id: number | null = null) =>
   ({ id, code: "", name, parent_id, kind: null, exposure: null });
@@ -29,4 +29,12 @@ test("moyenne : dernières valeurs connues de chaque courbe", () => {
 test("moyenne : une courbe muette trop longtemps est ignorée", () => {
   const avg = averagePoints([pts([0, 10], [100, 10]), pts([0, 20])], 50);
   assert.deepEqual(avg.map((p) => [p.ts, p.value]), [[0, 15], [100, 10]]);
+});
+
+test("ordre choisi puis nom ; détection des sous-emplacements", () => {
+  const ps = [{ ...place(1, "B"), sort_order: 2 }, { ...place(2, "A"), sort_order: 2 }, { ...place(3, "Z", 1), sort_order: 1 }];
+  assert.deepEqual(placeTree(ps, []).map((n) => n.name), ["A", "B"]);
+  assert.equal(isWithin(ps, 3, 1), true);
+  assert.equal(isWithin(ps, 1, 3), false);
+  assert.equal(isWithin(ps, null, 1), false);
 });

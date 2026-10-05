@@ -165,7 +165,10 @@ pour l'urgent, quotidien pour les avertissements).
 **Fait en partie (05/10/2026)** : page Courbes organisée selon l'imbrication des emplacements ;
 courbe **moyenne** d'un emplacement parent (moyenne, à chaque changement, des dernières valeurs
 de ses sous-emplacements mesurés), en tirets, avec sa ligne dans le tableau récapitulatif ;
-emplacements sans mesure grisés. Pistes : bande min – max du groupe autour de la moyenne, page
+emplacements sans mesure grisés. Un emplacement parent se sélectionne en entier (bouton en
+pointillé = moyenne, ses éventuelles mesures propres comprises) ; ordre et arborescence modifiables
+dans Admin › Emplacements (glisser-déposer, flèches ; `place.sort_order`, `reorder_places`,
+boucles interdites). Pistes : bande min – max du groupe autour de la moyenne, page
 d'un emplacement parent (courbes de ses sous-emplacements), statistiques du groupe.
 
 **Besoin** : profiter de la hiérarchie des emplacements (Maison > étage > pièces) pour des moyennes
@@ -311,5 +314,6 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 05/10/2026 | Emplacements : ordre et arborescence réorganisables (glisser-déposer, flèches) |
 | 05/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |
 | 05/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |
