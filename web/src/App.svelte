@@ -12,6 +12,7 @@
   import Place from "./pages/Place.svelte";
   import Sharing from "./pages/Sharing.svelte";
   import Welcome from "./pages/Welcome.svelte";
+  import Data from "./pages/Data.svelte";
 
   let session = $state<{ email: string } | null | undefined>(undefined);
   let ctxError = $state("");
@@ -38,6 +39,7 @@
   const main: { href: Route; label: string; icon: string }[] = [
     { href: "/", label: "Maintenant", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 8v4l3 2" },
     { href: "/courbes", label: "Courbes", icon: "M3 17l5-6 4 3 5-7 4 4" },
+    { href: "/donnees", label: "Données", icon: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" },
     { href: "/admin", label: "Admin", icon: "M4 6h16M4 12h16M4 18h10" },
   ];
   /** Onglets d'administration accessibles au compte, selon ses droits dans la maison courante */
@@ -112,6 +114,8 @@
             {/if}
           {:else if router.route === "/courbes"}
             <Charts />
+          {:else if router.route === "/donnees"}
+            {#key router.query.toString()}<Data />{/key}
           {:else if router.route === "/lieu" && router.param}
             {#key router.param}<Place placeId={Number(router.param)} />{/key}
           {:else}

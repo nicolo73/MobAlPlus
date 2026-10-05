@@ -117,6 +117,8 @@
 <div class="stack">
   <div class="row">
     <a href="#/" class="back">‹ Maintenant</a>
+    <span class="spacer"></span>
+    <a href="#/donnees?lieu={placeId}" class="btn">Exporter les données</a>
   </div>
 
   {#if error}<div class="notice err" role="alert">{error}</div>{/if}

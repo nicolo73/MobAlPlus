@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
-  Property, SeriesInfo, SeriesStats, Stats,
+  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportResult,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -170,6 +170,23 @@ export class SupabaseApi implements Api {
         channel_no: d.device_channel.channel_no, from, to,
       };
     })).sort((a, b) => (b.from ?? "").localeCompare(a.from ?? ""));
+  }
+
+  async seriesBounds(ids: number[]) {
+    const rows = check(await this.sb.rpc("series_bounds", { p_series: ids })) as { first_ts: string | null; last_ts: string | null }[];
+    const r = rows[0];
+    return { first: r?.first_ts ? Date.parse(r.first_ts) : null, last: r?.last_ts ? Date.parse(r.last_ts) : null };
+  }
+
+  async exportCsv(ids: number[], from: number, to: number, opts: ExportOptions) {
+    return (check(await this.sb.rpc("export_csv", {
+      p_series: ids, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
+      p_tz: opts.tz, p_sep: opts.sep, p_decimal: opts.decimal, p_limit: opts.limit ?? null,
+    })) as string) ?? "";
+  }
+
+  async importValues(kind: "series" | "channel", rows: { s?: number; c?: number; t: string; v: number; q?: string }[]) {
+    return check(await this.sb.rpc("import_values", { p_kind: kind, p_rows: rows })) as ImportResult;
   }
 
   async stats() {

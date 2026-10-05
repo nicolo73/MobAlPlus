@@ -2,7 +2,7 @@
 
 import type {
   Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
-  Property, SeriesInfo, SeriesStats, Stats,
+  Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportResult,
 } from "./types";
 
 const PROPS: Property[] = [
@@ -208,6 +208,32 @@ export class DemoApi implements Api {
       series_id: c.id, property: c.property, property_name: c.property_name, ma_id: d.ma_id,
       device_name: d.name, channel_no: c.channel_no, from: c.since, to: null,
     }))));
+  }
+
+  async seriesBounds(ids: number[]) {
+    return delay({ first: ids.length ? now - HISTORY : null, last: ids.length ? now : null });
+  }
+
+  async exportCsv(ids: number[], from: number, to: number, opts: ExportOptions) {
+    const info = series();
+    const fmt = (t: number) => opts.tz === "UTC" ? new Date(t).toISOString().slice(0, 19) + "Z"
+      : new Date(t + 2 * 3600_000).toISOString().slice(0, 19) + "+02:00";   // démo : décalage d'été fixe
+    const lines: [number, string][] = [];
+    for (const id of ids) {
+      const s = info.find((x) => x.id === id);
+      if (!s) continue;
+      const dev = devices.find((d) => d.channels.some((c) => c.id === id))!;
+      for (const p of rawPoints(id, from, to)) {
+        lines.push([p.ts, [fmt(p.ts), s.place_name, s.property, String(p.value).replace(".", opts.decimal), s.unit, p.quality,
+                           dev.ma_id, String(dev.channels.find((c) => c.id === id)!.channel_no)].join(opts.sep)]);
+      }
+    }
+    lines.sort((a, b) => a[0] - b[0]);
+    return delay(lines.slice(0, opts.limit ?? undefined).map((l) => l[1]).join("\n"));
+  }
+
+  async importValues(_kind: "series" | "channel", rows: unknown[]): Promise<ImportResult> {
+    return delay({ received: rows.length, inserted: rows.length, skipped: 0, extended: 0, rejected: 0 });
   }
 
   async stats(): Promise<Stats> {

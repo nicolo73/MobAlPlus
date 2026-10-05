@@ -25,7 +25,7 @@ visible dans l'adresse du tableau de bord : `supabase.com/dashboard/project/<ref
 | 5 | Créer ton compte administrateur | 🟩 Supabase |
 | 6 | Mettre l'application en ligne ([deploiement-web.md](deploiement-web.md)) | Cloudflare |
 | 7 | Déclarer les capteurs (dans l'application, onglet Admin) | 📱 application |
-| 8 | Reprendre l'historique des Google Sheets | 💻 PC |
+| 8 | Reprendre l'historique des Google Sheets | 📱 application (ou 💻 PC) |
 
 ---
 
@@ -175,7 +175,16 @@ toutes les 10 minutes. **Admin** > **Tableau de bord** montre l'état de chaque 
 > `config/devices.yaml` (`python -m mobalplus load-config config/devices.yaml`, voir étape 8 pour
 > la préparation du PC).
 
-## 8. 💻 Reprendre l'historique des Google Sheets
+## 8. Reprendre l'historique des Google Sheets
+
+**Depuis l'application (le plus simple)** : exporter chaque Google Sheet en `.xlsx`
+(*Fichier* > *Télécharger* > *Microsoft Excel*), puis 📱 **Données** > **Importer** > choisir le
+fichier > dates « en heure de Paris » > **Analyser le fichier** > **Importer**. Les capteurs doivent
+déjà être déclarés dans la maison et avoir été collectés une fois (canaux détectés). Pour les très
+gros classeurs (plusieurs centaines de milliers de lignes), préférer un ordinateur, ou la variante
+en ligne de commande ci-dessous.
+
+**Variante 💻 en ligne de commande :**
 
 1. Récupérer la **chaîne de connexion** 🟩 : bouton **Connect** (en haut du tableau de bord) >
    onglet *Connection string* > méthode **Session pooler** > copier l'URI

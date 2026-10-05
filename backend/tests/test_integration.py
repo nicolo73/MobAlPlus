@@ -11,6 +11,8 @@ import openpyxl
 import psycopg
 import pytest
 
+from psycopg.types.json import Jsonb
+
 from mobalplus import db
 from mobalplus.collector import collect
 from mobalplus.config_loader import load_config
@@ -455,3 +457,86 @@ def test_home_keeps_an_owner(conn):
     # Supprimer la maison entière reste possible
     conn.execute("DELETE FROM home WHERE id = %s", (home,))
     conn.rollback()
+
+
+def test_export_import_round_trip(conn):
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sid = series_id(conn, "salon", "temperature")
+    t0 = datetime(2026, 7, 1, 10, 0, tzinfo=UTC)
+    db.insert_readings(conn, [(ch, t0 + timedelta(minutes=7 * i), 20.0 + i / 10) for i in range(5)])
+    conn.execute("INSERT INTO correction (channel_id, ts_range, action) VALUES (%s, tstzrange(%s, %s, '[]'), 'reject')",
+                 (ch, t0 + timedelta(minutes=7), t0 + timedelta(minutes=7)))
+    conn.commit()
+    csv = conn.execute("SELECT export_csv(%s, %s, %s)", ([sid], t0, t0 + timedelta(hours=1))).fetchone()[0]
+    lines = csv.split("\n")
+    assert lines[0] == "2026-07-01T12:00:00+02:00;Salon;temperature;20;°C;ok;07AAAAAAAAAA;1"
+    assert lines[1].split(";")[5] == "rejected" and len(lines) == 5
+    utc = conn.execute("SELECT export_csv(%s, %s, %s, 'UTC', ',', '.', 2)", ([sid], t0, t0 + timedelta(hours=1))).fetchone()[0]
+    assert utc.split("\n") == ["2026-07-01T10:00:00Z,Salon,temperature,20,°C,ok,07AAAAAAAAAA,1",
+                               "2026-07-01T10:07:00Z,Salon,temperature,20.1,°C,rejected,07AAAAAAAAAA,1"]
+
+    # On efface puis on réimporte le fichier : mêmes valeurs, correction recréée
+    conn.execute("DELETE FROM reading WHERE channel_id = %s", (ch,))
+    conn.execute("DELETE FROM reading_day WHERE channel_id = %s", (ch,))
+    conn.execute("DELETE FROM correction WHERE channel_id = %s", (ch,))
+    rows = [{"s": sid, "t": l.split(";")[0], "v": float(l.split(";")[3].replace(",", ".")), "q": l.split(";")[5]}
+            for l in lines]
+    out = conn.execute("SELECT import_values('series', %s)", (Jsonb(rows),)).fetchone()[0]
+    assert out == {"received": 5, "inserted": 5, "skipped": 0, "extended": 0, "rejected": 1}
+    assert conn.execute("SELECT export_csv(%s, %s, %s)", ([sid], t0, t0 + timedelta(hours=1))).fetchone()[0] == csv
+    # Réimport : aucun doublon
+    again = conn.execute("SELECT import_values('series', %s)", (Jsonb(rows),)).fetchone()[0]
+    assert again["inserted"] == 0 and again["rejected"] == 0
+
+
+def test_import_extends_first_deployment(conn):
+    # Capteur affecté au garage depuis le 02/01/2025 : un historique de 2024 doit y être rattaché
+    ch = channel_id(conn, "03BBBBBBBBBB", 1)
+    garage = series_id(conn, "garage", "temperature")
+    old = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
+    out = conn.execute("SELECT import_values('series', %s)",
+                       (Jsonb([{"s": garage, "t": old.isoformat(), "v": 18.5}]),)).fetchone()[0]
+    # Avant la première affectation de la série « garage » : celle-ci n'est pas étendue au-delà de
+    # l'affectation précédente du même capteur (cave)... ici la série garage n'a qu'une affectation,
+    # mais son canal en avait une plus ancienne (cave) : le canal de la première affectation du garage
+    # est celui du capteur 03, dont la première affectation (cave) commence à l'origine -> pas d'extension
+    assert out["inserted"] == 1 and out["skipped"] == 0
+    # Via l'ancien format (canal) : la mesure de 2024 tombe dans l'affectation « cave » (depuis l'origine)
+    out = conn.execute("SELECT import_values('channel', %s)",
+                       (Jsonb([{"c": ch, "t": "2024-06-02T12:00:00Z", "v": 17.0}]),)).fetchone()[0]
+    assert out["inserted"] == 1
+    assert [v for _, v, _ in observations(conn, "cave", "temperature", "2024-01-01", "2024-12-31")] == [18.5, 17.0]
+
+    # Nouvelle station affectée aujourd'hui seulement : l'import de 2023 étend l'affectation vers le passé
+    dev = conn.execute("INSERT INTO device (ma_id) VALUES ('03CCCCCCCCCC') RETURNING id").fetchone()[0]
+    new_ch = conn.execute("INSERT INTO device_channel (device_id, channel_no, property_id) VALUES (%s, 1, 1) RETURNING id",
+                          (dev,)).fetchone()[0]
+    bureau = conn.execute("INSERT INTO place (code, name) VALUES ('bureau', 'Bureau') RETURNING id").fetchone()[0]
+    conn.execute("SELECT assign_channel(%s, %s, now())", (new_ch, bureau))
+    sb = series_id(conn, "bureau", "temperature")
+    out = conn.execute("SELECT import_values('series', %s)",
+                       (Jsonb([{"s": sb, "t": "2023-03-01T08:00:00+01:00", "v": 19.0}]),)).fetchone()[0]
+    assert out["extended"] == 1 and out["inserted"] == 1
+    assert [v for _, v, _ in observations(conn, "bureau", "temperature", "2023-01-01", "2024-01-01")] == [19.0]
+
+
+def test_import_requires_editor(conn):
+    sid = series_id(conn, "salon", "temperature")
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    viewer = uuid.uuid4()
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'lecteur@ex.fr', %s, 'viewer')",
+                 (home, viewer))
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, viewer, "lecteur@ex.fr")
+        assert conn.execute("SELECT export_csv(%s, '2000-01-01', '2100-01-01', 'UTC', ';', ',', 1)", ([sid],)).fetchone()[0] == ""
+        with pytest.raises(psycopg.errors.RaiseException):
+            conn.execute("SELECT import_values('series', %s)", (Jsonb([{"s": sid, "t": "2026-01-01T00:00:00Z", "v": 1}]),))
+        conn.rollback()
+        # Un inconnu n'exporte rien
+        as_user(conn, uuid.uuid4(), "x@ex.fr")
+        assert conn.execute("SELECT export_csv(%s, '2000-01-01', '2100-01-01')", ([sid],)).fetchone()[0] == ""
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")

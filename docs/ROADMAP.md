@@ -12,12 +12,12 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 3 | [Rapport de diagnostic « pour Claude »](#3-rapport-de-diagnostic-pour-claude) | P1 | S | à faire |
 | 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | ✅ fait (reste : identifiants Mobile Alerts par maison) |
 | 5 | [Corrections et annotations](#5-corrections-et-annotations) | P2 | M | à faire |
-| 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | à faire |
+| 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | ✅ fait |
 | 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | à faire |
 | 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | à faire |
 | 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | à faire |
 | 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P3 | M | idée |
-| 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outil prêt, à lancer |
+| 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outils prêts (application ou PC), à lancer |
 | 11 | [Module carto / plan intérieur](#11-module-carto--plan-intérieur) | P3 | L | idée |
 | 12 | [Ouverture : SensorThings, openSenseMap, Play Store](#12-ouverture--sensorthings-opensensemap-play-store) | P3 | M | idée |
 
@@ -186,6 +186,14 @@ rassurer et sauvegarder.
   produit par lots dans le navigateur, valeurs rejetées signalées dans une colonne « qualité » ;
 - export complet d'une maison (tous ses emplacements) pour sauvegarde.
 
+**Fait (07/10/2026)** : page **Données** (menu principal). Export CSV par emplacements, grandeurs,
+période (24 h, 7 j, 30 j, tout l'historique, personnalisée), nombre de lignes maximal, fichier
+exemple de 10 lignes, dates en heure de Paris avec décalage ou en UTC, format Excel français ou
+international. Import (droits « gestion ») du même format en CSV ou Excel, ou de l'ancien tableur
+Mobile Alerts, avec choix du fuseau des dates sans fuseau, analyse avant envoi, envoi par lots,
+doublons ignorés, valeurs « rejetées » restaurées, affectations étendues vers le passé quand
+l'historique est plus ancien que l'affectation du capteur.
+
 ---
 
 ## Fait
@@ -198,3 +206,4 @@ rassurer et sauvegarder.
 | 04/10/2026 | Page par emplacement, page Courbes (périodes, glissement, zoom, curseur temporel) |
 | 05/10/2026 | Correctif de performance des règles d'accès (délai dépassé sur les courbes) |
 | 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
+| 07/10/2026 | Import / export CSV et Excel depuis l'application |

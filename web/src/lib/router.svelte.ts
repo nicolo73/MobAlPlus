@@ -1,8 +1,9 @@
-// Routage par fragment d'URL (#/admin..., #/lieu/12) : aucune configuration côté hébergeur.
+// Routage par fragment d'URL (#/admin..., #/lieu/12, #/donnees?lieu=3) : aucune configuration côté hébergeur.
 
 export const routes = {
   "/": "Maintenant",
   "/courbes": "Courbes",
+  "/donnees": "Données",
   "/lieu": "Emplacement",
   "/admin": "Tableau de bord",
   "/admin/capteurs": "Capteurs",
@@ -13,11 +14,12 @@ export const routes = {
 
 export type Route = keyof typeof routes;
 
-const read = (): { route: Route; param: string | null } => {
-  const path = location.hash.replace(/^#/, "").split("?")[0] || "/";
+const read = (): { route: Route; param: string | null; query: URLSearchParams } => {
+  const [path, qs] = (location.hash.replace(/^#/, "") || "/").split("?");
+  const query = new URLSearchParams(qs ?? "");
   const m = path.match(/^\/lieu\/([^/]+)$/);
-  if (m) return { route: "/lieu", param: decodeURIComponent(m[1]) };
-  return { route: (path in routes ? path : "/") as Route, param: null };
+  if (m) return { route: "/lieu", param: decodeURIComponent(m[1]), query };
+  return { route: (path in routes ? path : "/") as Route, param: null, query };
 };
 
 export const router = $state(read());
@@ -26,5 +28,6 @@ addEventListener("hashchange", () => {
   const next = read();
   router.route = next.route;
   router.param = next.param;
+  router.query = next.query;
   scrollTo(0, 0);
 });

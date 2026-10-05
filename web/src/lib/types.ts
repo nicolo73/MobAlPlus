@@ -154,6 +154,21 @@ export interface PlaceDeployment {
   to: string | null;
 }
 
+export interface ImportResult {
+  received: number;
+  inserted: number;
+  skipped: number;     // hors de toute affectation
+  extended: number;    // affectations étendues vers le passé
+  rejected: number;    // corrections recréées
+}
+
+export interface ExportOptions {
+  tz: "Europe/Paris" | "UTC";
+  sep: ";" | ",";
+  decimal: "," | ".";
+  limit?: number | null;
+}
+
 export interface Api {
   readonly demo: boolean;
   session(): Promise<{ email: string } | null>;
@@ -182,6 +197,11 @@ export interface Api {
   /** Mesures détaillées antérieures à « before », les plus récentes d'abord */
   observations(ids: number[], from: number, before: number, limit: number): Promise<Observation[]>;
   placeDeployments(placeId: number): Promise<PlaceDeployment[]>;
+  /** Première et dernière mesure de séries */
+  seriesBounds(ids: number[]): Promise<{ first: number | null; last: number | null }>;
+  /** Lignes CSV (format MobAlPlus, sans en-tête) de [from, to[ */
+  exportCsv(ids: number[], from: number, to: number, opts: ExportOptions): Promise<string>;
+  importValues(kind: "series" | "channel", rows: { s?: number; c?: number; t: string; v: number; q?: string }[]): Promise<ImportResult>;
   stats(): Promise<Stats>;
   devices(): Promise<Device[]>;
   places(): Promise<Place[]>;

@@ -168,13 +168,20 @@ def import_sheet(conn: psycopg.Connection, sheet: SheetData, batch: int = 20000)
 
     total = 0
     buf = []
+    first: dict[int, datetime] = {}
     for r in readings():
+        if r[0] not in first or r[1] < first[r[0]]:
+            first[r[0]] = r[1]
         buf.append(r)
         if len(buf) >= batch:
             total += insert_readings(conn, buf)
             buf.clear()
     if buf:
         total += insert_readings(conn, buf)
+    # Mesures plus anciennes que l'affectation du canal : on étend celle-ci vers le passé pour qu'elles
+    # soient rattachées à l'emplacement (même règle que l'import depuis l'application)
+    for ch, ts in first.items():
+        conn.execute("SELECT extend_first_deployment(%s, %s)", (ch, ts))
     conn.commit()
     # Compactage immédiat des mesures anciennes : l'historique ne transite pas en entier par la table
     # détaillée, ce qui garde la base sous le quota pendant l'import
