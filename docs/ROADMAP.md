@@ -20,6 +20,10 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outils prêts (application ou PC), à lancer |
 | 11 | [Module carto / plan intérieur](#11-module-carto--plan-intérieur) | P3 | L | idée |
 | 12 | [Ouverture : SensorThings, openSenseMap, Play Store](#12-ouverture--sensorthings-opensensemap-play-store) | P3 | M | idée |
+| 14 | [Nom de l'application et nom de domaine](#14-nom-de-lapplication-et-nom-de-domaine) | P2 | S | à décider |
+| 15 | [Envoi et réception d'e-mails](#15-envoi-et-réception-de-mails) | P2 | M | invitation à transmettre soi-même : ✅ ; e-mails : après le domaine |
+| 16 | [Autres marques de capteurs](#16-autres-marques-de-capteurs) | P3 | M | idée (à garder en tête) |
+| 17 | [Actions : volets Somfy TaHoma, Google Home…](#17-actions--volets-somfy-tahoma-google-home) | P3 | L | idée (à garder en tête) |
 
 Taille : **S** quelques heures · **M** une journée · **L** plusieurs jours.
 
@@ -207,6 +211,75 @@ est supprimée, y compris dans l'historique compacté) ; chaque remplacement est
 (`maintenance_log`, tâche `import_replace`) ; avertissement si de nombreuses valeurs se retrouvent
 décalées d'exactement 1 h ou 2 h (fuseau probablement erroné).
 
+## 14. Nom de l'application et nom de domaine
+
+**Besoin** : « MobAlPlus » vient de « Mobile Alerts Plus ». Mobile Alerts est une marque : un nom
+qui la reprend (ou s'en approche) peut poser problème, et l'application doit pouvoir accueillir
+d'autres capteurs (voir 16). Trouver un nom parlant, sympa, libre, avec son domaine (~10 €/an).
+
+**Pistes** :
+- vérifier la disponibilité : marques (base INPI, TMview de l'EUIPO pour l'Europe), domaine
+  (`.fr`, `.app`, `.eu`), stores ;
+- mentionner les marques seulement pour décrire la compatibilité (« compatible avec les capteurs
+  Mobile Alerts »), pas dans le nom ni le logo ;
+- le changement de nom touche peu de choses : titre, manifeste PWA, icône, textes ; le dépôt et le
+  projet Supabase peuvent garder leur nom technique ;
+- domaine acheté chez Cloudflare (prix coûtant) : adresse de l'application
+  (`app.<domaine>`) et e-mails (voir 15).
+
+## 15. Envoi et réception d'e-mails
+
+**Besoin** : prévenir les personnes invitées, envoyer les alertes (voir 7), permettre la création
+de compte par e-mail (confirmation), plus tard recevoir des commandes par e-mail.
+
+**Fait (09/10/2026)** : en attendant, page **Partage** : après une invitation (ou depuis un membre
+« en attente »), message d'invitation modifiable à envoyer par **WhatsApp**, par le partage du
+téléphone (SMS…), par e-mail (messagerie de l'appareil) ou à copier.
+
+**Pistes** (après l'achat du domaine) :
+- **envoi** : Resend (gratuit jusqu'à ~3 000 e-mails/mois) avec le domaine vérifié (SPF, DKIM) :
+  SMTP de Supabase Auth (confirmations, mot de passe oublié) et Edge Function `notify` pour les
+  invitations et les alertes ;
+- **réception** : Cloudflare Email Routing (gratuit) vers un Email Worker qui transmet le message
+  à une Edge Function ; commandes acceptées seulement depuis l'adresse d'un membre, avec un
+  vocabulaire simple (« état congélateur », « pause alertes 2 h ») et réponse par e-mail ;
+- sans domaine, dépannage possible avec Brevo et une adresse Gmail vérifiée (risque de spam).
+
+## 16. Autres marques de capteurs
+
+**Besoin** : ne pas rester lié à Mobile Alerts : d'autres capteurs bon marché pourraient
+alimenter les mêmes emplacements, courbes et alertes.
+
+**Pistes** :
+- le modèle de données le permet déjà : capteur → canaux → affectations datées → séries ; ajouter
+  un champ `device.vendor` (« mobile_alerts » par défaut) et des identifiants de compte par maison
+  et par fournisseur ;
+- un **adaptateur** par fournisseur dans le collecteur (`collect` choisit l'adaptateur selon
+  `vendor`), sur le modèle de `ma_client` / `ma_parser` : liste des mesures d'une période, ou
+  dernière valeur seulement ;
+- candidats : stations Netatmo (API officielle), capteurs Zigbee / Xiaomi / SwitchBot via leurs
+  API cloud, Home Assistant (API REST), capteurs à pousser soi-même (ESP32, LoRaWAN / The Things
+  Network) via une Edge Function de **réception** (jeton par capteur).
+
+## 17. Actions : volets Somfy TaHoma, Google Home…
+
+**Besoin** : déclencher des actions selon les valeurs des capteurs, par exemple fermer les volets
+Somfy (box TaHoma) quand le salon dépasse 26 °C l'été, ou les rouvrir quand l'extérieur est plus
+frais que l'intérieur.
+
+**Pistes** :
+- même moteur que les alertes (voir 7) : **règle** (condition sur une ou plusieurs séries,
+  durée, plage horaire, saison) → **actions** (e-mail, notification, commande d'un appareil),
+  avec journal, anti-rebond (pas plus d'une action par heure…) et mode « simulation » pour tester ;
+- connecteurs d'actions dans une Edge Function, identifiants chiffrés (Vault) par maison ;
+- **Somfy TaHoma** : API locale officielle (« mode développeur » de la box, jeton) joignable
+  seulement depuis le réseau de la maison ; depuis le cloud, l'API cloud Overkiz (utilisée par
+  Home Assistant), non officielle pour ce type d'usage : à vérifier au moment de la réalisation ;
+- **Google Home** : pas d'API simple pour piloter des appareils depuis un service tiers ; plutôt
+  exposer nos capteurs à Google Home, ou passer par une passerelle ;
+- passerelle universelle possible : **Home Assistant** (s'il y en a un à la maison) ou IFTTT /
+  webhooks, l'application n'envoyant qu'un appel HTTP.
+
 ---
 
 ## Fait
@@ -221,3 +294,4 @@ décalées d'exactement 1 h ou 2 h (fuseau probablement erroné).
 | 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
 | 07/10/2026 | Import / export CSV et Excel depuis l'application |
 | 09/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
+| 09/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |

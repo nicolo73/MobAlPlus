@@ -10,6 +10,8 @@
   sans créer de faux pics ; les marches restent le rendu par défaut, fidèle aux mesures.
 - **Masquer une grandeur** (par exemple l'humidité) : le choix vaut pour la page Courbes et pour
   les pages des emplacements, et il est mémorisé sur l'appareil.
+- **Partage** : après une invitation, un message tout prêt à envoyer par WhatsApp, SMS ou e-mail,
+  ou à copier (l'application n'envoie pas encore d'e-mails elle-même).
 
 ## 8 octobre 2026
 

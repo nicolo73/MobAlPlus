@@ -102,3 +102,18 @@ quelle que soit l'échelle, et ce sont toujours des mesures réelles.
 - Le collecteur utilise la clé *service_role* ; il n'accepte que le jeton de pg_cron,
   l'administrateur, ou un gestionnaire de maison pour ses propres capteurs (`can_collect`).
 - Identifiants Mobile Alerts : secrets de l'Edge Function et fichiers locaux ignorés par Git.
+
+## Évolutions d'architecture prévues
+
+À garder en tête dans les choix techniques (détails dans la [feuille de route](ROADMAP.md)) :
+
+- **Plusieurs marques de capteurs** (ROADMAP 16) : Mobile Alerts n'est qu'une source ; le
+  collecteur doit pouvoir choisir un adaptateur par fournisseur (`device.vendor`), et une source
+  pourra aussi *pousser* ses mesures. Le nom de l'application ne doit pas reprendre une marque
+  (ROADMAP 14).
+- **Règles et actions** (ROADMAP 7 et 17) : un moteur commun évalue des conditions sur les séries
+  après chaque collecte et déclenche des actions : e-mail, notification, commande d'appareils
+  (volets Somfy TaHoma, Google Home, Home Assistant, webhooks). Identifiants des services tiers
+  par maison, chiffrés.
+- **E-mails** (ROADMAP 15) : envoi par un service SMTP / API sur le domaine de l'application,
+  réception par Cloudflare Email Routing vers une Edge Function.

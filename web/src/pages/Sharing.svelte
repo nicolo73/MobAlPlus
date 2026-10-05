@@ -3,11 +3,12 @@
   import { fmtDate } from "../lib/format";
   import { ctx, currentHome, loadContext, selectHome } from "../lib/home.svelte";
   import type { HomeRole, Member } from "../lib/types";
+  import InviteSend from "../components/InviteSend.svelte";
 
-  const ROLES: Record<HomeRole, { label: string; help: string }> = {
-    owner: { label: "Propriétaire", help: "tout, y compris le partage" },
-    editor: { label: "Gestion", help: "capteurs, emplacements, corrections" },
-    viewer: { label: "Lecture", help: "consulte les valeurs et les courbes" },
+  const ROLES: Record<HomeRole, { label: string; help: string; rights: string }> = {
+    owner: { label: "Propriétaire", help: "tout, y compris le partage", rights: "comme propriétaire" },
+    editor: { label: "Gestion", help: "capteurs, emplacements, corrections", rights: "en gestion" },
+    viewer: { label: "Lecture", help: "consulte les valeurs et les courbes", rights: "en lecture" },
   };
 
   let members = $state<Member[] | null>(null);
@@ -17,6 +18,8 @@
   let newHome = $state("");
   let error = $state("");
   let info = $state("");
+  /** Invitation à transmettre (après un ajout, ou depuis la liste des membres) */
+  let sendTo = $state<{ email: string; role: HomeRole } | null>(null);
 
   const homeId = ctx.homeId!;
   const emailValid = $derived(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()));
@@ -38,18 +41,21 @@
       await action();
       info = success;
       await load();
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       error = /duplicate key|23505/.test(msg) ? "Cette adresse est déjà membre de la maison." : msg;
+      return false;
     }
   }
 
   async function invite(e: SubmitEvent) {
     e.preventDefault();
     const address = email.trim().toLowerCase();
-    await run(() => api.addMember(homeId, address, role),
+    const ok = await run(() => api.addMember(homeId, address, role),
       `${address} a accès à « ${currentHome()?.name} » (${ROLES[role].label.toLowerCase()}). ` +
-      "Il suffit qu'il se connecte à l'application avec cette adresse (Google ou e-mail).");
+      "Prévenez cette personne avec le message ci-dessous.");
+    if (ok) sendTo = { email: address, role };
     email = "";
   }
 
@@ -104,6 +110,13 @@
     </div>
   </form>
 
+  {#if sendTo}
+    {#key sendTo}
+      <InviteSend email={sendTo.email} home={currentHome()?.name ?? ""} rights={ROLES[sendTo.role].rights}
+                  link={shareLink} onclose={() => (sendTo = null)} />
+    {/key}
+  {/if}
+
   <section class="card">
     <h2>Membres</h2>
     {#if members === null}
@@ -120,6 +133,10 @@
                   {m.email}
                   {#if m.email === ctx.email}<span class="badge">vous</span>{/if}
                   <br /><small class="muted">{m.user_id ? "compte actif" : "invitation en attente de première connexion"}</small>
+                  {#if !m.user_id}
+                    <button class="link" onclick={() => { sendTo = { email: m.email, role: m.role }; scrollTo({ top: 0, behavior: "smooth" }); }}>
+                      envoyer l'invitation</button>
+                  {/if}
                 </td>
                 <td>
                   <select value={m.role} disabled={lastOwner} aria-label="Droits de {m.email}"
