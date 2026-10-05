@@ -4,6 +4,12 @@
   apparaît dès que ce fichier change.
 -->
 
+## 10 octobre 2026
+
+- Nouveau rendu **Simplifié** : un point au milieu de chaque palier de valeurs identiques, pour
+  des courbes vraiment lisses (le capteur arrondit au dixième, ce qui dessinait des marches même
+  en « Lissé »). Trois rendus au choix : Escalier, Lissé (par défaut), Simplifié.
+
 ## 9 octobre 2026
 
 - **Courbes lissées** en option (bouton « Escalier / Lissé ») : rendu adouci entre les mesures,

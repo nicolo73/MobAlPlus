@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { display, setSmooth, toggleProp, visibleProps } from "../lib/display.svelte";
+  import { display, setCurve, toggleProp, visibleProps } from "../lib/display.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
   let { properties }: { properties: { code: string; name: string }[] } = $props();
 
   const codes = $derived(properties.map((p) => p.code));
   const visible = $derived(visibleProps(codes));
+  const CURVES = [
+    { mode: "step", label: "Escalier", help: "Rendu fidèle : chaque valeur reste constante jusqu'à la mesure suivante" },
+    { mode: "smooth", label: "Lissé", help: "Courbe adoucie passant par toutes les mesures" },
+    { mode: "simple", label: "Simplifié", help: "Un point au milieu de chaque palier de valeurs identiques : supprime les marches dues à l'arrondi du capteur" },
+  ] as const;
 </script>
 
 <div class="display">
@@ -24,10 +29,10 @@
     </div>
   {/if}
   <div class="seg" role="group" aria-label="Rendu des courbes">
-    <button class:active={!display.smooth} aria-pressed={!display.smooth} onclick={() => setSmooth(false)}
-            title="Rendu fidèle : la valeur reste constante jusqu'à la mesure suivante">Escalier</button>
-    <button class:active={display.smooth} aria-pressed={display.smooth} onclick={() => setSmooth(true)}
-            title="Rendu adouci entre les mesures (affichage seulement, les données ne changent pas)">Lissé</button>
+    {#each CURVES as c (c.mode)}
+      <button class:active={display.curve === c.mode} aria-pressed={display.curve === c.mode}
+              onclick={() => setCurve(c.mode)} title="{c.help} (affichage seulement, les données ne changent pas)">{c.label}</button>
+    {/each}
   </div>
 </div>
 

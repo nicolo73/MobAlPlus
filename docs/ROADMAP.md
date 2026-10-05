@@ -53,6 +53,16 @@ rendu fidèle : Mobile Alerts n'enregistre qu'aux changements de valeur).
 communs à la page Courbes et aux pages des emplacements, mémorisés par appareil ; les grandeurs
 masquées ne sont pas chargées.
 
+**Fait (10/10/2026)** : troisième rendu **Simplifié** : le capteur arrondit au dixième, si bien
+qu'une montée lente forme des paliers (18,2 18,2 18,2 puis 18,3…) et des marches même lissées.
+Chaque palier de valeurs identiques est remplacé par un point au milieu du palier (plus le premier
+et le dernier point), puis lissé ; les pics isolés sont conservés. « Lissé » devient le rendu par
+défaut.
+
+**Piste suivante** : faire cette réduction côté base (`series_data`), pour transférer moins de
+points sur les longues périodes ; à mesurer (au-delà de 2 000 points, `series_data` renvoie déjà
+les minima et maxima par intervalle).
+
 ## 3. Rapport de diagnostic « pour Claude »
 
 **Besoin** : un bouton qui produit un résumé compact, à coller dans une conversation avec Claude,
@@ -294,4 +304,5 @@ frais que l'intérieur.
 | 06/10/2026 | Maisons, comptes et partage ; correctif de sécurité des fonctions d'administration |
 | 07/10/2026 | Import / export CSV et Excel depuis l'application |
 | 09/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
+| 10/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |
 | 09/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |

@@ -10,6 +10,7 @@
   import { cssVar } from "../lib/colors";
   import type { Window } from "../lib/period";
   import type { Point } from "../lib/types";
+  import { curveData, type CurveMode } from "../lib/curve";
 
   export interface ChartSeries {
     id: number;
@@ -31,11 +32,11 @@
     /** Courbes synchronisées (curseur et glissement communs) */
     group?: string;
     label: string;
-    /** Rendu lissé (affichage seulement) au lieu des marches fidèles */
-    smooth?: boolean;
+    /** Rendu (affichage seulement) : escalier fidèle, lissé ou simplifié */
+    curve?: CurveMode;
   }
 
-  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, smooth = false }: Props = $props();
+  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step" }: Props = $props();
 
   let el: HTMLDivElement;
   let chart: ECharts | null = null;
@@ -46,20 +47,6 @@
   const fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   const fmtTime = (t: number) =>
     new Date(t).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
-  /** Coupe la courbe sur les longues absences de mesure (capteur hors service) */
-  const GAP = 48 * 3_600_000;
-  function toData(points: Point[]) {
-    const out: [number, number | null][] = [];
-    let prev: number | null = null;
-    for (const p of points) {
-      if (p.quality === "rejected") continue;
-      if (prev !== null && p.ts - prev > GAP) out.push([prev + 1, null]);
-      out.push([p.ts, p.value]);
-      prev = p.ts;
-    }
-    return out;
-  }
 
   function escapeHtml(s: string) {
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -118,13 +105,13 @@
       series: series.map((s) => ({
         id: String(s.id), name: s.name, type: "line",
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
-        ...(smooth ? { step: false, smooth: 0.35, smoothMonotone: "x" } : { step: "end", smooth: false }),
+        ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
         showSymbol: false, symbolSize: 8, sampling: undefined,
         lineStyle: { width: 2, color: s.color }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
         emphasis: { focus: "series", lineStyle: { width: 2 } },
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
-        data: toData(s.points),
+        data: curveData(s.points, curve),
       })),
     };
   }
@@ -166,7 +153,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit; void smooth;
+    void series; void loaded; void unit; void curve;
     render();
   });
 

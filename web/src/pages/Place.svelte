@@ -169,7 +169,7 @@
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] }]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
-                 smooth={display.smooth}
+                 curve={display.curve}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
       {#if st}
         <dl class="stats">

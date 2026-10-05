@@ -195,7 +195,7 @@
         <section class="card">
           <h2>{c.title} <small class="muted">({c.unit})</small></h2>
           <TimeChart series={c.series} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
-                     smooth={display.smooth} group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
+                     curve={display.curve} group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
         </section>
       {/each}
       <small class="muted">Glisser sur une courbe pour se déplacer dans le temps, molette ou poignées du curseur
