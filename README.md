@@ -6,6 +6,7 @@ au-delà des 3 mois conservés par le service officiel.
 - **Architecture** : [docs/architecture.md](docs/architecture.md)
 - **Mise en place Supabase** (pas à pas) : [docs/supabase-setup.md](docs/supabase-setup.md)
 - **Mise en ligne de l'application** (Cloudflare Pages) : [docs/deploiement-web.md](docs/deploiement-web.md)
+- **Évolutions prévues** : [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## État
 
@@ -16,7 +17,7 @@ au-delà des 3 mois conservés par le service officiel.
 | Import de l'historique des Google Sheets | ✅ |
 | PWA : valeurs actuelles, administration (statistiques, capteurs, emplacements, maintenance) | ✅ (mode démo sans Supabase) |
 | PWA : page par emplacement (courbes, statistiques, mesures, capteurs), courbes superposées avec périodes et glissement | ✅ |
-| PWA : marquage des valeurs aberrantes, annotations, météo | à venir |
+| Suite (maisons et partage, alertes, météo, corrections…) | voir [ROADMAP](docs/ROADMAP.md) |
 
 ## Organisation du dépôt
 
