@@ -7,6 +7,8 @@
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
+  import TrendArrow from "../components/TrendArrow.svelte";
+  import { computeTrend } from "../lib/trend";
   import { display, visibleProps } from "../lib/display.svelte";
 
   let { placeId }: { placeId: number } = $props();
@@ -46,6 +48,19 @@
     return () => m.removeEventListener("change", f);
   });
 
+  // Tendances des valeurs actuelles : chargées à part, après le reste de la page
+  let history = $state(new Map<number, Point[]>());
+  async function loadTrends() {
+    const ids = sorted.map((s) => s.id);
+    if (!ids.length) return;
+    try {
+      const to = Date.now();
+      history = await api.seriesData(ids, to - 25 * 3_600_000, to);
+    } catch { /* pas de flèche : rien de bloquant */ }
+  }
+  const trends = $derived(new Map(sorted.map((s) => [s.id, history.has(s.id)
+    ? computeTrend(history.get(s.id)!, s.property, display.trend) : null])));
+
   async function init() {
     try {
       const [all, cur, deps] = await Promise.all([api.seriesList(), api.currentValues(), api.placeDeployments(placeId)]);
@@ -54,6 +69,7 @@
       deployments = deps;
       // Courbes, statistiques et liste indépendantes : l'échec de l'une n'empêche pas les autres
       const results = await Promise.allSettled([load(), loadRows(true), loadStats()]);
+      setTimeout(loadTrends, 0);
       const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
       if (failed) error = failed.reason instanceof Error ? failed.reason.message : String(failed.reason);
     } catch (e) {
@@ -123,6 +139,11 @@
     const t = setInterval(() => {
       const w = win[1] - win[0];
       if (document.visibilityState === "visible" && win[1] >= Date.now() - 10 * 60_000) setWindow([Date.now() - w, Date.now()]);
+      if (document.visibilityState === "visible") {
+        // valeurs actuelles et tendances suivent aussi le temps qui passe
+        api.currentValues().then((cur) => (current = cur.filter((c) => c.place_id === placeId))).catch(() => {});
+        loadTrends();
+      }
     }, 5 * 60_000);
     return () => clearInterval(t);
   });
@@ -146,7 +167,8 @@
       {#each sorted as s (s.id)}
         {@const c = current.find((x) => x.series_id === s.id)}
         <div class="value">
-          <span class="num big" style="color:{propertyColor(s.property, dark)}">{fmtValue(c?.value ?? null, s.unit)}</span>
+          <span class="num big" style="color:{propertyColor(s.property, dark)}">{fmtValue(c?.value ?? null, s.unit)}{#if trends.get(s.id)}<span
+            class="arrow"><TrendArrow trend={trends.get(s.id)!} unit={s.unit} detail /></span>{/if}</span>
           <small>{s.property_name.toLowerCase()}</small>
         </div>
       {/each}
@@ -238,6 +260,7 @@
   .head { display: grid; gap: 0.5rem; }
   .values { display: flex; gap: 2rem; flex-wrap: wrap; }
   .value { display: grid; }
+  .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
   h2 small { font-weight: 400; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem; margin: 0.75rem 0 0; }

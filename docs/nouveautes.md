@@ -9,6 +9,7 @@
 - **Flèches de tendance** sur la page Maintenant : plus ou moins inclinées selon la variation de la
   dernière heure (comparée à l'écart du jour), et flèche « cassée » orange quand on vient de passer
   un **pic** ou un **creux** (moment de fermer ou d'ouvrir les fenêtres). Réglages dans Options.
+- Les mêmes flèches, avec la pente, en tête de la page de chaque emplacement.
 
 ## 3-4-5 octobre 2026
 - Page **Maintenant** : bouton discret « Temp. / Hum. » pour n'afficher que la température.
