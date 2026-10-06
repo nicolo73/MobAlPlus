@@ -35,7 +35,8 @@ Plusieurs emplacements superposés, une courbe par grandeur (température, humid
 
 - **Choisir les emplacements** en touchant leurs noms (8 courbes au plus). La couleur à gauche du
   nom est celle de la courbe. Pour fixer la couleur d'un emplacement : sur sa page, **Couleur dans
-  les courbes** (droits « gestion ») ; sinon une couleur libre est attribuée automatiquement.
+  les courbes** (droits « gestion ») : palette, gris, marron… ou **Personnalisée…** pour n'importe
+  quelle teinte ; sinon une couleur libre est attribuée automatiquement.
 - **Emplacement parent** (bouton en pointillé, ex. « Jardin ») : affiche la **moyenne** de ses
   sous-emplacements, tracée en tirets. Ses sous-emplacements suivent sur la même ligne, ou en
   retrait dessous.

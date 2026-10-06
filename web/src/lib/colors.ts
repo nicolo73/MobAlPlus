@@ -19,3 +19,18 @@ export function propertyColor(property: string, dark = isDark()): string {
 
 /** Lit une variable CSS du thème courant */
 export const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/** Couleurs supplémentaires proposées pour un emplacement (fixes, identiques en clair et en sombre) */
+export const EXTRA_COLORS: { hex: string; name: string }[] = [
+  { hex: "#7a7f85", name: "gris" }, { hex: "#b0b5ba", name: "gris clair" }, { hex: "#3a3f44", name: "anthracite" },
+  { hex: "#8b5a2b", name: "marron" }, { hex: "#0fa3b1", name: "turquoise" }, { hex: "#5bb3e8", name: "bleu ciel" },
+  { hex: "#8e1b3a", name: "bordeaux" }, { hex: "#8a8f2a", name: "olive" },
+];
+
+/** Choix de couleur d'un emplacement : numéro de palette, couleur personnalisée (#rrggbb) ou automatique */
+export type ColorChoice = number | string | null;
+
+/** Couleur effective d'un emplacement : personnalisée, sinon palette, sinon `fallback` */
+export function placeColor(p: { color?: string | null; color_slot?: number | null }, dark: boolean, fallback: number): string {
+  return p.color ?? slotColor(p.color_slot ?? fallback, dark);
+}

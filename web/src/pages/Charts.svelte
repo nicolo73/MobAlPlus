@@ -75,13 +75,15 @@
              places: avg ? node.measured : [node.id] };
   }).sort((a, b) => nodes.indexOf(a.node) - nodes.indexOf(b.node) || b.key - a.key));
   const full = $derived(selected.length >= MAX_SERIES);
-  /** Couleur d'une courbe : celle choisie pour l'emplacement, sinon l'attribution automatique */
+  /** Numéro de palette d'une courbe : celui choisi pour l'emplacement, sinon l'attribution automatique */
   const slotOf = (key: number) => byId.get(Math.abs(key))?.color ?? slots[key] ?? 0;
+  /** Couleur d'une courbe : personnalisée, sinon celle de la palette */
+  const colorOf = (key: number) => byId.get(Math.abs(key))?.custom ?? slotColor(slotOf(key), dark);
   /** Courbes affichées de la même couleur (à signaler) */
   const clashes = $derived.by(() => {
-    const bySlot = new Map<number, string[]>();
-    for (const c of selected) bySlot.set(slotOf(c.key), [...(bySlot.get(slotOf(c.key)) ?? []), c.node.name]);
-    return [...bySlot.values()].filter((names) => names.length > 1);
+    const byColor = new Map<string, string[]>();
+    for (const c of selected) byColor.set(colorOf(c.key), [...(byColor.get(colorOf(c.key)) ?? []), c.node.name]);
+    return [...byColor.values()].filter((names) => names.length > 1);
   });
   const leaves = $derived(tree.filter((n) => !isParent(n)));
   const groups = $derived(tree.filter(isParent));
@@ -117,7 +119,7 @@
       slots = rest;
     } else if (!full) {
       // Couleur automatique : la première qui n'est ni attribuée ni choisie pour une courbe affichée
-      const used = new Set(selected.map((c) => slotOf(c.key)));
+      const used = new Set(selected.filter((c) => !byId.get(Math.abs(c.key))?.custom).map((c) => slotOf(c.key)));
       let slot = 0;
       while (used.has(slot)) slot++;
       slots = { ...slots, [key]: slot };
@@ -175,7 +177,7 @@
     for (const c of selected) {
       for (const [prop, chart] of byProp) {
         const points = curvePoints(c, prop);
-        if (points) chart.series.push({ id: c.key, name: c.name, color: slotColor(slotOf(c.key), dark), points, dashed: c.avg });
+        if (points) chart.series.push({ id: c.key, name: c.name, color: colorOf(c.key), points, dashed: c.avg });
       }
     }
     return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
@@ -216,7 +218,7 @@
       {@const on = key in slots}
       <button class="chip" class:on class:avg={key < 0} aria-pressed={on} disabled={!on && full} onclick={() => toggle(key)}
               title={!on && full ? `${MAX_SERIES} courbes au plus en même temps` : help}>
-        {#if on}<span class="key" class:dashed={key < 0} style="--c:{slotColor(slotOf(key), dark)}"></span>{/if}
+        {#if on}<span class="key" class:dashed={key < 0} style="--c:{colorOf(key)}"></span>{/if}
         {label}
       </button>
     {/snippet}
@@ -280,7 +282,7 @@
             <tbody>
               {#each selected as p (p.key)}
                 <tr>
-                  <td><span class="key" class:dashed={p.avg} style="--c:{slotColor(slotOf(p.key), dark)}"></span>
+                  <td><span class="key" class:dashed={p.avg} style="--c:{colorOf(p.key)}"></span>
                     {#if p.avg}{p.name}{:else}<a href="#/lieu/{p.node.id}">{p.name}</a>{/if}</td>
                   {#each charts as [prop, c] (prop)}
                     {@const pts = curvePoints(p, prop)}

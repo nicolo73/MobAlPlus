@@ -7,7 +7,8 @@
 
 ## 6 octobre 2026
 - **Couleur de chaque emplacement** dans les courbes : à choisir sur la page de l'emplacement
-  (« Couleur dans les courbes ») ou dans Admin › Emplacements.- **Guide d'utilisation** dans l'application : lien depuis « À propos » et « Options ».- **Flèches de tendance** sur la page Maintenant : plus ou moins inclinées selon la variation de la
+  (« Couleur dans les courbes ») ou dans Admin › Emplacements : 8 couleurs de la palette, gris,
+  marron, turquoise… ou n'importe quelle couleur personnalisée.- **Guide d'utilisation** dans l'application : lien depuis « À propos » et « Options ».- **Flèches de tendance** sur la page Maintenant : plus ou moins inclinées selon la variation de la
   dernière heure (comparée à l'écart du jour), et flèche « cassée » orange quand on vient de passer
   un **pic** ou un **creux** (moment de fermer ou d'ouvrir les fenêtres). Réglages dans Options.
 - Les mêmes flèches, avec la pente, en tête de la page de chaque emplacement.

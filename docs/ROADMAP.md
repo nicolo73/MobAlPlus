@@ -44,7 +44,8 @@ dans toutes les courbes (page Courbes comprise).
 **Fait (06/10/2026)** : `place.color_slot` (numéro dans la palette de 8 teintes, NULL = automatique),
 choisi sur la page de l'emplacement (droits « gestion ») ou dans Admin › Emplacements ; la page
 Courbes l'utilise (moyenne d'un parent comprise), attribue aux autres une couleur libre, et signale
-les courbes affichées de même couleur.
+les courbes affichées de même couleur. Puis `place.color` : couleurs supplémentaires (gris,
+marron…) ou personnalisée (#rrggbb), prioritaire sur la palette (non adaptée au thème sombre).
 
 ## 2. Courbes lissées (option d'affichage)
 

@@ -289,8 +289,10 @@ export class DemoApi implements Api {
 
   async devices() { return delay(structuredClone(devices)); }
   async places() { return delay(sortPlaces(structuredClone(places))); }
-  async setPlaceColor(id: number, slot: number | null) {
-    places.find((p) => p.id === id)!.color_slot = slot;
+  async setPlaceColor(id: number, color: number | string | null) {
+    const p = places.find((x) => x.id === id)!;
+    p.color_slot = typeof color === "number" ? color : null;
+    p.color = typeof color === "string" ? color : null;
     await delay(null);
   }
   async reorderPlaces(parentId: number | null, ids: number[]) {

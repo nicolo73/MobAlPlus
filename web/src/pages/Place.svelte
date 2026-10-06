@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
-  import { isDark, propertyColor, slotColor } from "../lib/colors";
+  import { isDark, propertyColor, slotColor, type ColorChoice } from "../lib/colors";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, needsReload, type Window } from "../lib/period";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
@@ -53,12 +53,12 @@
   // Tendances des valeurs actuelles : chargées à part, après le reste de la page
   let history = $state(new Map<number, Point[]>());
   /** Couleur de l'emplacement dans la page Courbes (undefined : pas encore lue) */
-  let color = $state<number | null | undefined>(undefined);
+  let color = $state<ColorChoice | undefined>(undefined);
   let colorOpen = $state(false);
-  async function saveColor(slot: number | null) {
+  async function saveColor(choice: ColorChoice) {
     const before = color;
-    color = slot;
-    try { await api.setPlaceColor(placeId, slot); } catch (e) {
+    color = choice;
+    try { await api.setPlaceColor(placeId, choice); } catch (e) {
       color = before;
       error = e instanceof Error ? e.message : String(e);
     }
@@ -77,7 +77,7 @@
   async function init() {
     try {
       const [all, cur, deps] = await Promise.all([api.seriesList(), api.currentValues(), api.placeDeployments(placeId)]);
-      api.places().then((ps) => (color = ps.find((p) => p.id === placeId)?.color_slot ?? null)).catch(() => {});
+      api.places().then((ps) => { const p = ps.find((x) => x.id === placeId); color = p?.color ?? p?.color_slot ?? null; }).catch(() => {});
       series = all.filter((s) => s.place_id === placeId);
       current = cur.filter((c) => c.place_id === placeId);
       deployments = deps;
@@ -190,7 +190,7 @@
     {#if canEdit() && color !== undefined}
       <div class="color">
         <button class="link" onclick={() => (colorOpen = !colorOpen)} aria-expanded={colorOpen}>
-          {#if color !== null}<span class="dot" style="--c:{slotColor(color, dark)}"></span>{/if}
+          {#if color !== null}<span class="dot" style="--c:{typeof color === "string" ? color : slotColor(color, dark)}"></span>{/if}
           Couleur dans les courbes : {color === null ? "automatique" : "choisie"} {colorOpen ? "▴" : "▾"}
         </button>
         {#if colorOpen}<ColorPicker value={color} {dark} onchange={saveColor} />{/if}

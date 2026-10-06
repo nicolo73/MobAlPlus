@@ -2,7 +2,7 @@
   import { api } from "../lib/api";
   import type { Place } from "../lib/types";
   import { isWithin, placeOrder } from "../lib/placetree";
-  import { isDark, slotColor } from "../lib/colors";
+  import { isDark, placeColor } from "../lib/colors";
   import ColorPicker from "../components/ColorPicker.svelte";
 
   const dark = isDark();
@@ -159,7 +159,11 @@
           </select>
         </label>
         <div class="field">Couleur dans les courbes
-          <ColorPicker value={draft.color_slot ?? null} {dark} onchange={(v) => { if (draft) draft.color_slot = v; }} />
+          <ColorPicker value={draft.color ?? draft.color_slot ?? null} {dark} onchange={(v) => {
+            if (!draft) return;
+            draft.color_slot = typeof v === "number" ? v : null;
+            draft.color = typeof v === "string" ? v : null;
+          }} />
         </div>
         <label>Exposition
           <select bind:value={draft.exposure}>
@@ -194,7 +198,7 @@
             <span class="handle" aria-hidden="true">⠿</span>
             {#if depth}<span class="elbow" aria-hidden="true">└</span>{/if}
             <span class="name">{place.name}</span>
-            {#if place.color_slot != null}<span class="dot" style="--c:{slotColor(place.color_slot, dark)}" title="couleur dans les courbes"></span>{/if}
+            {#if place.color != null || place.color_slot != null}<span class="dot" style="--c:{placeColor(place, dark, 0)}" title="couleur dans les courbes"></span>{/if}
             <span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>
             <span class="spacer"></span>
             <span class="actions">

@@ -617,3 +617,7 @@ def test_place_color(conn, workbook):
     with pytest.raises(psycopg.errors.CheckViolation):
         conn.execute("UPDATE place SET color_slot = 8 WHERE code = 'c1'")
     conn.rollback()
+    conn.execute("INSERT INTO place (code, name, color) VALUES ('c2', 'C2', '#7a7f85')")
+    with pytest.raises(psycopg.errors.CheckViolation):
+        conn.execute("UPDATE place SET color = 'gris' WHERE code = 'c2'")
+    conn.rollback()

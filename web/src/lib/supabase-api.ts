@@ -229,8 +229,10 @@ export class SupabaseApi implements Api {
     return sortPlaces(rows);
   }
 
-  async setPlaceColor(id: number, slot: number | null) {
-    check(await this.sb.from("place").update({ color_slot: slot }).eq("id", id));
+  async setPlaceColor(id: number, color: number | string | null) {
+    check(await this.sb.from("place").update({
+      color_slot: typeof color === "number" ? color : null, color: typeof color === "string" ? color : null,
+    }).eq("id", id));
   }
 
   async reorderPlaces(parentId: number | null, ids: number[]) {
