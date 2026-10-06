@@ -75,6 +75,14 @@
              places: avg ? node.measured : [node.id] };
   }).sort((a, b) => nodes.indexOf(a.node) - nodes.indexOf(b.node) || b.key - a.key));
   const full = $derived(selected.length >= MAX_SERIES);
+  /** Couleur d'une courbe : celle choisie pour l'emplacement, sinon l'attribution automatique */
+  const slotOf = (key: number) => byId.get(Math.abs(key))?.color ?? slots[key] ?? 0;
+  /** Courbes affichées de la même couleur (à signaler) */
+  const clashes = $derived.by(() => {
+    const bySlot = new Map<number, string[]>();
+    for (const c of selected) bySlot.set(slotOf(c.key), [...(bySlot.get(slotOf(c.key)) ?? []), c.node.name]);
+    return [...bySlot.values()].filter((names) => names.length > 1);
+  });
   const leaves = $derived(tree.filter((n) => !isParent(n)));
   const groups = $derived(tree.filter(isParent));
   const ORDER = ["temperature", "humidity"];
@@ -95,7 +103,7 @@
       // Première visite : les premiers emplacements mesurés (4 au plus, pour garder des courbes lisibles)
       slots = Object.fromEntries(Object.entries(slots).filter(([k]) => validKey(Number(k))));
       if (!Object.keys(slots).length)
-        nodes.filter((n) => n.series.length && !isParent(n)).slice(0, 4).forEach((n, i) => (slots[n.id] = i));
+        nodes.filter((n) => n.series.length && !isParent(n)).slice(0, 4).forEach((n, i) => (slots[n.id] = n.color ?? i));
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -108,7 +116,8 @@
       const { [key]: _, ...rest } = slots;
       slots = rest;
     } else if (!full) {
-      const used = new Set(Object.values(slots));
+      // Couleur automatique : la première qui n'est ni attribuée ni choisie pour une courbe affichée
+      const used = new Set(selected.map((c) => slotOf(c.key)));
       let slot = 0;
       while (used.has(slot)) slot++;
       slots = { ...slots, [key]: slot };
@@ -166,7 +175,7 @@
     for (const c of selected) {
       for (const [prop, chart] of byProp) {
         const points = curvePoints(c, prop);
-        if (points) chart.series.push({ id: c.key, name: c.name, color: slotColor(slots[c.key], dark), points, dashed: c.avg });
+        if (points) chart.series.push({ id: c.key, name: c.name, color: slotColor(slotOf(c.key), dark), points, dashed: c.avg });
       }
     }
     return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
@@ -207,7 +216,7 @@
       {@const on = key in slots}
       <button class="chip" class:on class:avg={key < 0} aria-pressed={on} disabled={!on && full} onclick={() => toggle(key)}
               title={!on && full ? `${MAX_SERIES} courbes au plus en même temps` : help}>
-        {#if on}<span class="key" class:dashed={key < 0} style="--c:{slotColor(slots[key], dark)}"></span>{/if}
+        {#if on}<span class="key" class:dashed={key < 0} style="--c:{slotColor(slotOf(key), dark)}"></span>{/if}
         {label}
       </button>
     {/snippet}
@@ -239,6 +248,10 @@
       {/if}
     </div>
     <DisplayBar {properties} />
+    {#if clashes.length}
+      <small class="muted">Même couleur pour {clashes.map((n) => n.join(" et ")).join(", ")} : la couleur d'un emplacement
+        se choisit sur sa page (ou dans Admin › Emplacements).</small>
+    {/if}
     {#if full}<small class="muted">{MAX_SERIES} courbes au plus en même temps : retirez-en une pour en ajouter une autre.</small>{/if}
 
     {#if selected.length === 0}
@@ -267,7 +280,7 @@
             <tbody>
               {#each selected as p (p.key)}
                 <tr>
-                  <td><span class="key" class:dashed={p.avg} style="--c:{slotColor(slots[p.key], dark)}"></span>
+                  <td><span class="key" class:dashed={p.avg} style="--c:{slotColor(slotOf(p.key), dark)}"></span>
                     {#if p.avg}{p.name}{:else}<a href="#/lieu/{p.node.id}">{p.name}</a>{/if}</td>
                   {#each charts as [prop, c] (prop)}
                     {@const pts = curvePoints(p, prop)}

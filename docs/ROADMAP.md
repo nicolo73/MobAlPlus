@@ -7,7 +7,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 
 | # | Évolution | Priorité | Taille | Statut |
 |---|---|---|---|---|
-| 1 | [Couleur des courbes par emplacement](#1-couleur-des-courbes-par-emplacement) | P1 | S | à faire |
+| 1 | [Couleur des courbes par emplacement](#1-couleur-des-courbes-par-emplacement) | P1 | S | ✅ fait |
 | 2 | [Courbes lissées (option d'affichage)](#2-courbes-lissées-option-daffichage) | P1 | S | ✅ fait |
 | 3 | [Rapport de diagnostic « pour Claude »](#3-rapport-de-diagnostic-pour-claude) | P1 | S | à faire |
 | 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | ✅ fait (reste : identifiants Mobile Alerts par maison) |
@@ -40,6 +40,11 @@ dans toutes les courbes (page Courbes comprise).
   daltoniens), plutôt qu'une couleur libre ;
 - la page Courbes utilise la couleur de l'emplacement quand elle existe, sinon l'attribution
   automatique actuelle ; signaler deux emplacements affichés avec la même couleur.
+
+**Fait (06/10/2026)** : `place.color_slot` (numéro dans la palette de 8 teintes, NULL = automatique),
+choisi sur la page de l'emplacement (droits « gestion ») ou dans Admin › Emplacements ; la page
+Courbes l'utilise (moyenne d'un parent comprise), attribue aux autres une couleur libre, et signale
+les courbes affichées de même couleur.
 
 ## 2. Courbes lissées (option d'affichage)
 
@@ -319,6 +324,7 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 06/10/2026 | Couleur des courbes choisie par emplacement |
 | 06/10/2026 | Flèches de tendance et inversions (pic, creux) sur la page Maintenant, réglables |
 | 05/10/2026 | Emplacements : ordre et arborescence réorganisables (glisser-déposer, flèches) |
 | 05/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |

@@ -9,6 +9,8 @@ export interface PlaceNode {
   depth: number;
   /** Séries propres de l'emplacement (capteurs qui y sont affectés) */
   series: SeriesInfo[];
+  /** Couleur choisie (numéro de palette), null = automatique */
+  color: number | null;
   /** Emplacements mesurés de la branche (lui compris) : de quoi calculer une moyenne */
   measured: number[];
   children: PlaceNode[];
@@ -45,7 +47,7 @@ export function placeTree(places: Place[], series: SeriesInfo[]): PlaceNode[] {
       .map((p) => {
         const children = build(p.id, depth + 1, new Set([...seen, p.id]));
         const own = byPlace.get(p.id) ?? [];
-        return { id: p.id, name: p.name, depth, series: own, children,
+        return { id: p.id, name: p.name, depth, series: own, children, color: p.color_slot ?? null,
                  measured: [...(own.length ? [p.id] : []), ...children.flatMap((c) => c.measured)] };
       });
   return build(null, 0, new Set());

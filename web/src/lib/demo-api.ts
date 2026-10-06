@@ -289,6 +289,10 @@ export class DemoApi implements Api {
 
   async devices() { return delay(structuredClone(devices)); }
   async places() { return delay(sortPlaces(structuredClone(places))); }
+  async setPlaceColor(id: number, slot: number | null) {
+    places.find((p) => p.id === id)!.color_slot = slot;
+    await delay(null);
+  }
   async reorderPlaces(parentId: number | null, ids: number[]) {
     if (parentId !== null && ids.some((id) => isWithin(places, parentId, id)))
       throw new Error("Un emplacement ne peut pas être placé dans l'un de ses sous-emplacements");

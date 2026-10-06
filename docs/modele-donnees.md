@@ -73,6 +73,7 @@ erDiagram
     text name
     int parent_id FK "emplacement parent"
     int sort_order "ordre parmi ses voisins"
+    smallint color_slot "couleur des courbes, 0-7 ou NULL"
     text kind "room, outdoor, zone…"
     text exposure "indoor | outdoor | appliance"
     float lon

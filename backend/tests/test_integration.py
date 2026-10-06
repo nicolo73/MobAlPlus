@@ -609,3 +609,11 @@ def test_place_order_and_tree(conn, workbook):
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
+
+
+def test_place_color(conn, workbook):
+    conn.execute("INSERT INTO place (code, name, color_slot) VALUES ('c1', 'C1', 3)")
+    assert conn.execute("SELECT color_slot FROM place WHERE code = 'c1'").fetchone()[0] == 3
+    with pytest.raises(psycopg.errors.CheckViolation):
+        conn.execute("UPDATE place SET color_slot = 8 WHERE code = 'c1'")
+    conn.rollback()

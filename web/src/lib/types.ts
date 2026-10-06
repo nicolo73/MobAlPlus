@@ -45,6 +45,8 @@ export interface Place {
   exposure: "indoor" | "outdoor" | "appliance" | null;
   /** Ordre parmi les emplacements de même parent */
   sort_order?: number;
+  /** Couleur dans les courbes : numéro dans la palette (0 à 7), null = automatique */
+  color_slot?: number | null;
 }
 
 export interface Channel {
@@ -231,6 +233,8 @@ export interface Api {
   retireDevice(id: number): Promise<void>;
   reactivateDevice(id: number): Promise<void>;
   assignChannel(channelId: number, placeId: number | null, from: Date): Promise<void>;
+  /** Couleur d'un emplacement dans les courbes (numéro de palette, null = automatique) */
+  setPlaceColor(id: number, slot: number | null): Promise<void>;
   /** Range ces emplacements, dans cet ordre, sous ce parent (null : premier niveau) */
   reorderPlaces(parentId: number | null, ids: number[]): Promise<void>;
   savePlace(place: Omit<Place, "id"> & { id?: number }): Promise<void>;

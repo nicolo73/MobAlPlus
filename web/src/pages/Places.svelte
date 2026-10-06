@@ -2,6 +2,10 @@
   import { api } from "../lib/api";
   import type { Place } from "../lib/types";
   import { isWithin, placeOrder } from "../lib/placetree";
+  import { isDark, slotColor } from "../lib/colors";
+  import ColorPicker from "../components/ColorPicker.svelte";
+
+  const dark = isDark();
 
   type Draft = Omit<Place, "id"> & { id?: number };
   const EXPOSURES: Record<string, string> = { indoor: "intérieur", outdoor: "extérieur", appliance: "appareil" };
@@ -154,6 +158,9 @@
             {#each (places ?? []).filter((p) => p.id !== draft?.id) as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
           </select>
         </label>
+        <div class="field">Couleur dans les courbes
+          <ColorPicker value={draft.color_slot ?? null} {dark} onchange={(v) => { if (draft) draft.color_slot = v; }} />
+        </div>
         <label>Exposition
           <select bind:value={draft.exposure}>
             {#each Object.entries(EXPOSURES) as [v, l] (v)}<option value={v}>{l}</option>{/each}
@@ -187,6 +194,7 @@
             <span class="handle" aria-hidden="true">⠿</span>
             {#if depth}<span class="elbow" aria-hidden="true">└</span>{/if}
             <span class="name">{place.name}</span>
+            {#if place.color_slot != null}<span class="dot" style="--c:{slotColor(place.color_slot, dark)}" title="couleur dans les courbes"></span>{/if}
             <span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>
             <span class="spacer"></span>
             <span class="actions">
@@ -223,6 +231,8 @@
   .handle { color: var(--muted); cursor: grab; }
   .elbow { color: var(--muted); }
   .name { font-weight: 500; }
+  .dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--c); }
+  .field { display: grid; gap: 0.35rem; font-size: 0.9rem; }
   .actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.35rem; margin-left: auto; white-space: nowrap; }
   @media (max-width: 600px) { .tree { --indent: 0.8rem; } }
   .moves { display: inline-flex; gap: 0.15rem; }

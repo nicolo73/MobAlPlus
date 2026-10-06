@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
-  import { isDark, propertyColor } from "../lib/colors";
+  import { isDark, propertyColor, slotColor } from "../lib/colors";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, needsReload, type Window } from "../lib/period";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
@@ -8,6 +8,8 @@
   import TimeChart from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
+  import ColorPicker from "../components/ColorPicker.svelte";
+  import { canEdit } from "../lib/home.svelte";
   import { computeTrend } from "../lib/trend";
   import { display, visibleProps } from "../lib/display.svelte";
 
@@ -50,6 +52,17 @@
 
   // Tendances des valeurs actuelles : chargées à part, après le reste de la page
   let history = $state(new Map<number, Point[]>());
+  /** Couleur de l'emplacement dans la page Courbes (undefined : pas encore lue) */
+  let color = $state<number | null | undefined>(undefined);
+  let colorOpen = $state(false);
+  async function saveColor(slot: number | null) {
+    const before = color;
+    color = slot;
+    try { await api.setPlaceColor(placeId, slot); } catch (e) {
+      color = before;
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
   async function loadTrends() {
     const ids = sorted.map((s) => s.id);
     if (!ids.length) return;
@@ -64,6 +77,7 @@
   async function init() {
     try {
       const [all, cur, deps] = await Promise.all([api.seriesList(), api.currentValues(), api.placeDeployments(placeId)]);
+      api.places().then((ps) => (color = ps.find((p) => p.id === placeId)?.color_slot ?? null)).catch(() => {});
       series = all.filter((s) => s.place_id === placeId);
       current = cur.filter((c) => c.place_id === placeId);
       deployments = deps;
@@ -173,6 +187,15 @@
         </div>
       {/each}
     </div>
+    {#if canEdit() && color !== undefined}
+      <div class="color">
+        <button class="link" onclick={() => (colorOpen = !colorOpen)} aria-expanded={colorOpen}>
+          {#if color !== null}<span class="dot" style="--c:{slotColor(color, dark)}"></span>{/if}
+          Couleur dans les courbes : {color === null ? "automatique" : "choisie"} {colorOpen ? "▴" : "▾"}
+        </button>
+        {#if colorOpen}<ColorPicker value={color} {dark} onchange={saveColor} />{/if}
+      </div>
+    {/if}
     <small title={fmtDate(lastTs)}>
       {#if isStale(lastTs)}<span class="badge warn">ancienne</span>{/if} dernière mesure {fmtAgo(lastTs)}
     </small>
@@ -260,6 +283,9 @@
   .head { display: grid; gap: 0.5rem; }
   .values { display: flex; gap: 2rem; flex-wrap: wrap; }
   .value { display: grid; }
+  .color { display: grid; gap: 0.4rem; justify-items: start; }
+  .color .link { font-size: 0.85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
+  .dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--c); }
   .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
   h2 small { font-weight: 400; }
