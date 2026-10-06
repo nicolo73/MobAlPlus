@@ -38,7 +38,8 @@
 
 <div class="stack">
   <h1 style="margin:0">Options d'affichage</h1>
-  <p class="muted" style="margin:0">Réglages mémorisés sur cet appareil (téléphone et ordinateur se règlent séparément).</p>
+  <p class="muted" style="margin:0">Réglages mémorisés sur cet appareil (téléphone et ordinateur se règlent séparément).
+    Mode d'emploi : <a href="#/aide">guide d'utilisation</a>.</p>
 
   <section class="card stack">
     <div class="opt">

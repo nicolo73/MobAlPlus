@@ -15,6 +15,7 @@
   import Data from "./pages/Data.svelte";
   import About from "./pages/About.svelte";
   import Options from "./pages/Options.svelte";
+  import Help from "./pages/Help.svelte";
   import "./lib/display.svelte"; // applique taille du texte et densité dès le démarrage
   import { hasUnseenNews } from "./lib/content";
 
@@ -86,8 +87,8 @@
          title="Options d'affichage">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
       </a>
-      <a href="#/a-propos" class="about" class:active={router.route === "/a-propos"}
-         aria-label={unseen ? "À propos (nouveautés)" : "À propos"} title="À propos et nouveautés">
+      <a href="#/a-propos" class="about" class:active={router.route === "/a-propos" || router.route === "/aide"}
+         aria-label={unseen ? "À propos (nouveautés)" : "À propos"} title="À propos, aide et nouveautés">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
         {#if unseen}<span class="news-dot" aria-hidden="true"></span>{/if}
       </a>
@@ -129,6 +130,8 @@
             {/if}
           {:else if router.route === "/courbes"}
             <Charts />
+          {:else if router.route === "/aide"}
+            <Help />
           {:else if router.route === "/options"}
             <Options />
           {:else if router.route === "/a-propos"}

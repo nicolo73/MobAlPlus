@@ -6,6 +6,7 @@ export const routes = {
   "/donnees": "Données",
   "/a-propos": "À propos",
   "/options": "Options",
+  "/aide": "Aide",
   "/lieu": "Emplacement",
   "/admin": "Tableau de bord",
   "/admin/capteurs": "Capteurs",

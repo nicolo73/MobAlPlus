@@ -3,7 +3,9 @@
 Historisation et visualisation des capteurs **Mobile Alerts** (températures, hygrométrie…),
 au-delà des 3 mois conservés par le service officiel.
 
-- **Architecture** : [docs/architecture.md](docs/architecture.md)
+- **Architecture et technologies** (schémas) : [docs/architecture.md](docs/architecture.md)
+- **Modèle de données** (schémas des tables) : [docs/modele-donnees.md](docs/modele-donnees.md)
+- **Guide d'utilisation** (aussi affiché dans l'application, page Aide) : [docs/guide-utilisateur.md](docs/guide-utilisateur.md)
 - **Mise en place Supabase** (pas à pas) : [docs/supabase-setup.md](docs/supabase-setup.md)
 - **Mise en ligne de l'application** (Cloudflare Pages) : [docs/deploiement-web.md](docs/deploiement-web.md)
 - **Évolutions prévues** : [docs/ROADMAP.md](docs/ROADMAP.md)

@@ -14,6 +14,11 @@
 <div class="stack">
   <article class="card prose">{@html aboutHtml}</article>
 
+  <a class="card guide" href="#/aide">
+    <strong>Guide d'utilisation</strong>
+    <span class="muted">Courbes, tendances, import / export, partage, administration… ›</span>
+  </a>
+
   <section class="card prose">
     <h2>Nouveautés</h2>
     {@html newsHtml}
@@ -23,6 +28,8 @@
 </div>
 
 <style>
+  .guide { display: grid; gap: 0.2rem; text-decoration: none; color: inherit; }
+  .guide:hover { border-color: var(--primary); }
   .prose :global(h1) { font-size: 1.4rem; }
   .prose :global(h2) { font-size: 1.1rem; margin-top: 1.25rem; }
   .prose :global(h2:first-child) { margin-top: 0; }

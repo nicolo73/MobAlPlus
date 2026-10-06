@@ -1,119 +1,310 @@
-# Architecture MobAlPlus
+# Architecture et conception de MobAlPlus
+
+MobAlPlus historise les mesures des capteurs **Mobile Alerts** (température, humidité…) au-delà des
+3 mois conservés par le service officiel, et les présente dans une application web installable sur
+téléphone (PWA). Tout repose sur des **services cloud gérés, sur leurs offres gratuites** : aucune
+machine à administrer.
+
+> Les schémas de cette page sont écrits en [Mermaid](https://mermaid.js.org) : du texte dans le
+> fichier Markdown, que GitHub dessine automatiquement. Pour les modifier : bouton ✏️ de GitHub sur
+> ce fichier (aperçu avec l'onglet *Preview*), ou copier le bloc dans
+> [mermaid.live](https://mermaid.live) pour le retoucher avec un aperçu immédiat, puis le recoller.
+> draw.io sait aussi importer un bloc Mermaid (*Organiser › Insérer › Avancé › Mermaid*) pour en
+> faire un dessin libre.
+
+**Sommaire** · [Vue d'ensemble](#vue-densemble) · [Technologies](#technologies-et-services) ·
+[Collecte](#collecte-des-mesures) · [Stockage](#stockage-en-trois-niveaux) ·
+[Lecture et affichage](#lecture-et-affichage) · [Application web](#application-web) ·
+[Sécurité](#sécurité-et-droits) · [Déploiement](#déploiement) · [Modèle de données](#modèle-de-données)
+· [Évolutions](#évolutions-darchitecture-prévues)
+
+---
 
 ## Vue d'ensemble
 
-Uniquement des services cloud gérés, sur leurs offres gratuites : aucune machine à administrer.
+```mermaid
+flowchart TB
+  subgraph users["Utilisateurs"]
+    direction LR
+    phone["📱 Téléphone<br/>application installée"]
+    browser["💻 Navigateur"]
+  end
 
+  subgraph cf["Cloudflare Pages"]
+    pwa["<b>Application web (PWA)</b><br/>Svelte 5 · Vite · ECharts · fichiers statiques"]
+  end
+
+  subgraph sb["Supabase"]
+    direction TB
+    auth["<b>Auth</b><br/>e-mail · Google"]
+    api["<b>API REST</b> PostgREST<br/>tables + fonctions SQL"]
+    fn["<b>Edge Function collect</b><br/>Deno · TypeScript"]
+    db[("<b>PostgreSQL</b><br/>données · règles d'accès<br/>maintenance nocturne")]
+    cron["<b>pg_cron</b> + <b>pg_net</b> + <b>Vault</b><br/>planificateur, appel HTTP, secrets"]
+  end
+
+  subgraph ma["Mobile Alerts"]
+    direction LR
+    sensors["📡 Capteurs → passerelle"]
+    site["🌐 measurements.mobile-alerts.eu<br/>90 jours d'historique"]
+  end
+
+  google["Google<br/>connexion OAuth"]
+
+  subgraph gh["GitHub"]
+    direction TB
+    repo["Dépôt : code + documentation"]
+    actions["Actions : tests,<br/>déploiement Supabase"]
+  end
+
+  cli["🐍 Outils Python sur PC<br/>import des Google Sheets"]
+
+  phone & browser -->|HTTPS| pwa
+  pwa --> auth
+  pwa --> api
+  pwa -->|« collecter maintenant »| fn
+  auth -.-> google
+  api --> db
+  cron -->|toutes les 10 min| fn
+  fn -->|enregistre| db
+  cron -.-|dans la base| db
+  fn -->|lit les pages HTML| site
+  sensors --> site
+  repo -->|chaque push : construction| cf
+  actions -->|migrations + fonction| sb
+  cli -->|SQL| db
 ```
-                         Supabase (offre gratuite)
- ┌──────────────────────────────────────────────────────────────────────────┐
- │ pg_cron ─(10 min)─► Edge Function « collect » ──► measurements.mobile-alerts.eu
- │                              │
- │                              ▼
- │                PostgreSQL : récent ─(nuit)─► compacté ─(> 3 ans)─► simplifié
- │                              │
- │                    Auth + API (RLS)                                      │
- └──────────────────────────────┼───────────────────────────────────────────┘
-                                ▼
-           PWA statique (Cloudflare Pages) : courbes, administration
-           installable sur mobile ; APK Play Store possible ensuite (TWA)
 
- PC (ponctuel) : python -m mobalplus import-sheets  ──► historique des Google Sheets
+| Brique | Rôle | Code |
+|---|---|---|
+| Application web (PWA) | valeurs actuelles, courbes, données, administration ; installable | `web/` |
+| Base de données | stockage, règles d'accès, calculs (séries, export, import, maintenance) | `supabase/migrations/` |
+| Collecteur | récupère les mesures sur le site Mobile Alerts toutes les 10 minutes | `supabase/functions/collect/` |
+| Outils PC | import des anciens tableurs, rattrapage manuel, tests de la base | `backend/` |
+| Documentation | architecture, mise en place, feuille de route, textes de l'application | `docs/` |
+
+Mise en place pas à pas : [supabase-setup.md](supabase-setup.md), puis [deploiement-web.md](deploiement-web.md).
+
+## Technologies et services
+
+| Couche | Produit / technologie | Pourquoi | Offre |
+|---|---|---|---|
+| Hébergement de l'application | **Cloudflare Pages** | fichiers statiques sur un réseau mondial, construction automatique à chaque push | gratuit |
+| Application | **Svelte 5** (runes), **TypeScript**, **Vite 8** | application légère et réactive, construction rapide | libre |
+| Mode hors ligne, installation | **vite-plugin-pwa** (Workbox) | service worker, icône sur l'écran d'accueil | libre |
+| Courbes | **Apache ECharts 6** (chargé à la demande) | zoom, curseur, plein écran, milliers de points | libre |
+| Accès aux données | **supabase-js 2** | authentification et appels à l'API depuis le navigateur | libre |
+| Textes de l'application | **marked** | « À propos », nouveautés, aide écrits en Markdown dans `docs/` | libre |
+| Import Excel | **read-excel-file** | lecture des fichiers `.xlsx` dans le navigateur | libre |
+| Base de données | **PostgreSQL** (Supabase) | SQL, contraintes, fonctions, Row Level Security | gratuit jusqu'à 500 Mo |
+| API | **PostgREST** (Supabase) | API REST générée depuis le schéma, appels de fonctions (RPC) | inclus |
+| Comptes | **Supabase Auth** (e-mail, Google OAuth) | connexion, jetons JWT lus par les règles d'accès | inclus |
+| Tâches planifiées | **pg_cron**, **pg_net**, **Vault** | collecte toutes les 10 min, maintenance chaque nuit, secrets chiffrés | inclus |
+| Collecteur | **Supabase Edge Functions** (Deno, TypeScript) | appel du site Mobile Alerts et lecture de ses pages | inclus |
+| Source des mesures | **Mobile Alerts** (site `measurements.mobile-alerts.eu`) | historique complet des 90 derniers jours | gratuit |
+| Code, intégration continue | **GitHub**, **GitHub Actions** | tests à chaque push, déploiement Supabase à la demande | gratuit |
+| Outils PC et tests | **Python 3.12**, psycopg, pytest ; **Node 22** (`node --test`) | import des tableurs, tests de la base et du code partagé | libre |
+
+## Collecte des mesures
+
+Le site Mobile Alerts ne fournit pas d'API d'historique : sa page
+`Home/MeasurementDetails?deviceid=…&vendorid=…&fromepoch=…&toepoch=…` renvoie en HTML **toutes**
+les mesures d'une période. Le collecteur la lit par fenêtres d'un jour.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as pg_cron
+  participant F as Edge Function collect
+  participant D as PostgreSQL
+  participant M as Site Mobile Alerts
+
+  C->>F: toutes les 10 min (pg_net, jeton du Vault)
+  F->>D: collect_targets() : capteurs actifs, date de dernière collecte
+  loop chaque capteur, 10 jours au plus par passage
+    F->>M: MeasurementDetails (fenêtre d'un jour)
+    M-->>F: page HTML
+    F->>F: lecture du tableau, heure locale → UTC
+    F->>D: ingest_readings(mesures, synced_until)
+  end
+  Note over F,D: en cas d'erreur : record_sync_error(), le capteur est repris au passage suivant
+  C->>F: chaque nuit à 2 h 47 : relecture des 3 derniers jours
 ```
 
-| Élément | Où | Code |
-|---|---|---|
-| Base de données, sécurité, tâches planifiées | Supabase | `supabase/migrations/` |
-| Collecteur | Supabase Edge Function (Deno) | `supabase/functions/collect/` |
-| Import de l'historique, rattrapage manuel | PC (Python) | `backend/` |
-| Application web et mobile (PWA) | Cloudflare Pages | `web/` |
-
-Mise en place : [supabase-setup.md](supabase-setup.md), puis [deploiement-web.md](deploiement-web.md).
-
-## Source des données
-
-La page `Home/MeasurementDetails?deviceid=…&vendorid=…&fromepoch=…&toepoch=…` renvoie **toutes**
-les mesures d'un intervalle (l'API REST publique ne donne que la dernière).
-
-- Collecte incrémentale depuis la dernière mesure reçue, par fenêtres d'un jour, 10 jours au plus
-  par passage : après une interruption, le retard (90 jours au maximum, durée de conservation du
-  site) se rattrape sur les passages suivants.
-- Relecture quotidienne des 3 derniers jours, pour les mesures transmises en retard par la passerelle.
-- `fromepoch` / `toepoch` sont l'heure **locale** encodée comme si c'était de l'UTC ; les dates
-  affichées sont locales (Europe/Paris) et converties en UTC, avec levée d'ambiguïté au passage à
-  l'heure d'hiver grâce à l'ordre chronologique des mesures.
-- Le site semble n'enregistrer une mesure que lorsque la valeur change : courbes en escalier.
-
-## Modèle de données
-
-Le **capteur** est découplé de l'**emplacement** :
-
-| Table | Rôle | Équivalent SensorThings |
-|---|---|---|
-| `device`, `device_channel` | capteur physique et ses colonnes de mesure | Thing / Sensor |
-| `place` | pièce, zone extérieure, appareil (hiérarchique, position) | Location |
-| `series` | courbe affichée = emplacement × grandeur | Datastream |
-| `deployment` | affectation datée d'un canal à une série | (HistoricalLocation) |
-| `reading`, `reading_day` | mesures brutes, par canal | Observation |
-| `correction` | valeurs rejetées / corrigées, sans toucher au brut | resultQuality |
-| `annotation` | commentaires sur une période | — |
-| `device_sync`, `maintenance_log` | état de la collecte et de la maintenance | — |
-| `app_setting`, `app_user` | paramètres, utilisateurs et rôles | — |
-
-- Déplacer ou remplacer un capteur = clôturer une affectation et en ouvrir une autre. Les
-  contraintes d'exclusion garantissent qu'un canal n'est qu'à un endroit à la fois et qu'une série
-  n'a qu'une source à la fois.
-- Le rattachement d'une mesure à sa série est calculé à la lecture : corriger une date de
-  déplacement ne réécrit aucune mesure. Les corrections s'appliquent aussi à la lecture, quel que
-  soit le niveau de stockage.
+- **Incrémentale** : chaque capteur reprend là où il s'était arrêté (`device_sync.synced_until`) ;
+  après une interruption, le retard (jusqu'à 90 jours) se rattrape sur les passages suivants.
+- **Relecture nocturne** des 3 derniers jours, pour les mesures transmises en retard.
+- **Heure** : `fromepoch` / `toepoch` sont l'heure *locale* encodée comme de l'UTC ; les dates lues
+  sont converties en UTC, avec levée de l'ambiguïté du passage à l'heure d'hiver grâce à l'ordre
+  chronologique des mesures (`_shared/timeutil.ts`).
+- Le site n'enregistre une mesure que lorsque la valeur change (environ toutes les 7 minutes) :
+  le rendu fidèle est donc en **escalier**.
+- Les identifiants Mobile Alerts sont des secrets de la fonction, jamais dans le dépôt.
 
 ## Stockage en trois niveaux
 
-| Âge (réglable) | Stockage | Contenu | Coût mesuré |
-|---|---|---|---|
-| 0 – 90 jours | `reading` : une ligne par valeur | tous les points | ~84 octets / valeur |
-| 90 jours – 3 ans | `reading_day` : une ligne par canal et par jour (tableaux de points) | tous les points, **sans perte** | ~10 octets / valeur |
-| au-delà de 3 ans | `reading_day` (simplifié) | points significatifs : extrêmes du jour, crêtes, creux, ruptures de pente | quelques % des points |
+```mermaid
+flowchart LR
+  in(["mesures collectées<br/>ou importées"]) --> r
+  subgraph r["0 – 90 jours"]
+    reading[("reading<br/>1 ligne par mesure<br/>≈ 84 octets / valeur")]
+  end
+  subgraph c["90 jours – 3 ans"]
+    day[("reading_day<br/>1 ligne par canal et par jour<br/>tableaux t[] / v[] · ≈ 10 octets / valeur")]
+  end
+  subgraph s["au-delà de 3 ans"]
+    simp[("reading_day simplifié<br/>points significatifs seulement")]
+  end
+  reading -->|"chaque nuit : compactage<br/>sans perte"| day
+  day -->|"chaque nuit : simplification<br/>min / max du jour + Douglas-Peucker"| simp
+```
 
-- Compactage et simplification chaque nuit (`run_maintenance()`), paramètres dans `app_setting`.
-- Simplification : premier et dernier point, minimum et maximum du jour, puis Douglas-Peucker sur
-  l'écart vertical, avec une tolérance par grandeur (`observed_property.simplify_tolerance` :
-  0,2 °C, 2 % HR ; pluie jamais simplifiée). Les points conservés sont de **vrais points**
-  (horodatage et valeur d'origine). Les valeurs rejetées sont écartées avant simplification.
+- Durées réglables (`app_setting` : `hot_days`, `simplify_after_days`), tâche nocturne
+  `run_maintenance()` à 3 h 17, journal dans `maintenance_log`.
+- **Simplification** : premier et dernier point, minimum et maximum du jour, puis Douglas-Peucker
+  sur l'écart vertical avec une tolérance par grandeur (`observed_property.simplify_tolerance` :
+  0,2 °C, 2 % ; pluie jamais simplifiée). Les points conservés sont de **vrais points**.
+- Les mesures brutes ne sont **jamais modifiées** : corrections et annotations sont à part et
+  s'appliquent à la lecture.
 - Estimation : 3 ans pour 13 capteurs ≈ 110 Mo, pour un quota gratuit de 500 Mo.
 
-## Lecture pour l'affichage
+## Lecture et affichage
 
-`series_data(série, début, fin, max_points)` renvoie tous les points si leur nombre est inférieur
-à `max_points`, sinon le minimum et le maximum de chaque intervalle : les pics restent visibles
-quelle que soit l'échelle, et ce sont toujours des mesures réelles.
+```mermaid
+flowchart LR
+  raw[("reading<br/>reading_day")] --> cr["channel_readings()<br/>les deux niveaux réunis"]
+  cr --> so["series_observations()<br/>canal → série selon les affectations datées<br/>+ corrections (rejet, remplacement)"]
+  so --> sd["series_data()<br/>tous les points, ou min / max<br/>par intervalle au-delà de 1 000"]
+  so --> st["series_stats()<br/>min, max, moyenne"]
+  so --> ex["export_csv()"]
+  sd -->|API| ui["Navigateur : courbes<br/>escalier · lissé · simplifié<br/>moyenne d'un groupe · tendance"]
+```
 
-## Sécurité
+- **Affectations datées** : le rattachement d'une mesure à un emplacement est calculé à la
+  lecture ; déplacer un capteur ou corriger une date ne réécrit aucune mesure.
+- **Réduction** : au-delà de 1 000 points, `series_data` renvoie le minimum et le maximum réels de
+  chaque intervalle ; les pics restent visibles à toutes les échelles.
+- **Calculs dans le navigateur** (rapides, sans charge pour la base) : rendus lissé et simplifié
+  (`curve.ts`), moyenne d'un emplacement parent (`placetree.ts`), flèches de tendance et
+  inversions (`trend.ts`).
 
-- **Maisons** : emplacements et capteurs appartiennent à une maison (`home`). Les membres
-  (`home_member`, désignés par leur e-mail, invitables avant leur première connexion) ont un rôle
-  `owner`, `editor` ou `viewer`. L'administrateur de la plateforme (`app_user.role = 'admin'`) voit
-  toutes les maisons et seul il accède aux statistiques globales et à la maintenance.
-- **Row Level Security** sur toutes les tables : chaque règle compare l'identifiant de la ligne à
-  la liste des maisons / capteurs / séries accessibles, calculée **une fois par requête**
-  (`(SELECT my_channel_ids())::int[]`), jamais par ligne.
-- Cohérence : un capteur ne peut alimenter qu'un emplacement de sa maison ; une maison garde
-  toujours au moins un propriétaire.
+## Application web
+
+```mermaid
+flowchart TB
+  app["App.svelte<br/>en-tête, navigation, routage (#/…)"]
+  subgraph pages["Pages"]
+    now["Maintenant"]
+    charts["Courbes"]
+    place["Emplacement"]
+    data["Données<br/>import / export"]
+    admin["Admin : tableau de bord,<br/>capteurs, emplacements,<br/>partage, maintenance"]
+    opts["Options · À propos"]
+  end
+  subgraph comps["Composants"]
+    tc["TimeChart<br/>(ECharts à la demande)"]
+    bars["PeriodBar · DisplayBar<br/>TrendArrow · InviteSend"]
+  end
+  subgraph lib["Logique (src/lib)"]
+    api["api.ts : interface Api"]
+    sapi["supabase-api.ts"]
+    demo["demo-api.ts<br/>données fictives"]
+    calc["curve · placetree · trend<br/>dataio · timeutil"]
+    state["home · display · router<br/>(état partagé, préférences)"]
+  end
+  app --> pages
+  pages --> comps
+  pages --> lib
+  api --> sapi & demo
+  sapi -->|supabase-js| sb[("Supabase")]
+```
+
+- **Mode démo** : sans variables Supabase, l'application tourne sur des données fictives
+  (`demo-api.ts`) ; pratique pour essayer une évolution sans toucher aux vraies données.
+- **Préférences** (rendu des courbes, grandeurs masquées, taille du texte, densité, tendances) :
+  mémorisées sur l'appareil (`localStorage`).
+- **Textes** : `docs/a-propos.md`, `docs/nouveautes.md` et `docs/guide-utilisateur.md` sont intégrés
+  à la construction ; les modifier sur GitHub suffit à mettre l'application à jour.
+
+## Sécurité et droits
+
+```mermaid
+flowchart LR
+  user["Compte connecté<br/>(jeton JWT : id, e-mail)"] --> rls
+  subgraph rls["Règles d'accès (Row Level Security)"]
+    ids["my_home_ids(rôle) · my_place_ids · my_channel_ids…<br/>calculés une fois par requête"]
+  end
+  member[("home_member<br/>e-mail · rôle")] --> ids
+  ids --> tables[("tables de la maison :<br/>emplacements, capteurs,<br/>séries, mesures…")]
+  admin["Administrateur de la plateforme<br/>(app_user.role = admin)"] -->|"voit tout, statistiques,<br/>maintenance"| tables
+```
+
+| Rôle dans une maison | Peut… |
+|---|---|
+| **Propriétaire** (`owner`) | tout, y compris inviter, retirer, changer les droits |
+| **Gestion** (`editor`) | capteurs, emplacements, corrections, import ; collecte de ses capteurs |
+| **Lecture** (`viewer`) | consulter valeurs, courbes, export |
+
+- Les membres sont désignés par leur **e-mail** : une invitation fonctionne avant la première
+  connexion, et les droits suivent l'adresse même si le compte est recréé.
+- Cohérence garantie par la base : un capteur n'alimente qu'un emplacement de sa maison, une
+  maison garde au moins un propriétaire, un emplacement ne peut pas être son propre ancêtre.
 - Le collecteur utilise la clé *service_role* ; il n'accepte que le jeton de pg_cron,
   l'administrateur, ou un gestionnaire de maison pour ses propres capteurs (`can_collect`).
-- Identifiants Mobile Alerts : secrets de l'Edge Function et fichiers locaux ignorés par Git.
+
+## Déploiement
+
+```mermaid
+flowchart LR
+  dev["Modification<br/>(code ou docs/*.md)"] -->|git push| gh["GitHub"]
+  gh -->|automatique| tests["Actions « Tests »<br/>pytest · node --test ·<br/>svelte-check · build"]
+  gh -->|automatique| cfp["Cloudflare Pages<br/>construit et publie l'application"]
+  gh -->|"à la demande<br/>(Run workflow)"| dep["Actions « Déploiement Supabase »<br/>supabase db push +<br/>functions deploy collect"]
+  dep --> sbp[("Supabase")]
+```
+
+- Une modification de la **base** (nouveau fichier dans `supabase/migrations/`) demande de lancer
+  le workflow « Déploiement Supabase » ; l'application, elle, se republie seule.
+- Secrets : clés Supabase dans les secrets GitHub et Cloudflare ; identifiants Mobile Alerts dans
+  les secrets de l'Edge Function ; URL et jeton de collecte dans le Vault.
+
+## Modèle de données
+
+Vue d'ensemble ci-dessous ; **toutes les tables et colonnes** dans
+[modele-donnees.md](modele-donnees.md).
+
+```mermaid
+flowchart TB
+  home["🏠 home<br/>maison"] --> member["home_member<br/>membres et rôles"]
+  home --> place["📍 place<br/>emplacement (arborescence)"]
+  home --> device["📡 device<br/>capteur physique"]
+  place -->|parent| place
+  device --> channel["device_channel<br/>canal = une grandeur mesurée"]
+  property["observed_property<br/>température, humidité…"] --> channel
+  place --> series["📈 series<br/>emplacement × grandeur"]
+  property --> series
+  channel --> deployment["deployment<br/>canal → série, période datée"]
+  series --> deployment
+  channel --> reading[("reading · reading_day<br/>mesures brutes")]
+  channel --> correction["correction<br/>rejet, remplacement"]
+  series --> annotation["annotation<br/>commentaire sur une période"]
+```
+
+L'idée centrale : le **capteur** (ce qui mesure) est séparé de l'**emplacement** (ce qu'on
+regarde). Les mesures sont rattachées au canal du capteur ; la **série** affichée (« Salon –
+température ») en reçoit les valeurs selon les **affectations datées**. Ce découpage suit le
+standard OGC SensorThings (Thing, Sensor, Location, Datastream, Observation).
 
 ## Évolutions d'architecture prévues
 
 À garder en tête dans les choix techniques (détails dans la [feuille de route](ROADMAP.md)) :
 
-- **Plusieurs marques de capteurs** (ROADMAP 16) : Mobile Alerts n'est qu'une source ; le
-  collecteur doit pouvoir choisir un adaptateur par fournisseur (`device.vendor`), et une source
-  pourra aussi *pousser* ses mesures. Le nom de l'application ne doit pas reprendre une marque
-  (ROADMAP 14).
+- **Plusieurs marques de capteurs** (ROADMAP 16) : un adaptateur par fournisseur dans le
+  collecteur (`device.vendor`), et une source pourra aussi *pousser* ses mesures. Le nom de
+  l'application ne doit pas reprendre une marque (ROADMAP 14).
 - **Règles et actions** (ROADMAP 7 et 17) : un moteur commun évalue des conditions sur les séries
-  après chaque collecte et déclenche des actions : e-mail, notification, commande d'appareils
-  (volets Somfy TaHoma, Google Home, Home Assistant, webhooks). Identifiants des services tiers
-  par maison, chiffrés.
+  après chaque collecte (seuils, capteur muet, inversion de tendance) et déclenche des actions :
+  e-mail, notification, commande d'appareils (volets Somfy TaHoma, Google Home, Home Assistant,
+  webhooks). Identifiants des services tiers par maison, chiffrés.
 - **E-mails** (ROADMAP 15) : envoi par un service SMTP / API sur le domaine de l'application,
   réception par Cloudflare Email Routing vers une Edge Function.

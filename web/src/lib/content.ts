@@ -3,6 +3,7 @@
 import { marked } from "marked";
 import aboutMd from "../../../docs/a-propos.md?raw";
 import newsMd from "../../../docs/nouveautes.md?raw";
+import guideMd from "../../../docs/guide-utilisateur.md?raw";
 
 const stripComments = (md: string) => md.replace(/<!--[\s\S]*?-->/g, "").trim();
 
@@ -19,6 +20,7 @@ marked.use({
 
 export const aboutHtml = marked.parse(stripComments(aboutMd), { async: false });
 export const newsHtml = marked.parse(stripComments(newsMd), { async: false });
+export const guideHtml = marked.parse(stripComments(guideMd), { async: false });
 
 /** Empreinte des nouveautés : sert à signaler qu'il y a du nouveau depuis la dernière visite */
 export const newsVersion = (() => {
