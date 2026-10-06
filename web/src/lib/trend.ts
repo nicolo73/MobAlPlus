@@ -5,7 +5,9 @@
 //   de la valeur en cours au début de la fenêtre (le capteur n'enregistre qu'aux changements) ;
 // - inclinaison : pente rapportée à l'amplitude des dernières 24 h (une même pente compte plus
 //   un jour calme qu'un jour de grand écart), avec une amplitude minimale par grandeur ;
-// - inversion : maximum (ou minimum) récent, dépassé d'au moins le seuil de part et d'autre.
+// - inversion : maximum (ou minimum) récent, précédé d'une montée d'au moins le seuil et suivi d'une
+//   baisse d'au moins la moitié du seuil (et de deux pas de mesure) : après un pic, la baisse est
+//   souvent lente au début, il faut la signaler sans attendre qu'elle ait rattrapé la montée.
 
 import type { Point } from "./types";
 
@@ -27,6 +29,8 @@ export const TREND_DEFAULTS: TrendOptions = {
 /** Amplitude journalière minimale prise en compte (évite des flèches nerveuses un jour très calme) */
 const MIN_AMPLITUDE: Record<string, number> = { temperature: 1, humidity: 5 };
 const DEFAULT_REVERSAL = 0.5;
+/** Pas de mesure des capteurs (arrondi) : une baisse d'un seul pas peut n'être qu'une oscillation */
+const RESOLUTION: Record<string, number> = { temperature: 0.1, humidity: 1 };
 /** Seuils d'inclinaison : part de l'amplitude journalière par heure */
 const LEVELS = [0.03, 0.07, 0.12];
 const H = 3_600_000;
@@ -67,11 +71,13 @@ export function computeTrend(points: Point[], property: string, opts: TrendOptio
   const steps = LEVELS.filter((t) => r >= t * opts.sensitivity).length;
   const level = Math.sign(slope) * steps;
 
-  return { level, slope, reversal: findReversal(pts, opts.reversal[property] ?? DEFAULT_REVERSAL, opts.holdMin * 60_000) };
+  const threshold = opts.reversal[property] ?? DEFAULT_REVERSAL;
+  const after = Math.max(threshold / 2, 2 * (RESOLUTION[property] ?? 0));
+  return { level, slope, reversal: findReversal(pts, threshold, after, opts.holdMin * 60_000) };
 }
 
-/** Pic ou creux passé depuis moins de `hold`, avec un écart d'au moins `threshold` de part et d'autre */
-function findReversal(pts: Point[], threshold: number, hold: number): Trend["reversal"] {
+/** Pic ou creux passé depuis moins de `hold` : écart d'au moins `before` avant, `after` après */
+function findReversal(pts: Point[], before: number, after: number, hold: number): Trend["reversal"] {
   const last = pts[pts.length - 1];
   const recent = pts.filter((p) => p.ts >= last.ts - hold);
   const eps = 1e-9;
@@ -82,12 +88,12 @@ function findReversal(pts: Point[], threshold: number, hold: number): Trend["rev
     let ext: Point | undefined;
     for (const p of recent) if (!ext || sign * (p.value - ext.value) >= -eps) ext = p;
     if (!ext || ext === last) continue;
-    const after = sign * (ext.value - last.value);
+    const drop = sign * (ext.value - last.value);
     // Écart avant le pic, sur une durée comparable
     const prior = pts.filter((p) => p.ts >= ext!.ts - hold && p.ts <= ext!.ts);
     const lowest = prior.reduce((m, p) => Math.min(m, sign * p.value), Infinity);
     const beforeGap = sign * ext.value - lowest;
-    if (after >= threshold - eps && beforeGap >= threshold - eps && (!found || ext.ts > found.ts))
+    if (drop >= after - eps && beforeGap >= before - eps && (!found || ext.ts > found.ts))
       found = { kind, ts: ext.ts, value: ext.value };
   }
   return found;

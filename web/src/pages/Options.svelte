@@ -79,7 +79,7 @@
     </div>
     <p class="muted" style="margin:0">La pente est calculée sur la dernière période ci-dessous et comparée à l'écart du
       jour (minimum – maximum des dernières 24 h) : une même hausse compte plus un jour calme. Une inversion est
-      signalée quand la valeur a monté puis baissé (ou l'inverse) d'au moins le seuil.</p>
+      signalée quand la valeur a monté d'au moins le seuil puis a commencé à baisser (ou l'inverse).</p>
     <div class="opt">
       <h3>Période de calcul de la pente</h3>
       <div class="seg" role="group" aria-label="Période de calcul">
@@ -109,7 +109,8 @@
           <span><input type="number" min="1" step="1" value={display.trend.reversal.humidity}
                        onchange={(e) => setReversal("humidity", e)} /> %</span></label>
       </div>
-      <small class="muted">Écart minimal avant et après le pic pour le signaler.</small>
+      <small class="muted">Montée minimale avant le pic ; après le pic, une baisse de la moitié suffit (au moins
+        2 pas de mesure : 0,2 °C, 2 %).</small>
     </div>
     <div class="opt">
       <h3>Inversion signalée pendant</h3>

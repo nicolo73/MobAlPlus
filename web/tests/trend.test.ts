@@ -53,3 +53,20 @@ test("pas d'inversion quand le pic est trop ancien", () => {
   assert.equal(t.reversal, undefined);
   assert.ok(t.level < 0);
 });
+
+test("inversion : pic lent d'une pièce (cas réel du 6 octobre)", () => {
+  // 12:56 → 18:39, une mesure toutes les 7 min : montée de 20,1 à 22,8 °C, puis 22,7 et 22,6
+  const vals = [20.1, 20.2, 20.3, 20.3, 20.4, 20.5, 20.5, 20.6, 20.6, 20.7, 20.8, 20.9, 21.0, 21.1, 21.2, 21.3, 21.4,
+    21.5, 21.6, 21.7, 21.7, 21.9, 22.0, 22.0, 22.0, 22.1, 22.2, 22.3, 22.4, 22.5, 22.5, 22.5, 22.7, 22.7, 22.7, 22.7,
+    22.7, 22.7, 22.7, 22.8, 22.8, 22.8, 22.7, 22.7, 22.7, 22.7, 22.7, 22.6, 22.6, 22.6];
+  const pts = vals.map((value, i) => ({ ts: i * 7 * M, value, quality: "ok" as const }));
+  const t = computeTrend(pts, "temperature")!;
+  assert.equal(t.reversal?.kind, "peak");
+  assert.equal(t.reversal?.value, 22.8);
+});
+
+test("pas d'inversion sur une simple oscillation d'un pas", () => {
+  const vals = [20.0, 20.2, 20.4, 20.6, 20.8, 21.0, 21.0, 20.9, 21.0, 20.9];
+  const pts = vals.map((value, i) => ({ ts: i * 7 * M, value, quality: "ok" as const }));
+  assert.equal(computeTrend(pts, "temperature")!.reversal, undefined);
+});
