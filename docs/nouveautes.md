@@ -6,7 +6,12 @@
 
 
 ## 6 octobre 2026
-- **Couleur de chaque emplacement** dans les courbes : à choisir sur la page de l'emplacement
+- Page **Maintenant** : fiches dans l'ordre de l'arborescence, regroupées par emplacement parent
+  (cadre en pointillé avec la **moyenne** ⌀ et sa tendance) ; liseré de la couleur choisie pour
+  l'emplacement.
+- **Page d'un emplacement parent** : moyenne, courbes de ses sous-emplacements avec la moyenne en
+  tirets, liste des sous-emplacements, couleur de la moyenne.
+- Flèches de tendance : un **pic** est signalé dès que la baisse s'amorce (moitié du seuil).- **Couleur de chaque emplacement** dans les courbes : à choisir sur la page de l'emplacement
   (« Couleur dans les courbes ») ou dans Admin › Emplacements : 8 couleurs de la palette, gris,
   marron, turquoise… ou n'importe quelle couleur personnalisée.- **Guide d'utilisation** dans l'application : lien depuis « À propos » et « Options ».- **Flèches de tendance** sur la page Maintenant : plus ou moins inclinées selon la variation de la
   dernière heure (comparée à l'écart du jour), et flèche « cassée » orange quand on vient de passer

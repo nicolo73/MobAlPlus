@@ -9,7 +9,7 @@
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
   import Maintenance from "./pages/Maintenance.svelte";
-  import Place from "./pages/Place.svelte";
+  import Place from "./pages/PlaceRoute.svelte";
   import Sharing from "./pages/Sharing.svelte";
   import Welcome from "./pages/Welcome.svelte";
   import Data from "./pages/Data.svelte";

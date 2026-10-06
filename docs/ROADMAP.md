@@ -179,7 +179,8 @@ de ses sous-emplacements mesurés), en tirets, avec sa ligne dans le tableau ré
 emplacements sans mesure grisés. Un emplacement parent se sélectionne en entier (bouton en
 pointillé = moyenne, ses éventuelles mesures propres comprises) ; ordre et arborescence modifiables
 dans Admin › Emplacements (glisser-déposer, flèches ; `place.sort_order`, `reorder_places`,
-boucles interdites). Pistes : bande min – max du groupe autour de la moyenne, page
+boucles interdites). Page Maintenant regroupée par emplacement parent (moyenne et tendance) et
+page d'un emplacement parent (moyenne, courbes des sous-emplacements, liste) le 06/10/2026. Pistes : bande min – max du groupe autour de la moyenne, page
 d'un emplacement parent (courbes de ses sous-emplacements), statistiques du groupe.
 
 **Besoin** : profiter de la hiérarchie des emplacements (Maison > étage > pièces) pour des moyennes
@@ -325,6 +326,7 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 06/10/2026 | Maintenant regroupé par emplacement parent, page de groupe, liseré de couleur |
 | 06/10/2026 | Couleur des courbes choisie par emplacement |
 | 06/10/2026 | Flèches de tendance et inversions (pic, creux) sur la page Maintenant, réglables |
 | 05/10/2026 | Emplacements : ordre et arborescence réorganisables (glisser-déposer, flèches) |

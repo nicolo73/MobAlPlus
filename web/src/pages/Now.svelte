@@ -6,10 +6,14 @@
   import DisplayBar from "../components/DisplayBar.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
   import { computeTrend } from "../lib/trend";
-  import type { Point } from "../lib/types";
+  import type { Place, Point, SeriesInfo } from "../lib/types";
+  import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
+  import { isDark, placeColor } from "../lib/colors";
   import { display, visibleProps } from "../lib/display.svelte";
 
   let values = $state<CurrentValue[] | null>(null);
+  let places = $state<Place[]>([]);
+  const dark = isDark();
   let error = $state("");
   let now = $state(Date.now());
 
@@ -36,7 +40,9 @@
 
   async function load() {
     try {
-      values = await api.currentValues();
+      const [cur, pl] = await Promise.all([api.currentValues(), api.places().catch(() => places)]);
+      places = pl;
+      values = cur;
       now = Date.now();
       error = "";
       setTimeout(() => loadTrends(), 0);
@@ -64,16 +70,38 @@
   });
   const visible = $derived(visibleProps(properties.map((p) => p.code)));
 
-  /** Une carte par emplacement : température et humidité côte à côte */
+  /** Valeurs actuelles affichées, par emplacement */
   const byPlace = $derived.by(() => {
-    const groups = new Map<number, { id: number; name: string; items: CurrentValue[] }>();
+    const m = new Map<number, CurrentValue[]>();
     for (const v of values ?? []) {
       if (!visible.includes(v.property)) continue;
-      if (!groups.has(v.place_id)) groups.set(v.place_id, { id: v.place_id, name: v.place_name, items: [] });
-      groups.get(v.place_id)!.items.push(v);
+      m.set(v.place_id, [...(m.get(v.place_id) ?? []), v]);
     }
-    return [...groups.values()];
+    for (const items of m.values()) items.sort((a, b) => rank(a.property) - rank(b.property));
+    return m;
   });
+
+  /** Arborescence des emplacements (ordre choisi dans Admin › Emplacements) */
+  const tree = $derived(placeTree(places, (values ?? []).map((v) => ({
+    id: v.series_id, name: v.series_name, place_id: v.place_id, place_name: v.place_name, exposure: null,
+    property: v.property, property_name: v.property, unit: v.unit,
+  }) as SeriesInfo)));
+
+  /** Couleur choisie pour l'emplacement (marqueur), sinon rien */
+  const markOf = (n: PlaceNode) => (n.custom || n.color !== null ? placeColor({ color: n.custom, color_slot: n.color }, dark, 0) : null);
+
+  /** Moyenne actuelle d'un groupe, par grandeur, et sa tendance (moyenne des courbes) */
+  function groupValues(n: PlaceNode) {
+    return visible.flatMap((prop) => {
+      const items = n.measured.flatMap((id) => (byPlace.get(id) ?? []).filter((v) => v.property === prop && v.value !== null));
+      if (!items.length) return [];
+      const value = items.reduce((t, v) => t + v.value!, 0) / items.length;
+      const lists = items.map((v) => history.get(v.series_id)).filter((l): l is Point[] => !!l);
+      const trend = lists.length === items.length ? computeTrend(averagePoints(lists), prop, display.trend) : null;
+      const ts = items.map((v) => v.ts).filter(Boolean).sort()[0] ?? null;
+      return [{ property: prop, unit: items[0].unit, value: Math.round(value * 10) / 10, n: items.length, trend, ts }];
+    });
+  }
 </script>
 
 <div class="row head">
@@ -95,27 +123,59 @@
     {#if canEdit()}<a href="#/admin/capteurs">Configurer les capteurs</a>{/if}
   </div>
 {:else}
+  {#snippet card(n: PlaceNode)}
+    {@const items = byPlace.get(n.id) ?? []}
+    {@const ts = items[0]?.ts ?? null}
+    {@const stale = isStale(ts, now)}
+    {@const mark = markOf(n)}
+    <a class="card place" class:stale class:marked={mark} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}"
+       aria-label="{n.name} : historique et courbes">
+      <h2>{n.name} <span class="chev" aria-hidden="true">›</span></h2>
+      <div class="values">
+        {#each items as v (v.series_id)}
+          <div class="value {v.property}">
+            <span class="num big">{fmtValue(v.value, v.unit)}{#if trends.get(v.series_id)}<span class="arrow"><TrendArrow
+              trend={trends.get(v.series_id)!} unit={v.unit} detail={display.density !== "compact"} /></span>{/if}</span>
+            <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}</small>
+          </div>
+        {/each}
+      </div>
+      <small title={fmtDate(ts)}>
+        {#if stale}<span class="badge warn">ancienne</span>{/if}
+        {fmtAgo(ts, now)}
+      </small>
+    </a>
+  {/snippet}
+
+  {#snippet node(n: PlaceNode)}
+    {#if n.children.length}
+      {#if n.measured.some((id) => byPlace.has(id))}
+        {@const avg = groupValues(n)}
+        {@const mark = markOf(n)}
+        <section class="group" style={mark ? `--mark:${mark}` : ""} class:marked={mark}>
+          <a class="group-head" href="#/lieu/{n.id}" aria-label="{n.name} : moyenne et détail du groupe">
+            <h2>{n.name}</h2>
+            {#each avg as g (g.property)}
+              <span class="avg {g.property}" title="moyenne de {g.n} emplacement{g.n > 1 ? 's' : ''}">
+                <span class="num">⌀ {fmtValue(g.value, g.unit)}</span>{#if g.trend}<span class="arrow"><TrendArrow
+                  trend={g.trend} unit={g.unit} /></span>{/if}
+              </span>
+            {/each}
+            <span class="chev" aria-hidden="true">›</span>
+          </a>
+          <div class="grid now" class:compact={display.density === "compact"}>
+            {#if byPlace.has(n.id)}{@render card(n)}{/if}
+            {#each n.children as c (c.id)}{@render node(c)}{/each}
+          </div>
+        </section>
+      {/if}
+    {:else if byPlace.has(n.id)}
+      {@render card(n)}
+    {/if}
+  {/snippet}
+
   <div class="grid now" class:compact={display.density === "compact"}>
-    {#each byPlace as place (place.id)}
-      {@const ts = place.items[0].ts}
-      {@const stale = isStale(ts, now)}
-      <a class="card place" class:stale href="#/lieu/{place.id}" aria-label="{place.name} : historique et courbes">
-        <h2>{place.name} <span class="chev" aria-hidden="true">›</span></h2>
-        <div class="values">
-          {#each place.items as v (v.series_id)}
-            <div class="value {v.property}">
-              <span class="num big">{fmtValue(v.value, v.unit)}{#if trends.get(v.series_id)}<span class="arrow"><TrendArrow
-                trend={trends.get(v.series_id)!} unit={v.unit} detail={display.density !== "compact"} /></span>{/if}</span>
-              <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}</small>
-            </div>
-          {/each}
-        </div>
-        <small title={fmtDate(ts)}>
-          {#if stale}<span class="badge warn">ancienne</span>{/if}
-          {fmtAgo(ts, now)}
-        </small>
-      </a>
-    {/each}
+    {#each tree as n (n.id)}{@render node(n)}{/each}
   </div>
 {/if}
 
@@ -143,4 +203,18 @@
   .temperature .big { color: var(--temp); }
   .humidity .big { color: var(--hum); }
   .stale .big { opacity: 0.6; }
+  /* Couleur choisie pour l'emplacement : liseré à gauche, comme repère commun avec les courbes */
+  .place.marked { border-left: 4px solid var(--mark); }
+  /* Emplacement parent : cadre en pointillé regroupant ses sous-emplacements, avec la moyenne */
+  .group { grid-column: 1 / -1; border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 0.6rem;
+           display: grid; gap: 0.6rem; }
+  .group.marked { border-color: var(--mark); }
+  .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; text-decoration: none; color: inherit;
+                padding: 0 0.25rem; }
+  .group-head h2 { margin: 0; font-size: 1rem; }
+  .group-head .chev { margin-left: auto; }
+  .avg { display: inline-flex; align-items: center; font-weight: 700; }
+  .avg.temperature { color: var(--temp); }
+  .avg.humidity { color: var(--hum); }
+  .compact.now, .group .now { gap: 0.5rem; }
 </style>

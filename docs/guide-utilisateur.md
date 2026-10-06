@@ -26,6 +26,12 @@ Une fiche par emplacement : dernière température, humidité, et ancienneté de
 - **Flèche cassée orange** : on vient de passer un **pic** (la température redescend) ou un **creux**
   (elle remonte). C'est le moment de fermer ou d'ouvrir les fenêtres.
 - Boutons **Temp. / Hum.** en haut : n'afficher que la température (ou que l'humidité).
+- Les fiches suivent l'ordre choisi dans Admin › Emplacements. Les sous-emplacements d'un
+  emplacement parent (ex. Jardin) sont regroupés dans un **cadre en pointillé** qui affiche leur
+  **moyenne** (⌀) et sa tendance ; toucher le titre du cadre ouvre la page du groupe (moyenne,
+  courbes de chaque sous-emplacement et de la moyenne).
+- Le liseré coloré à gauche d'une fiche rappelle la couleur choisie pour l'emplacement dans les
+  courbes.
 - Toucher une fiche ouvre la page de l'emplacement.
 - Les valeurs se mettent à jour toutes les 2 minutes ; ↻ pour forcer.
 

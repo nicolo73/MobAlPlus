@@ -172,7 +172,8 @@
 
   {#if error}<div class="notice err" role="alert">{error}</div>{/if}
 
-  <section class="card head">
+  <section class="card head"
+           style={color != null ? `border-left: 4px solid ${typeof color === "string" ? color : slotColor(color, dark)}` : ""}>
     <div class="row">
       <h1 style="margin:0">{name}</h1>
       {#if series?.[0]?.exposure}<span class="badge">{EXPOSURE[series[0].exposure]}</span>{/if}
