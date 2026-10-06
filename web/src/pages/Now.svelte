@@ -4,17 +4,42 @@
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import type { CurrentValue } from "../lib/types";
   import DisplayBar from "../components/DisplayBar.svelte";
+  import TrendArrow from "../components/TrendArrow.svelte";
+  import { computeTrend } from "../lib/trend";
+  import type { Point } from "../lib/types";
   import { display, visibleProps } from "../lib/display.svelte";
 
   let values = $state<CurrentValue[] | null>(null);
   let error = $state("");
   let now = $state(Date.now());
 
+  // Tendances : chargées après les valeurs (affichage immédiat), seulement pour les grandeurs
+  // affichées, et au plus toutes les 5 minutes
+  let history = $state(new Map<number, Point[]>());
+  let historyAt = 0;
+  let historyKey = "";
+  async function loadTrends(force = false) {
+    const ids = (values ?? []).filter((v) => visible.includes(v.property) && v.value !== null).map((v) => v.series_id);
+    const key = ids.join(",");
+    if (!ids.length || (!force && key === historyKey && Date.now() - historyAt < 5 * 60_000)) return;
+    historyKey = key;
+    historyAt = Date.now();
+    try {
+      const to = Date.now();
+      history = await api.seriesData(ids, to - 25 * 3_600_000, to);
+    } catch { historyKey = ""; /* les flèches attendront le prochain rafraîchissement */ }
+  }
+  const trends = $derived(new Map([...history].map(([id, pts]) => [id, computeTrend(pts,
+    values?.find((v) => v.series_id === id)?.property ?? "", display.trend)])));
+  // Grandeur réaffichée : ses tendances sont chargées à leur tour
+  $effect(() => { void visible; if (values) setTimeout(() => loadTrends(), 0); });
+
   async function load() {
     try {
       values = await api.currentValues();
       now = Date.now();
       error = "";
+      setTimeout(() => loadTrends(), 0);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -79,7 +104,8 @@
         <div class="values">
           {#each place.items as v (v.series_id)}
             <div class="value {v.property}">
-              <span class="num big">{fmtValue(v.value, v.unit)}</span>
+              <span class="num big">{fmtValue(v.value, v.unit)}{#if trends.get(v.series_id)}<span class="arrow"><TrendArrow
+                trend={trends.get(v.series_id)!} unit={v.unit} detail={display.density !== "compact"} /></span>{/if}</span>
               <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}</small>
             </div>
           {/each}
@@ -112,6 +138,8 @@
   .values { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
   .value { display: grid; }
   .big { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+  .arrow { font-size: 1rem; margin-left: 0.3rem; font-weight: 400; }
+  .compact .arrow { font-size: 0.95rem; margin-left: 0.2rem; }
   .temperature .big { color: var(--temp); }
   .humidity .big { color: var(--hum); }
   .stale .big { opacity: 0.6; }

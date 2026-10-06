@@ -3,6 +3,7 @@
 // densité (pour voir plus de fiches à la fois).
 
 import type { CurveMode } from "./curve";
+import { TREND_DEFAULTS, type TrendOptions } from "./trend";
 
 const STORE = "mobalplus.display";
 const MODES: CurveMode[] = ["step", "smooth", "simple"];
@@ -17,6 +18,7 @@ export const display = $state({
   hidden: [] as string[],
   text: "normal" as TextSize,
   density: "comfort" as Density,
+  trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
 });
 
 try {
@@ -24,6 +26,16 @@ try {
   if (MODES.includes(saved.curve)) display.curve = saved.curve;
   if (TEXTS.includes(saved.text)) display.text = saved.text;
   if (DENSITIES.includes(saved.density)) display.density = saved.density;
+  if (saved.trend && typeof saved.trend === "object") {
+    const t = saved.trend;
+    const num = (v: unknown, d: number) => (typeof v === "number" && v > 0 ? v : d);
+    display.trend = {
+      windowMin: num(t.windowMin, TREND_DEFAULTS.windowMin),
+      sensitivity: num(t.sensitivity, TREND_DEFAULTS.sensitivity),
+      holdMin: num(t.holdMin, TREND_DEFAULTS.holdMin),
+      reversal: { ...TREND_DEFAULTS.reversal, ...Object.fromEntries(Object.entries(t.reversal ?? {}).filter((e): e is [string, number] => typeof e[1] === "number" && e[1] > 0)) },
+    };
+  }
   if (Array.isArray(saved.hidden)) display.hidden = saved.hidden.filter((h: unknown) => typeof h === "string");
 } catch { /* stockage indisponible : valeurs par défaut */ }
 apply();
@@ -49,6 +61,16 @@ export function setDensity(density: Density) {
 
 function save() {
   try { localStorage.setItem(STORE, JSON.stringify(display)); } catch { /* ignoré */ }
+}
+
+export function setTrend(patch: Partial<TrendOptions>) {
+  display.trend = { ...display.trend, ...patch };
+  save();
+}
+
+export function resetTrend() {
+  display.trend = structuredClone(TREND_DEFAULTS);
+  save();
 }
 
 export function setCurve(mode: CurveMode) {

@@ -145,7 +145,12 @@ pour l'urgent, quotidien pour les avertissements).
   notifications push de la PWA en option ;
 - seuils affichés en lignes horizontales sur les courbes de la page d'un emplacement,
   **déplaçables en les faisant glisser** pour les ajuster ;
-- alerte « capteur muet » (voir 6).
+- alerte « capteur muet » (voir 6) ;
+- alerte **inversion de tendance** (pic ou creux passé, ex. « l'extérieur redescend : ouvrir les
+  fenêtres », « le salon a commencé à chauffer : fermer les volets ») : reprendre l'algorithme des
+  flèches de tendance (`web/src/lib/trend.ts` : pente sur 1 h rapportée à l'écart du jour, pic ou
+  creux dépassé d'un seuil de part et d'autre), côté base pour l'évaluer à chaque collecte ; lien
+  avec les actions (voir 17).
 
 ## 8. Données météo publiques
 
@@ -314,6 +319,7 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 06/10/2026 | Flèches de tendance et inversions (pic, creux) sur la page Maintenant, réglables |
 | 05/10/2026 | Emplacements : ordre et arborescence réorganisables (glisser-déposer, flèches) |
 | 05/10/2026 | Rendu « Simplifié » des courbes (un point par palier), « Lissé » par défaut |
 | 05/10/2026 | Partage : message d'invitation à envoyer par WhatsApp, SMS, e-mail ou à copier |

@@ -5,6 +5,11 @@
 -->
 
 
+## 6 octobre 2026
+- **Flèches de tendance** sur la page Maintenant : plus ou moins inclinées selon la variation de la
+  dernière heure (comparée à l'écart du jour), et flèche « cassée » orange quand on vient de passer
+  un **pic** ou un **creux** (moment de fermer ou d'ouvrir les fenêtres). Réglages dans Options.
+
 ## 3-4-5 octobre 2026
 - Page **Maintenant** : bouton discret « Temp. / Hum. » pour n'afficher que la température.
 - Nouvelle page **Options d'affichage** (icône à réglettes en haut) : taille du texte et
