@@ -245,7 +245,8 @@ flowchart LR
 ```
 
 - Les seuils sont réglés par série (emplacement × grandeur) sur deux niveaux ; un dépassement est
-  une alerte **en cours** jusqu'au retour en deçà du seuil d'un pas de mesure (hystérésis).
+  une alerte **en cours** jusqu'au retour en deçà du seuil d'un pas de mesure (hystérésis) ; un
+  refranchissement dans l'heure rouvre la même alerte : une notification par franchissement.
 - Les pics et creux reprennent l'algorithme des flèches de tendance (`trend.ts`) ;
   `alerteval.ts` en est la version JavaScript (mode démo, tests).
 - Chaque compte archive ses alertes pour lui-même ; l'effacement vaut pour toute la maison.

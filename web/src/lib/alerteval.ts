@@ -8,6 +8,8 @@ import type { AlertRule, Point } from "./types";
 export const PEAK_DEFAULT: Record<string, number> = { temperature: 0.3, humidity: 3 };
 export const RESOLUTION: Record<string, number> = { temperature: 0.1, humidity: 1 };
 const HOLD = 2 * 3_600_000;
+/** Refranchissement moins d'une heure après la fin d'une alerte : la même alerte est rouverte */
+const REARM = 3_600_000;
 const EPS = 1e-6;
 
 export interface EvalEvent {
@@ -32,6 +34,8 @@ export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">
     let open: EvalEvent | null = null;
     for (const p of pts) {
       if (sign * (p.value - t) > 0) {
+        const prev = out.at(-1);
+        if (!open && prev?.ended_at != null && p.ts - prev.ended_at < REARM) { open = prev; open.ended_at = null; }
         if (!open) out.push(open = { kind: rule.kind, level: rule.level, threshold: t, started_at: p.ts, ended_at: null, value: p.value });
         else open.value = sign > 0 ? Math.max(open.value, p.value) : Math.min(open.value, p.value);
       } else if (open && sign * (t - p.value) >= res - EPS) {

@@ -687,3 +687,25 @@ def test_alerts_rights_and_archive(conn):
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
+
+
+def test_alerts_one_per_crossing(conn):
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sid = series_id(conn, "salon", "temperature")
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([{"kind": "above", "level": "warning", "threshold": 25}])))
+    t0 = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    # Oscillation autour du seuil : 25,1 / 24,9 / 25,2 / 24,8 / 25,1… puis vraie baisse, puis nouvelle montée 3 h après
+    vals = [24.5, 25.1, 25.3, 24.9, 25.2, 24.8, 25.1, 25.4, 24.0, 23.5]
+    for i, v in enumerate(vals):
+        ts = t0 + timedelta(minutes=10 * i)
+        db.insert_readings(conn, [(ch, ts, v)])
+        conn.execute("SELECT evaluate_alerts(%s)", (ts,))
+    rows = conn.execute("SELECT started_at, ended_at, value FROM alert_event ORDER BY id").fetchall()
+    assert len(rows) == 1                                   # une seule alerte malgré l'oscillation
+    assert rows[0][0] == t0 + timedelta(minutes=10) and rows[0][2] == pytest.approx(25.4)
+    assert rows[0][1] == t0 + timedelta(minutes=80)         # close à 24,0
+    later = t0 + timedelta(hours=3)
+    db.insert_readings(conn, [(ch, later, 25.5)])
+    conn.execute("SELECT evaluate_alerts(%s)", (later,))
+    assert conn.execute("SELECT count(*) FROM alert_event").fetchone()[0] == 2   # nouveau franchissement
+    conn.commit()

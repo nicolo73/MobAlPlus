@@ -29,3 +29,13 @@ test("pic lent (cas réel) et pas de pic sur une oscillation", () => {
     { kind: "peak", level: "warning", threshold: null, enabled: true }, "temperature");
   assert.equal(flat.length, 0);
 });
+
+test("une alerte par franchissement, même si la valeur oscille autour du seuil", () => {
+  const rule = { kind: "above" as const, level: "warning" as const, threshold: 25, enabled: true };
+  const ev = evaluateRule(pts([24.5, 25.1, 25.3, 24.9, 25.2, 24.8, 25.1, 25.4, 24, 23.5]), rule, "temperature");
+  assert.equal(ev.length, 1);
+  assert.deepEqual([ev[0].started_at, ev[0].ended_at, ev[0].value], [10 * M, 80 * M, 25.4]);
+  // nouveau franchissement 2 h plus tard : nouvelle alerte
+  const two = evaluateRule(pts([25.5, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25.5]), rule, "temperature");
+  assert.equal(two.length, 2);
+});

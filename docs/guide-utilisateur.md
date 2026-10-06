@@ -81,8 +81,10 @@ indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre 
 
 - Case vide : pas d'alerte. Les pics et creux suivent la sensibilité des flèches de tendance
   (Options).
-- Vérification **toutes les 10 minutes**. Une alerte de seuil reste **en cours** tant que la valeur
-  dépasse, puis se ferme d'elle-même.
+- Vérification **toutes les 10 minutes**. **Une seule alerte (et une seule notification) par
+  franchissement** : elle reste **en cours** tant que la valeur dépasse, puis se ferme d'elle-même.
+  Si la valeur oscille autour du seuil, l'alerte est simplement rouverte pendant l'heure qui suit,
+  sans nouvelle notification.
 
 **Liste des alertes** :
 
