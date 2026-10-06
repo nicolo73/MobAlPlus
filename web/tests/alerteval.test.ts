@@ -8,9 +8,9 @@ const pts = (vals: number[], step = 10) => vals.map((value, i) => ({ ts: i * ste
 test("dépassement de seuil : début, valeur extrême, fin avec hystérésis", () => {
   const ev = evaluateRule(pts([21, 22, 22.5, 23, 22.6, 22, 21.95, 21.9, 23.2]),
     { kind: "above", level: "warning", threshold: 22, enabled: true }, "temperature");
-  assert.equal(ev.length, 2);
-  assert.deepEqual([ev[0].started_at, ev[0].value, ev[0].ended_at], [20 * M, 23, 70 * M]);
-  assert.equal(ev[1].ended_at, null);
+  // fermée à 21,9 (70 min), refranchie 10 min plus tard : la même alerte est rouverte
+  assert.equal(ev.length, 1);
+  assert.deepEqual([ev[0].started_at, ev[0].value, ev[0].ended_at], [20 * M, 23.2, null]);
 });
 
 test("seuil bas", () => {
