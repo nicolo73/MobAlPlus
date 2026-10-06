@@ -5,6 +5,8 @@ MobAlPlus historise les mesures des capteurs **Mobile Alerts** (température, hu
 téléphone (PWA). Tout repose sur des **services cloud gérés, sur leurs offres gratuites** : aucune
 machine à administrer.
 
+<p align="center"><img src="images/apercu-ordinateur.jpg" alt="Aperçu de l'application sur ordinateur (démo)" width="640"></p>
+
 > Les schémas de cette page sont écrits en [Mermaid](https://mermaid.js.org) : du texte dans le
 > fichier Markdown, que GitHub dessine automatiquement. Pour les modifier : bouton ✏️ de GitHub sur
 > ce fichier (aperçu avec l'onglet *Preview*), ou copier le bloc dans
@@ -219,6 +221,8 @@ flowchart TB
   sapi -->|supabase-js| sb[("Supabase")]
 ```
 
+- **Copies d'écran** de la documentation (`docs/images/`) : `cd web && npm run screenshots`
+  reconstruit l'application en mode démo et la parcourt avec Playwright (`scripts/screenshots.mjs`).
 - **Mode démo** : sans variables Supabase, l'application tourne sur des données fictives
   (`demo-api.ts`) ; pratique pour essayer une évolution sans toucher aux vraies données.
 - **Préférences** (rendu des courbes, grandeurs masquées, taille du texte, densité, tendances) :

@@ -3,6 +3,13 @@
 Historisation et visualisation des capteurs **Mobile Alerts** (températures, hygrométrie…),
 au-delà des 3 mois conservés par le service officiel.
 
+<p>
+  <img src="docs/images/maintenant-groupe.jpg" alt="Page Maintenant" width="180">
+  <img src="docs/images/courbes.jpg" alt="Page Courbes" width="180">
+  <img src="docs/images/emplacement.jpg" alt="Page d'un emplacement" width="180">
+  <img src="docs/images/groupe.jpg" alt="Page d'un groupe" width="180">
+</p>
+
 - **Architecture et technologies** (schémas) : [docs/architecture.md](docs/architecture.md)
 - **Modèle de données** (schémas des tables) : [docs/modele-donnees.md](docs/modele-donnees.md)
 - **Guide d'utilisation** (aussi affiché dans l'application, page Aide) : [docs/guide-utilisateur.md](docs/guide-utilisateur.md)

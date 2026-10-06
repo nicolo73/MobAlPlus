@@ -6,6 +6,9 @@
 
 # Guide d'utilisation
 
+> Illustrations prises sur la version de démonstration (données fictives). Toucher une image pour
+> l'agrandir.
+
 ## Installer l'application sur le téléphone
 
 MobAlPlus est une application web : pas de magasin d'applications, elle s'installe depuis le
@@ -17,6 +20,8 @@ navigateur et s'ouvre ensuite comme les autres.
 Connexion : **Continuer avec Google**, ou adresse e-mail et mot de passe.
 
 ## Maintenant
+
+<img src="images/maintenant.jpg" alt="Page Maintenant : une fiche par emplacement avec tendance" width="220" align="right">
 
 Une fiche par emplacement : dernière température, humidité, et ancienneté de la mesure.
 
@@ -35,7 +40,11 @@ Une fiche par emplacement : dernière température, humidité, et ancienneté de
 - Toucher une fiche ouvre la page de l'emplacement.
 - Les valeurs se mettent à jour toutes les 2 minutes ; ↻ pour forcer.
 
+<p class="gallery"><img src="images/maintenant-groupe.jpg" alt="Emplacement parent : cadre en pointillé et moyenne" width="220"> <img src="images/maintenant-compact.jpg" alt="Présentation compacte, température seule" width="220"></p>
+
 ## Courbes
+
+<img src="images/courbes.jpg" alt="Page Courbes : choix des emplacements, emplacements parents en pointillé" width="220" align="right">
 
 Plusieurs emplacements superposés, une courbe par grandeur (température, humidité).
 
@@ -61,13 +70,21 @@ Plusieurs emplacements superposés, une courbe par grandeur (température, humid
   - *Simplifié* : supprime les petites marches dues à l'arrondi du capteur au dixième.
 - Le tableau en bas résume la période affichée : valeur actuelle, minimum, maximum.
 
+<p class="gallery"><img src="images/courbes-graphique.jpg" alt="Courbes superposées" width="220"> <img src="images/plein-ecran.jpg" alt="Courbe en plein écran, valeurs au toucher" width="220"></p>
+
 ## Page d'un emplacement
+
+<img src="images/emplacement.jpg" alt="Page d'un emplacement : valeurs, tendances, courbes" width="220" align="right">
 
 Valeurs actuelles avec leur tendance, courbes de la période, minimum, maximum (avec leur date),
 moyenne, liste des mesures (les plus récentes d'abord), capteurs affectés et leurs périodes, et
 bouton **Exporter les données**.
 
+<p class="gallery"><img src="images/groupe.jpg" alt="Page d'un emplacement parent : moyenne et sous-emplacements" width="220"></p>
+
 ## Données
+
+<img src="images/donnees.jpg" alt="Page Données : export et import" width="220" align="right">
 
 - **Exporter** : choisir les emplacements, les grandeurs, la période, puis télécharger un fichier
   CSV (format Excel français par défaut). Le fichier exemple montre le format.
@@ -80,6 +97,8 @@ bouton **Exporter les données**.
 
 ## Options d'affichage
 
+<img src="images/options.jpg" alt="Options d'affichage" width="220" align="right">
+
 Icône à réglettes en haut de l'écran. Réglages mémorisés sur l'appareil.
 
 - **Taille du texte** et **présentation compacte** (2 colonnes de fiches sur téléphone) : pour voir
@@ -88,7 +107,11 @@ Icône à réglettes en haut de l'écran. Réglages mémorisés sur l'appareil.
 - **Flèches de tendance** : période de calcul (1 h par défaut), sensibilité, écart minimal pour
   signaler un pic ou un creux, durée de signalement.
 
+<p class="gallery"><img src="images/options-tendances.jpg" alt="Réglage des flèches de tendance" width="220"></p>
+
 ## Partager la maison
+
+<img src="images/partage.jpg" alt="Message d'invitation à envoyer par WhatsApp" width="220" align="right">
 
 **Admin › Partage** (propriétaire de la maison) : saisir l'adresse e-mail de la personne et ses
 droits, puis **Inviter**.
@@ -104,6 +127,8 @@ L'application n'envoie pas encore d'e-mail : un message tout prêt s'affiche, à
 « Continuer avec Google ») et voit aussitôt la maison.
 
 ## Administrer les capteurs et les emplacements
+
+<img src="images/admin-emplacements.jpg" alt="Organisation des emplacements" width="220" align="right">
 
 - **Admin › Emplacements** : créer les pièces et zones. Les ranger les unes dans les autres
   (ex. Jardin › Bosquet) en les **glissant** sur ordinateur, ou avec les **flèches** sur

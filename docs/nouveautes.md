@@ -6,7 +6,7 @@
 
 
 ## 6 octobre 2026
-- Page **Maintenant** : fiches dans l'ordre de l'arborescence, regroupées par emplacement parent
+- Le **guide d'utilisation** est illustré de copies d'écran (toucher une image pour l'agrandir).- Page **Maintenant** : fiches dans l'ordre de l'arborescence, regroupées par emplacement parent
   (cadre en pointillé avec la **moyenne** ⌀ et sa tendance) ; liseré de la couleur choisie pour
   l'emplacement.
 - **Page d'un emplacement parent** : moyenne, courbes de ses sous-emplacements avec la moyenne en

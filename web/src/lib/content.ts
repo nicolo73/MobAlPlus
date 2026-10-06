@@ -20,7 +20,12 @@ marked.use({
 
 export const aboutHtml = marked.parse(stripComments(aboutMd), { async: false });
 export const newsHtml = marked.parse(stripComments(newsMd), { async: false });
-export const guideHtml = marked.parse(stripComments(guideMd), { async: false });
+// Images de docs/images/ : intégrées à la construction (adresses avec empreinte, chargées à la demande)
+const images = import.meta.glob("../../../docs/images/*.{jpg,png,webp}", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+const imageUrl = (src: string) => images[`../../../docs/${src}`] ?? src;
+const withImages = (html: string) => html.replace(/src="(images\/[^"]+)"/g, (_, src) => `src="${imageUrl(src)}" loading="lazy"`);
+
+export const guideHtml = withImages(marked.parse(stripComments(guideMd), { async: false }));
 
 /** Empreinte des nouveautés : sert à signaler qu'il y a du nouveau depuis la dernière visite */
 export const newsVersion = (() => {
