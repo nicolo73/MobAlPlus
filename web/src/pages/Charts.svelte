@@ -5,6 +5,7 @@
   import { fmtValue } from "../lib/format";
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
+  import type { AlertEvent } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -127,6 +128,17 @@
     }
   }
 
+  // Alertes importantes de la période, marquées sur les courbes des emplacements eux-mêmes
+  let events = $state<AlertEvent[]>([]);
+  async function loadEvents(from: number) {
+    try { events = (await api.alertEvents({ since: from })).filter((e) => e.level === "warning"); } catch { events = []; }
+  }
+  function markersOf(prop: string) {
+    const shown = new Set(selected.filter((c) => !c.avg).map((c) => c.node.id));
+    return events.filter((e) => e.property === prop && shown.has(e.place_id))
+      .map((e) => ({ ts: e.started_at, value: (e.kind === "above" || e.kind === "below" ? e.threshold : e.value) ?? 0, level: e.level }));
+  }
+
   async function load(range = loadRange(win)) {
     // Les grandeurs masquées ne sont pas chargées
     const ids = [...new Set(selected.flatMap((c) => c.places.flatMap((id) => seriesByPlace.get(id) ?? []))
@@ -138,6 +150,7 @@
       if (id !== reqId) return;
       data = res;
       loaded = range;
+      loadEvents(range[0]);
       error = "";
     } catch (e) {
       if (id === reqId) error = e instanceof Error ? e.message : String(e);
@@ -263,7 +276,7 @@
         <section class="card">
           <h2>{c.title} <small class="muted">({c.unit})</small></h2>
           <TimeChart series={c.series} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
-                     curve={display.curve} group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
+                     curve={display.curve} alertPoints={markersOf(prop)} alertsWideOnly group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
         </section>
       {/each}
       <small class="muted">Toucher ou survoler une courbe pour lire les valeurs ; zoomer à deux doigts ou à la molette ;

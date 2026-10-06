@@ -2,6 +2,28 @@
   import { api } from "../lib/api";
   import DisplayBar from "../components/DisplayBar.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
+  import { currentSubscription, needsInstall, pushConfigured, pushSupported, savedLevel, subscribe, unsubscribe } from "../lib/push";
+  import type { AlertLevel } from "../lib/types";
+
+  // Notifications des alertes sur cet appareil
+  let pushOn = $state(false);
+  let pushLevel = $state<AlertLevel>(savedLevel());
+  let pushBusy = $state(false);
+  let pushError = $state("");
+  currentSubscription().then((s) => (pushOn = !!s)).catch(() => {});
+  async function setPush(on: boolean, level = pushLevel) {
+    pushBusy = true;
+    pushError = "";
+    try {
+      if (on) await subscribe(level); else await unsubscribe();
+      pushOn = on;
+      pushLevel = level;
+    } catch (e) {
+      pushError = e instanceof Error ? e.message : String(e);
+    } finally {
+      pushBusy = false;
+    }
+  }
   import { display, resetTrend, setDensity, setText, setTrend, type Density, type TextSize } from "../lib/display.svelte";
 
   const WINDOWS = [{ v: 30, label: "30 min" }, { v: 60, label: "1 h" }, { v: 120, label: "2 h" }];
@@ -122,6 +144,32 @@
       </div>
     </div>
     <div><button onclick={resetTrend}>Valeurs par défaut</button></div>
+  </section>
+
+  <section class="card stack">
+    <h2 style="margin:0">Notifications des alertes sur cet appareil</h2>
+    {#if !pushConfigured()}
+      <p class="muted" style="margin:0">Pas encore activées pour cette installation : voir « Notifications » dans
+        docs/supabase-setup.md (clés à créer une fois). Les alertes restent visibles dans l'application (🔔).</p>
+    {:else if !pushSupported()}
+      <p class="muted" style="margin:0">Ce navigateur ne permet pas les notifications.</p>
+    {:else if needsInstall()}
+      <p class="muted" style="margin:0">Sur iPhone, installer d'abord l'application (Partager › Sur l'écran d'accueil),
+        puis l'ouvrir depuis son icône pour activer les notifications.</p>
+    {:else}
+      <div class="opt">
+        <div class="seg" role="group" aria-label="Notifications">
+          <button class:active={!pushOn} aria-pressed={!pushOn} disabled={pushBusy} onclick={() => setPush(false)}>Désactivées</button>
+          <button class:active={pushOn && pushLevel === "warning"} aria-pressed={pushOn && pushLevel === "warning"} disabled={pushBusy}
+                  onclick={() => setPush(true, "warning")}>Importantes</button>
+          <button class:active={pushOn && pushLevel === "info"} aria-pressed={pushOn && pushLevel === "info"} disabled={pushBusy}
+                  onclick={() => setPush(true, "info")}>Toutes</button>
+        </div>
+        <small class="muted">Une notification par alerte nouvelle (vérification toutes les 10 minutes), même
+          application fermée. Réglage propre à cet appareil.</small>
+        {#if pushError}<div class="notice err">{pushError}</div>{/if}
+      </div>
+    {/if}
   </section>
 
   <section class="card">

@@ -36,9 +36,16 @@
     label: string;
     /** Rendu (affichage seulement) : escalier fidèle, lissé ou simplifié */
     curve?: CurveMode;
+    /** Seuils d'alerte : lignes horizontales en tirets */
+    thresholds?: { value: number; level: "info" | "warning"; label: string }[];
+    /** Points en alerte (mesures au-delà d'un seuil, pics, creux) */
+    alertPoints?: { ts: number; value: number; level: "info" | "warning"; label?: string }[];
+    /** Points d'alerte seulement sur grand écran ou en plein écran (courbes superposées) */
+    alertsWideOnly?: boolean;
   }
 
-  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step" }: Props = $props();
+  let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step",
+        thresholds = [], alertPoints = [], alertsWideOnly = false }: Props = $props();
 
   let el: HTMLDivElement;
   let box: HTMLDivElement;
@@ -63,6 +70,13 @@
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
     const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
+    const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
+    const showPoints = alertPoints.length > 0 && (!alertsWideOnly || full || (el?.clientWidth ?? 0) >= 500);
+    // Échelle : les seuils proches des mesures sont inclus, les seuils lointains n'écrasent pas la courbe
+    const near = (v: { min: number; max: number }) => {
+      const span = Math.max(v.max - v.min, unit === "%" ? 5 : 1);
+      return thresholds.map((t) => t.value).filter((x) => x >= v.min - span && x <= v.max + span);
+    };
     return {
       animation: false,
       backgroundColor: "transparent",
@@ -79,6 +93,8 @@
       },
       yAxis: {
         type: "value", scale: true,
+        min: (v: { min: number; max: number }) => Math.min(v.min, ...near(v)),
+        max: (v: { min: number; max: number }) => Math.max(v.max, ...near(v)),
         axisLabel: { color: muted, formatter: (v: number) => fmt(v) },
         splitLine: { lineStyle: { color: border, opacity: 0.6 } },
       },
@@ -87,9 +103,9 @@
         backgroundColor: surface, borderColor: border, textStyle: { color: text },
         confine: true,
         axisPointer: { type: "line", lineStyle: { color: muted, width: 1 } },
-        formatter: (params: { axisValue: number; seriesName: string; color: string; value: [number, number | null] }[]) => {
+        formatter: (params: { axisValue: number; seriesName: string; seriesType: string; color: string; value: [number, number | null] }[]) => {
           const rows = params
-            .filter((p) => p.value[1] != null)
+            .filter((p) => p.value[1] != null && p.seriesType === "line")
             .map((p) => `<div style="display:flex;align-items:center;gap:.5rem">
               <span style="display:inline-block;width:14px;border-top:2px ${dashed.has(p.seriesName) ? "dashed" : "solid"} ${p.color}"></span>
               <b style="min-width:4.5rem">${fmt(p.value[1]!)} ${escapeHtml(unit)}</b>
@@ -112,7 +128,7 @@
             new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
           brushSelect: false },
       ],
-      series: series.map((s) => ({
+      series: [...series.map((s, i) => ({
         id: String(s.id), name: s.name, type: "line",
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
@@ -122,7 +138,26 @@
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
         data: curveData(s.points, curve),
+        ...(i === 0 && thresholds.length ? {
+          markLine: {
+            silent: true, symbol: "none", animation: false,
+            data: thresholds.map((t) => ({
+              yAxis: t.value,
+              lineStyle: { color: levelColor(t.level), type: [5, 4], width: t.level === "warning" ? 1.5 : 1, opacity: 0.85 },
+              label: { formatter: t.label, position: "insideStartTop", color: levelColor(t.level), fontSize: 10 },
+            })),
+          },
+        } : {}),
       })),
+      ...(showPoints ? [{
+        id: "alertes", name: "Alertes", type: "scatter", silent: true, z: 5, animation: false,
+        symbolSize: alertsWideOnly ? 9 : 6,
+        data: alertPoints.map((p) => ({
+          value: [p.ts, p.value],
+          itemStyle: { color: levelColor(p.level), borderColor: surface, borderWidth: alertsWideOnly ? 1.5 : 0.5 },
+          symbol: alertsWideOnly ? "triangle" : "circle",
+        })),
+      }] : [])],
     };
   }
 
@@ -190,7 +225,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit; void curve;
+    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full;
     render();
   });
 

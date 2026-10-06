@@ -3,6 +3,7 @@ import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
+  AlertEvent, AlertLevel, AlertRule,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -291,5 +292,64 @@ export class SupabaseApi implements Api {
 
   async runMaintenance() {
     return check(await this.sb.rpc("admin_run_maintenance")) as Record<string, unknown>;
+  }
+
+  async alertRules(seriesIds: number[]) {
+    if (!seriesIds.length) return [];
+    return check(await this.sb.from("alert_rule").select("series_id, kind, level, threshold, enabled")
+      .in("series_id", seriesIds)) as AlertRule[];
+  }
+
+  async saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]) {
+    check(await this.sb.rpc("set_alert_rules", { p_series: seriesId, p_rules: rules }));
+  }
+
+  async alertEvents({ since, seriesIds }: { since: number; seriesIds?: number[] }): Promise<AlertEvent[]> {
+    let q = this.sb.from("alert_event")
+      .select("id, series_id, kind, level, threshold, started_at, ended_at, value, "
+        + "series!inner(place_id, place!inner(name, home_id), observed_property(code, unit)), alert_archive(user_id)")
+      .eq("series.place.home_id", this.homeId ?? -1)
+      .or(`ended_at.is.null,started_at.gte.${new Date(since).toISOString()}`)
+      .order("started_at", { ascending: false })
+      .limit(500);
+    if (seriesIds) q = q.in("series_id", seriesIds.length ? seriesIds : [-1]);
+    const rows = check(await q) as unknown as (Omit<AlertEvent, "place_id" | "place_name" | "property" | "unit" | "archived" | "started_at" | "ended_at"> & {
+      started_at: string; ended_at: string | null;
+      series: { place_id: number; place: { name: string }; observed_property: { code: string; unit: string } };
+      alert_archive: unknown[];
+    })[];
+    return rows.map(({ series, alert_archive, ...r }) => ({
+      ...r, started_at: Date.parse(r.started_at), ended_at: r.ended_at ? Date.parse(r.ended_at) : null,
+      place_id: series.place_id, place_name: series.place.name, property: series.observed_property.code,
+      unit: series.observed_property.unit, archived: alert_archive.length > 0,
+    }));
+  }
+
+  async archiveAlerts(ids: number[], archived: boolean) {
+    if (!ids.length) return;
+    if (archived) {
+      check(await this.sb.from("alert_archive").upsert(ids.map((event_id) => ({ event_id })),
+        { onConflict: "event_id,user_id", ignoreDuplicates: true }));
+    } else {
+      check(await this.sb.from("alert_archive").delete().in("event_id", ids));
+    }
+  }
+
+  async deleteAlerts(ids: number[]) {
+    if (!ids.length) return;
+    const { data, error } = await this.sb.from("alert_event").delete().in("id", ids).select("id");
+    if (error) throw new Error(error.message);
+    if ((data ?? []).length < ids.length) throw new Error("Effacement réservé aux comptes « gestion » de la maison.");
+  }
+
+  async savePushSubscription(sub: PushSubscriptionJSON, minLevel: AlertLevel) {
+    check(await this.sb.from("push_subscription").upsert({
+      endpoint: sub.endpoint, p256dh: sub.keys?.p256dh, auth: sub.keys?.auth, min_level: minLevel,
+      user_agent: navigator.userAgent.slice(0, 200),
+    }, { onConflict: "endpoint" }));
+  }
+
+  async deletePushSubscription(endpoint: string) {
+    check(await this.sb.from("push_subscription").delete().eq("endpoint", endpoint));
   }
 }

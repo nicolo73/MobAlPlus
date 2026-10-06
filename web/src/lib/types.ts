@@ -190,6 +190,34 @@ export interface ExportOptions {
 
 export type ImportRows = { s?: number; c?: number; t: string; v: number; q?: string }[];
 
+export type AlertKind = "above" | "below" | "peak" | "trough";
+export type AlertLevel = "info" | "warning";
+
+/** Règle d'alerte d'une série : seuil haut / bas, ou pic / creux (seuil = montée minimale) */
+export interface AlertRule {
+  series_id: number;
+  kind: AlertKind;
+  level: AlertLevel;
+  threshold: number | null;
+  enabled: boolean;
+}
+
+export interface AlertEvent {
+  id: number;
+  series_id: number;
+  place_id: number;
+  place_name: string;
+  property: string;
+  unit: string;
+  kind: AlertKind;
+  level: AlertLevel;
+  threshold: number | null;
+  started_at: number;          // millisecondes
+  ended_at: number | null;     // null : dépassement en cours
+  value: number | null;        // valeur extrême
+  archived: boolean;           // masquée par le compte connecté
+}
+
 export interface Api {
   readonly demo: boolean;
   session(): Promise<{ email: string } | null>;
@@ -245,4 +273,13 @@ export interface Api {
   saveTolerance(propertyId: number, tolerance: number | null): Promise<void>;
   collectNow(maIds?: string[]): Promise<CollectResult[]>;
   runMaintenance(): Promise<Record<string, unknown>>;
+  alertRules(seriesIds: number[]): Promise<AlertRule[]>;
+  /** Remplace les règles d'une série (droits « gestion ») */
+  saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]): Promise<void>;
+  /** Alertes en cours ou commencées depuis `since`, archivées comprises (champ archived) */
+  alertEvents(opts: { since: number; seriesIds?: number[] }): Promise<AlertEvent[]>;
+  archiveAlerts(ids: number[], archived: boolean): Promise<void>;
+  deleteAlerts(ids: number[]): Promise<void>;
+  savePushSubscription(sub: PushSubscriptionJSON, minLevel: AlertLevel): Promise<void>;
+  deletePushSubscription(endpoint: string): Promise<void>;
 }

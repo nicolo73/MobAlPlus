@@ -4,3 +4,7 @@ project_id = "mobalplus"
 [functions.collect]
 # L'authentification est vérifiée dans la fonction (jeton pg_cron ou administrateur connecté)
 verify_jwt = false
+
+[functions.notify]
+# Appelée par pg_cron avec le jeton de collecte (vérifié dans la fonction)
+verify_jwt = false

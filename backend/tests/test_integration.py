@@ -621,3 +621,69 @@ def test_place_color(conn, workbook):
     with pytest.raises(psycopg.errors.CheckViolation):
         conn.execute("UPDATE place SET color = 'gris' WHERE code = 'c2'")
     conn.rollback()
+
+
+def test_alerts_thresholds_and_peaks(conn):
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sid = series_id(conn, "salon", "temperature")
+    t0 = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    # Montée de 20,0 à 22,8 °C (12 h → 17 h 43), puis lente redescente à 22,6 °C
+    vals = [20.0 + 0.1 * i for i in range(29)] + [22.8, 22.8, 22.7, 22.7, 22.6, 22.6]
+    db.insert_readings(conn, [(ch, t0 + timedelta(minutes=10 * i), v) for i, v in enumerate(vals)])
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([
+        {"kind": "above", "level": "info", "threshold": 22},
+        {"kind": "above", "level": "warning", "threshold": 25},
+        {"kind": "peak", "level": "warning"},
+    ])))
+    now = t0 + timedelta(minutes=10 * (len(vals) - 1))
+    assert conn.execute("SELECT evaluate_alerts(%s)", (now,)).fetchone()[0] == 2
+    events = conn.execute("SELECT kind, level, started_at, ended_at, value FROM alert_event ORDER BY kind").fetchall()
+    above, peak = events
+    assert above[:2] == ("above", "info") and above[3] is None and above[4] == pytest.approx(22.8)
+    assert above[2] == t0 + timedelta(minutes=10 * 21)  # première mesure au-dessus de 22 °C (22,1)
+    assert peak[:2] == ("peak", "warning") and peak[4] == pytest.approx(22.8)
+    # Réévaluation : rien de nouveau (un pic = une alerte)
+    assert conn.execute("SELECT evaluate_alerts(%s)", (now,)).fetchone()[0] == 0
+    # Retour sous le seuil (hystérésis d'un pas) : l'alerte se ferme
+    db.insert_readings(conn, [(ch, now + timedelta(minutes=10), 21.9)])
+    conn.execute("SELECT evaluate_alerts(%s)", (now + timedelta(minutes=10),))
+    assert conn.execute("SELECT ended_at FROM alert_event WHERE kind = 'above'").fetchone()[0] == now + timedelta(minutes=10)
+    # Seuil modifié ou règle supprimée : les règles suivent la liste
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([{"kind": "below", "level": "warning", "threshold": 15}])))
+    assert conn.execute("SELECT kind FROM alert_rule").fetchall() == [("below",)]
+    conn.commit()
+
+
+def test_alerts_rights_and_archive(conn):
+    sid = series_id(conn, "salon", "temperature")
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([{"kind": "above", "level": "warning", "threshold": 25}])))
+    conn.execute("INSERT INTO alert_event (series_id, kind, level, threshold, started_at, value) "
+                 "VALUES (%s, 'above', 'warning', 25, now(), 26)", (sid,))
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    viewer, editor = uuid.uuid4(), uuid.uuid4()
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'l@ex.fr', %s, 'viewer'), "
+                 "(%s, 'g@ex.fr', %s, 'editor')", (home, viewer, home, editor))
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, viewer, "l@ex.fr")
+        ev = conn.execute("SELECT id FROM alert_event").fetchone()[0]
+        # Archivage personnel
+        conn.execute("INSERT INTO alert_archive (event_id) VALUES (%s)", (ev,))
+        assert conn.execute("SELECT count(*) FROM alert_archive").fetchone()[0] == 1
+        # Lecture seule : ni règles ni suppression d'alerte
+        with pytest.raises(psycopg.errors.RaiseException):
+            conn.execute("SELECT set_alert_rules(%s, '[]')", (sid,))
+        conn.rollback()
+        as_user(conn, viewer, "l@ex.fr")
+        assert conn.execute("DELETE FROM alert_event").rowcount == 0
+        # L'archivage d'un autre compte reste invisible
+        conn.commit()
+        as_user(conn, editor, "g@ex.fr")
+        assert conn.execute("SELECT count(*) FROM alert_archive").fetchone()[0] == 0
+        conn.execute("SELECT set_alert_rules(%s, '[]')", (sid,))
+        assert conn.execute("DELETE FROM alert_event").rowcount == 1
+        conn.commit()
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")

@@ -47,6 +47,10 @@ erDiagram
   device_channel ||--o{ reading_day : "mesures compactées"
   device_channel ||--o{ correction : "corrections"
   series |o--o{ annotation : "annotée"
+  series ||--o{ alert_rule : "seuils d'alerte"
+  series ||--o{ alert_event : "alertes"
+  alert_rule |o--o{ alert_event : "déclenche"
+  alert_event ||--o{ alert_archive : "archivée par"
   place |o--o{ annotation : "annotée"
 
   home {
@@ -155,6 +159,31 @@ erDiagram
     text author
     timestamptz created_at
   }
+  alert_rule {
+    int id PK
+    int series_id FK
+    text kind "above | below | peak | trough"
+    text level "info | warning"
+    real threshold "seuil, ou montée minimale du pic"
+    bool enabled
+  }
+  alert_event {
+    bigint id PK
+    int rule_id FK
+    int series_id FK
+    text kind
+    text level
+    real threshold
+    timestamptz started_at
+    timestamptz ended_at "NULL = en cours"
+    real value "valeur extrême"
+    timestamptz notified_at
+  }
+  alert_archive {
+    bigint event_id PK, FK
+    uuid user_id PK "chaque compte archive pour lui"
+    timestamptz archived_at
+  }
   device_sync {
     int device_id PK, FK
     timestamptz last_ts "dernière mesure reçue"
@@ -181,6 +210,14 @@ erDiagram
     text email
     text role "admin | viewer"
   }
+  push_subscription {
+    int id PK
+    uuid user_id
+    text endpoint "unique, adresse du service de notification"
+    text p256dh
+    text auth
+    text min_level "info | warning"
+  }
   maintenance_log {
     bigint id PK
     timestamptz run_at
@@ -205,6 +242,10 @@ erDiagram
 | `reading_day` | mesures anciennes, une ligne par canal et par jour | tableaux `t` / `v` ; `simplified` au-delà de 3 ans |
 | `correction` | valeurs rejetées ou remplacées | appliquées à la lecture, le brut reste intact |
 | `annotation` | commentaires sur une période | par série, par emplacement ou globaux |
+| `alert_rule` | seuils d'alerte d'une série (au-dessus, en dessous, pic, creux ; info ou importante) | une règle par type et niveau |
+| `alert_event` | alertes déclenchées | en cours tant que `ended_at` est vide ; effacement réservé à « gestion » |
+| `alert_archive` | alertes archivées (masquées) | propre à chaque compte |
+| `push_subscription` | appareils abonnés aux notifications | supprimés quand le service les déclare expirés |
 | `device_sync` | avancement de la collecte par capteur | reprise incrémentale, dernière erreur |
 | `maintenance_log` | journal des tâches (compactage, simplification, remplacements à l'import) | consultable dans Admin › Maintenance |
 | `app_setting` | réglages (durées de conservation, fuseau, quota) | modifiables par l'administrateur |
@@ -224,4 +265,6 @@ erDiagram
 | `assign_channel()`, `retire_device()`, `reorder_places()` | administration |
 | `export_csv()`, `import_preview()`, `import_values()` | export et import de fichiers |
 | `my_context()`, `my_home_ids()`, `my_place_ids()`… | droits du compte connecté (règles d'accès) |
+| `evaluate_alerts()`, `set_alert_rules()` | alertes : évaluation toutes les 10 minutes, réglage des seuils |
+| `pending_notifications()`, `mark_notified()` | notifications à envoyer (Edge Function `notify`) |
 | `admin_stats()`, `stats()` | statistiques d'occupation |

@@ -153,6 +153,32 @@ Pour que la personne puisse se connecter :
 Laisser activée l'option **Confirm email** (🟩 **Authentication** > **Sign In / Providers** >
 **Email**) : c'est elle qui garantit qu'une adresse appartient bien à la personne qui se connecte.
 
+## 5 ter. (Option) Notifications des alertes sur téléphone
+
+Les alertes s'affichent dans l'application (🔔) sans rien configurer. Pour les recevoir aussi en
+**notification sur le téléphone**, même application fermée, il faut une paire de clés « VAPID »
+(gratuite, à créer une seule fois).
+
+1. 💻 Sur un PC avec Node : `npx web-push generate-vapid-keys`. La commande affiche une
+   **Public Key** et une **Private Key** 🔒.
+2. 🟩 **Supabase** : **Edge Functions** > **Secrets**, ajouter :
+
+   | Name | Value |
+   |---|---|
+   | `VAPID_PUBLIC_KEY` | la *Public Key* |
+   | `VAPID_PRIVATE_KEY` | la *Private Key* 🔒 |
+   | `VAPID_SUBJECT` | `mailto:` suivi de votre adresse (contact pour les services de notification) |
+
+3. ☁️ **Cloudflare** : projet `mobalplus` > **Settings** > **Variables and Secrets** : ajouter
+   `VITE_VAPID_PUBLIC_KEY` = la *Public Key* (la publique seulement), puis **Deployments** >
+   dernier déploiement > **Retry deployment**.
+4. ⬛ **GitHub** : relancer **Actions** > **Déploiement Supabase** (déploie la fonction `notify`).
+5. 📱 Dans l'application : **Options** > **Notifications des alertes** > *Importantes* ou *Toutes*
+   (sur iPhone : application installée sur l'écran d'accueil, iOS 16.4 ou plus).
+
+✔️ Vérification : **Integrations** > **Cron** affiche aussi `mobalplus-alerts` et
+`mobalplus-notify` (toutes les 10 minutes).
+
 ## 6. Mettre l'application en ligne
 
 Voir [deploiement-web.md](deploiement-web.md) (Cloudflare Pages, une dizaine de minutes).

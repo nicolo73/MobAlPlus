@@ -4,7 +4,9 @@ import { isWithin, sortPlaces } from "./placetree";
 import type {
   Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
+  AlertEvent, AlertLevel, AlertRule,
 } from "./types";
+import { evaluateRule } from "./alerteval";
 
 const PROPS: Property[] = [
   { id: 1, code: "temperature", name: "Température", unit: "°C", simplify_tolerance: 0.2 },
@@ -344,4 +346,49 @@ export class DemoApi implements Api {
       .map((d) => ({ ma_id: d.ma_id, status: "OK", received: 1, inserted: d.channels.length }));
   }
   async runMaintenance() { return delay({ compacted: 0, simplified: { days: 0, points_before: 0, points_after: 0 } }); }
+
+  // Alertes de démonstration : règles en mémoire, alertes recalculées sur les données fictives
+  private rules: AlertRule[] = [
+    { series_id: 41, kind: "above", level: "info", threshold: 22, enabled: true },
+    { series_id: 41, kind: "above", level: "warning", threshold: 22.8, enabled: true },
+    { series_id: 41, kind: "peak", level: "warning", threshold: null, enabled: true },
+    { series_id: 13, kind: "below", level: "warning", threshold: 4, enabled: true },
+    { series_id: 13, kind: "trough", level: "info", threshold: null, enabled: true },
+    { series_id: 91, kind: "above", level: "warning", threshold: -18.5, enabled: true },
+    { series_id: 71, kind: "above", level: "warning", threshold: 16, enabled: true },
+    { series_id: 72, kind: "above", level: "info", threshold: 55, enabled: true },
+  ];
+  private archived = new Set<number>();
+  private deleted = new Set<number>();
+
+  async alertRules(seriesIds: number[]) { return delay(this.rules.filter((r) => seriesIds.includes(r.series_id))); }
+  async saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]) {
+    this.rules = [...this.rules.filter((r) => r.series_id !== seriesId), ...rules.map((r) => ({ ...r, series_id: seriesId }))];
+    await delay(null);
+  }
+  async alertEvents({ since, seriesIds }: { since: number; seriesIds?: number[] }) {
+    const info = series();
+    const out: AlertEvent[] = [];
+    for (const r of this.rules) {
+      if (seriesIds && !seriesIds.includes(r.series_id)) continue;
+      const s = info.find((x) => x.id === r.series_id);
+      if (!s) continue;
+      // Identifiant stable : série, règle, début
+      evaluateRule(rawPoints(r.series_id, now - 15 * 86_400_000, now), r, s.property).forEach((e) => {
+        const id = r.series_id * 1e7 + ["above", "below", "peak", "trough"].indexOf(r.kind) * 1e6
+          + (r.level === "warning" ? 5e5 : 0) + Math.round((now - e.started_at) / 60_000) % 5e5;
+        if (this.deleted.has(id) || (e.ended_at !== null && e.started_at < since)) return;
+        out.push({ ...e, id, series_id: r.series_id, place_id: s.place_id, place_name: s.place_name,
+                   property: s.property, unit: s.unit, archived: this.archived.has(id) });
+      });
+    }
+    return delay(out.sort((a, b) => b.started_at - a.started_at));
+  }
+  async archiveAlerts(ids: number[], archived: boolean) {
+    ids.forEach((id) => (archived ? this.archived.add(id) : this.archived.delete(id)));
+    await delay(null);
+  }
+  async deleteAlerts(ids: number[]) { ids.forEach((id) => this.deleted.add(id)); await delay(null); }
+  async savePushSubscription(_sub: PushSubscriptionJSON, _level: AlertLevel) { await delay(null); }
+  async deletePushSubscription(_endpoint: string) { await delay(null); }
 }

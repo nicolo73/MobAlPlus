@@ -230,6 +230,26 @@ flowchart TB
 - **Textes** : `docs/a-propos.md`, `docs/nouveautes.md` et `docs/guide-utilisateur.md` sont intégrés
   à la construction ; les modifier sur GitHub suffit à mettre l'application à jour.
 
+## Alertes et notifications
+
+```mermaid
+flowchart LR
+  rules[("alert_rule<br/>seuils par série")] --> ev
+  cron1["pg_cron<br/>toutes les 10 min (+4)"] --> ev["evaluate_alerts()<br/>dépassements, pics, creux"]
+  ev --> events[("alert_event")]
+  events -->|API| app["Application : cloche,<br/>page Alertes, fiches, courbes"]
+  cron2["pg_cron (+5)"] -->|pg_net| notify["Edge Function notify<br/>Web Push (clés VAPID)"]
+  events --> notify
+  subs[("push_subscription")] --> notify
+  notify --> phone["📱 notification<br/>(service worker)"]
+```
+
+- Les seuils sont réglés par série (emplacement × grandeur) sur deux niveaux ; un dépassement est
+  une alerte **en cours** jusqu'au retour en deçà du seuil d'un pas de mesure (hystérésis).
+- Les pics et creux reprennent l'algorithme des flèches de tendance (`trend.ts`) ;
+  `alerteval.ts` en est la version JavaScript (mode démo, tests).
+- Chaque compte archive ses alertes pour lui-même ; l'effacement vaut pour toute la maison.
+
 ## Sécurité et droits
 
 ```mermaid
@@ -306,8 +326,8 @@ standard OGC SensorThings (Thing, Sensor, Location, Datastream, Observation).
 - **Plusieurs marques de capteurs** (ROADMAP 16) : un adaptateur par fournisseur dans le
   collecteur (`device.vendor`), et une source pourra aussi *pousser* ses mesures. Le nom de
   l'application ne doit pas reprendre une marque (ROADMAP 14).
-- **Règles et actions** (ROADMAP 7 et 17) : un moteur commun évalue des conditions sur les séries
-  après chaque collecte (seuils, capteur muet, inversion de tendance) et déclenche des actions :
+- **Règles et actions** (ROADMAP 17) : les alertes (ci-dessus) sont la première brique ; les
+  actions s'y brancheront (alert_event → action) :
   e-mail, notification, commande d'appareils (volets Somfy TaHoma, Google Home, Home Assistant,
   webhooks). Identifiants des services tiers par maison, chiffrés.
 - **E-mails** (ROADMAP 15) : envoi par un service SMTP / API sur le domaine de l'application,

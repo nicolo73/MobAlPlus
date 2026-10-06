@@ -9,6 +9,7 @@
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
+  import { currentAlerts, describe, shortText } from "../lib/alerts.svelte";
   import { display, visibleProps } from "../lib/display.svelte";
 
   let values = $state<CurrentValue[] | null>(null);
@@ -87,6 +88,17 @@
     property: v.property, property_name: v.property, unit: v.unit,
   }) as SeriesInfo)));
 
+  /** Alertes à voir, par emplacement (les importantes d'abord), pour les grandeurs affichées */
+  const alertsByPlace = $derived.by(() => {
+    const m = new Map<number, ReturnType<typeof currentAlerts>>();
+    for (const e of currentAlerts()) {
+      if (!visible.includes(e.property)) continue;
+      m.set(e.place_id, [...(m.get(e.place_id) ?? []), e]);
+    }
+    for (const l of m.values()) l.sort((a, b) => (a.level === b.level ? b.started_at - a.started_at : a.level === "warning" ? -1 : 1));
+    return m;
+  });
+
   /** Couleur choisie pour l'emplacement (marqueur), sinon rien */
   const markOf = (n: PlaceNode) => (n.custom || n.color !== null ? placeColor({ color: n.custom, color_slot: n.color }, dark, 0) : null);
 
@@ -131,6 +143,14 @@
     <a class="card place" class:stale class:marked={mark} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}"
        aria-label="{n.name} : historique et courbes">
       <h2>{n.name} <span class="chev" aria-hidden="true">›</span></h2>
+      {#if alertsByPlace.get(n.id)?.length}
+        <div class="alerts">
+          {#each alertsByPlace.get(n.id)!.slice(0, 2) as e (e.id)}
+            <span class="alert {e.level}" title={describe(e)}>{e.level === "warning" ? "⚠" : "ⓘ"} {shortText(e)}</span>
+          {/each}
+          {#if alertsByPlace.get(n.id)!.length > 2}<span class="alert more">+{alertsByPlace.get(n.id)!.length - 2}</span>{/if}
+        </div>
+      {/if}
       <div class="values">
         {#each items as v (v.series_id)}
           <div class="value {v.property}">
@@ -203,6 +223,11 @@
   .temperature .big { color: var(--temp); }
   .humidity .big { color: var(--hum); }
   .stale .big { opacity: 0.6; }
+  .alerts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: -0.25rem 0 0.4rem; }
+  .alert { font-size: 0.75rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: 6px; white-space: nowrap;
+           background: color-mix(in srgb, var(--hum) 12%, var(--surface)); color: var(--hum); }
+  .alert.warning { background: var(--err-soft); color: var(--err); }
+  .alert.more { color: var(--muted); background: var(--surface-2); }
   /* Couleur choisie pour l'emplacement : liseré à gauche, comme repère commun avec les courbes */
   .place.marked { border-left: 4px solid var(--mark); }
   /* Emplacement parent : cadre en pointillé regroupant ses sous-emplacements, avec la moyenne */

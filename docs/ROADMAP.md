@@ -14,7 +14,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 5 | [Corrections et annotations](#5-corrections-et-annotations) | P2 | M | à faire |
 | 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | ✅ fait |
 | 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | à faire |
-| 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | à faire |
+| 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | ✅ fait (reste : e-mails, capteur muet) |
 | 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | à faire |
 | 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P2 | M | en partie : moyenne d'un emplacement parent sur les courbes |
 | 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outils prêts (application ou PC), à lancer |
@@ -157,6 +157,18 @@ pour l'urgent, quotidien pour les avertissements).
   flèches de tendance (`web/src/lib/trend.ts` : pente sur 1 h rapportée à l'écart du jour, pic ou
   creux dépassé d'un seuil de part et d'autre), côté base pour l'évaluer à chaque collecte ; lien
   avec les actions (voir 17).
+
+**Fait (06/10/2026)** : tables `alert_rule` (par série : au-dessus, en dessous, pic, creux ; niveaux
+info / importante), `alert_event` (début, fin, valeur extrême), `alert_archive` (archivage propre à
+chaque compte), `push_subscription`. Évaluation par `evaluate_alerts()` toutes les 10 minutes
+(pg_cron, 4 minutes après la collecte), avec hystérésis d'un pas de mesure et la même détection de
+pic que les flèches de tendance. Application : cloche avec compteur, page **Alertes** (en cours,
+récentes, archivées ; glisser pour archiver, tout archiver, effacer), étiquettes sur les fiches de
+Maintenant, réglage des seuils sur la page d'un emplacement, lignes de seuil et points en alerte sur
+la courbe, triangles des alertes importantes sur les courbes superposées (grand écran ou plein
+écran). Notifications Web Push (Edge Function `notify`, clés VAPID, service worker), y compris
+application fermée. Restent : récapitulatif par e-mail (voir 15), alerte « capteur muet » (voir 6),
+seuils déplaçables à la souris sur la courbe.
 
 ## 8. Données météo publiques
 
@@ -326,6 +338,7 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 06/10/2026 | Alertes (seuils, pics, creux ; cloche, page Alertes, notifications sur téléphone) |
 | 06/10/2026 | Maintenant regroupé par emplacement parent, page de groupe, liseré de couleur |
 | 06/10/2026 | Couleur des courbes choisie par emplacement |
 | 06/10/2026 | Flèches de tendance et inversions (pic, creux) sur la page Maintenant, réglables |

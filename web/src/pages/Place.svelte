@@ -9,7 +9,10 @@
   import DisplayBar from "../components/DisplayBar.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
+  import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
+  import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
+  import { loadAlerts } from "../lib/alerts.svelte";
   import { computeTrend } from "../lib/trend";
   import { display, visibleProps } from "../lib/display.svelte";
 
@@ -74,6 +77,42 @@
   const trends = $derived(new Map(sorted.map((s) => [s.id, history.has(s.id)
     ? computeTrend(history.get(s.id)!, s.property, display.trend) : null])));
 
+  // Alertes : règles des séries de l'emplacement, et alertes de la période chargée (pics, creux)
+  let rules = $state<AlertRule[]>([]);
+  let events = $state<AlertEvent[]>([]);
+  async function loadAlertData() {
+    const ids = sorted.map((s) => s.id);
+    try {
+      [rules, events] = await Promise.all([api.alertRules(ids), api.alertEvents({ since: loaded[0], seriesIds: ids })]);
+    } catch { /* base pas encore à jour : pas d'alerte */ }
+  }
+  const thresholdsOf = (id: number) => rules
+    .filter((r) => r.series_id === id && r.enabled && (r.kind === "above" || r.kind === "below") && r.threshold != null)
+    .map((r) => {
+      const u = sorted.find((s) => s.id === id)?.unit ?? "";
+      return { value: r.threshold!, level: r.level,
+               label: `${r.level === "warning" ? "⚠" : "ⓘ"} ${fmtValue(r.threshold, u)}` };
+    });
+  /** Mesures au-delà d'un seuil (niveau le plus élevé atteint) et pics / creux signalés */
+  function alertPointsOf(id: number) {
+    const rs = rules.filter((r) => r.series_id === id && r.enabled && r.threshold != null);
+    const out: { ts: number; value: number; level: "info" | "warning" }[] = [];
+    for (const p of data.get(id) ?? []) {
+      if (p.quality === "rejected") continue;
+      let level: "info" | "warning" | null = null;
+      for (const r of rs) {
+        const hit = (r.kind === "above" && p.value > r.threshold!) || (r.kind === "below" && p.value < r.threshold!);
+        if (hit && (level === null || r.level === "warning")) level = r.level;
+      }
+      if (level) out.push({ ts: p.ts, value: p.value, level });
+    }
+    for (const e of events) {
+      if (e.series_id === id && (e.kind === "peak" || e.kind === "trough") && e.value !== null)
+        out.push({ ts: e.started_at, value: e.value, level: e.level });
+    }
+    return out;
+  }
+
   async function init() {
     try {
       const [all, cur, deps] = await Promise.all([api.seriesList(), api.currentValues(), api.placeDeployments(placeId)]);
@@ -84,6 +123,7 @@
       // Courbes, statistiques et liste indépendantes : l'échec de l'une n'empêche pas les autres
       const results = await Promise.allSettled([load(), loadRows(true), loadStats()]);
       setTimeout(loadTrends, 0);
+      setTimeout(loadAlertData, 0);
       const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
       if (failed) error = failed.reason instanceof Error ? failed.reason.message : String(failed.reason);
     } catch (e) {
@@ -99,6 +139,7 @@
       const res = await api.seriesData(shownSeries.map((s) => s.id), range[0], range[1]);
       if (id !== reqId) return;
       data = res;
+      if (range[0] < loaded[0]) setTimeout(loadAlertData, 0);  // période élargie : alertes plus anciennes
       loaded = range;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -215,7 +256,7 @@
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] }]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
-                 curve={display.curve}
+                 curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
       {#if st}
         <dl class="stats">
@@ -225,6 +266,8 @@
           <div><dt>Mesures</dt><dd class="num">{st.n.toLocaleString("fr-FR")}</dd></div>
         </dl>
       {/if}
+      <AlertRulesEditor series={s} rules={rules.filter((r) => r.series_id === s.id)} editable={canEdit()}
+                        onsaved={() => { loadAlertData(); loadAlerts(); }} />
     </section>
   {/each}
 

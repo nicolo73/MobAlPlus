@@ -90,6 +90,12 @@ await shot(p, "plein-ecran");
 p = await phone();
 await go(p, "#/lieu/4", 2500);
 await shot(p, "emplacement");
+await p.locator("details.rules").first().evaluate((d) => (d.open = true));
+await shot(p, "emplacement-alertes", { scrollTo: "section.card h2", top: 60 });
+
+p = await phone();
+await go(p, "#/alertes", 2500);
+await shot(p, "alertes");
 
 p = await phone();
 await go(p, "#/lieu/10", 2500); // emplacement parent « Jardin » de la démo

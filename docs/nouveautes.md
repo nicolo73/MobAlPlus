@@ -6,7 +6,11 @@
 
 
 ## 6 octobre 2026
-- Le **guide d'utilisation** est illustré de copies d'écran (toucher une image pour l'agrandir).- Page **Maintenant** : fiches dans l'ordre de l'arborescence, regroupées par emplacement parent
+- **Alertes** : seuils haut et bas, pics et creux, sur deux niveaux (info, importante), réglés sur
+  la page de chaque emplacement. Cloche 🔔 avec le nombre d'alertes, page **Alertes** (glisser pour
+  archiver), étiquettes sur les fiches, lignes de seuil sur les courbes, **notifications sur le
+  téléphone** (Options).
+- Guide d'utilisation simplifié : symboles dans le texte, copies d'écran regroupées à la fin.- Page **Maintenant** : fiches dans l'ordre de l'arborescence, regroupées par emplacement parent
   (cadre en pointillé avec la **moyenne** ⌀ et sa tendance) ; liseré de la couleur choisie pour
   l'emplacement.
 - **Page d'un emplacement parent** : moyenne, courbes de ses sous-emplacements avec la moyenne en

@@ -41,6 +41,8 @@ export default defineConfig({
       workbox: {
         // Les données viennent de Supabase : jamais mises en cache par le service worker
         navigateFallbackDenylist: [/^\/functions\//],
+        // Notifications d'alertes (public/push-sw.js)
+        importScripts: ["push-sw.js"],
       },
     }),
   ],

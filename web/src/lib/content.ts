@@ -21,9 +21,11 @@ marked.use({
 export const aboutHtml = marked.parse(stripComments(aboutMd), { async: false });
 export const newsHtml = marked.parse(stripComments(newsMd), { async: false });
 // Images de docs/images/ : intégrées à la construction (adresses avec empreinte, chargées à la demande)
-const images = import.meta.glob("../../../docs/images/*.{jpg,png,webp}", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+const images = import.meta.glob("../../../docs/images/**/*.{jpg,png,webp,svg}", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 const imageUrl = (src: string) => images[`../../../docs/${src}`] ?? src;
-const withImages = (html: string) => html.replace(/src="(images\/[^"]+)"/g, (_, src) => `src="${imageUrl(src)}" loading="lazy"`);
+const withImages = (html: string) => html
+  .replace(/src="(images\/[^"]+)"/g, (_, src) => `src="${imageUrl(src)}" loading="lazy"`)
+  .replace(/href="(images\/[^"]+)"/g, (_, src) => `href="${imageUrl(src)}"`);
 
 export const guideHtml = withImages(marked.parse(stripComments(guideMd), { async: false }));
 

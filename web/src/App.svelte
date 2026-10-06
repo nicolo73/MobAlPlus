@@ -16,6 +16,8 @@
   import About from "./pages/About.svelte";
   import Options from "./pages/Options.svelte";
   import Help from "./pages/Help.svelte";
+  import Alerts from "./pages/Alerts.svelte";
+  import { currentAlerts, loadAlerts } from "./lib/alerts.svelte";
   import "./lib/display.svelte"; // applique taille du texte et densité dès le démarrage
   import { hasUnseenNews } from "./lib/content";
 
@@ -41,6 +43,16 @@
   }
   refreshSession();
   api.onAuthChange(refreshSession);
+
+  // Alertes de la maison courante : rechargées au changement de maison et toutes les 2 minutes
+  const bell = $derived(currentAlerts());
+  const bellWarn = $derived(bell.some((e) => e.level === "warning"));
+  $effect(() => {
+    if (!session || ctx.homeId === null) return;
+    loadAlerts();
+    const t = setInterval(() => document.visibilityState === "visible" && router.route !== "/alertes" && loadAlerts(), 120_000);
+    return () => clearInterval(t);
+  });
 
   const isAdminRoute = $derived(router.route.startsWith("/admin"));
   const main: { href: Route; label: string; icon: string }[] = [
@@ -84,6 +96,11 @@
       {/if}
       <span class="spacer"></span>
       <span class="user muted">{session.email}</span>
+      <a href="#/alertes" class="about" class:active={router.route === "/alertes"}
+         aria-label={bell.length ? `Alertes (${bell.length})` : "Alertes"} title="Alertes">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2zM10 21h4" /></svg>
+        {#if bell.length}<span class="count" class:warn={bellWarn}>{bell.length > 9 ? "9+" : bell.length}</span>{/if}
+      </a>
       <a href="#/options" class="about" class:active={router.route === "/options"} aria-label="Options d'affichage"
          title="Options d'affichage">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
@@ -131,6 +148,8 @@
             {/if}
           {:else if router.route === "/courbes"}
             <Charts />
+          {:else if router.route === "/alertes"}
+            <Alerts />
           {:else if router.route === "/aide"}
             <Help />
           {:else if router.route === "/options"}
@@ -175,6 +194,10 @@
   .about svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   .news-dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%;
               background: var(--primary); box-shadow: 0 0 0 2px var(--surface); }
+  .count { position: absolute; top: -4px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+           background: var(--hum); color: #fff; font-size: 0.65rem; font-weight: 700; line-height: 16px; text-align: center;
+           box-shadow: 0 0 0 2px var(--surface); }
+  .count.warn { background: var(--err); }
   .user { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
   @media (max-width: 600px) { .user { display: none; } }
   main { grid-area: main; padding: 1rem; width: 100%; max-width: 72rem; margin: 0 auto; min-width: 0; }

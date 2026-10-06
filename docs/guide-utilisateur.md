@@ -1,18 +1,18 @@
 <!--
-  Guide d'utilisation affiché dans l'application (page « Aide », lien depuis « À propos » et
-  « Options »). Pour le modifier : éditer ce fichier sur GitHub (icône crayon), puis valider
-  (« Commit changes ») ; l'application est reconstruite automatiquement en 1 à 2 minutes.
+  Guide d'utilisation affiché dans l'application (page « Aide »). Pour le modifier : éditer ce
+  fichier sur GitHub (icône crayon), puis valider (« Commit changes ») ; l'application est
+  reconstruite automatiquement en 1 à 2 minutes. Les copies d'écran (docs/images/) se refont avec
+  « cd web && npm run screenshots » ; les petits symboles sont dans docs/images/icones/.
 -->
 
 # Guide d'utilisation
 
-> Illustrations prises sur la version de démonstration (données fictives). Toucher une image pour
-> l'agrandir.
+Les copies d'écran sont regroupées [à la fin](#copies-decran) ; les liens « écran » y renvoient.
 
 ## Installer l'application sur le téléphone
 
-MobAlPlus est une application web : pas de magasin d'applications, elle s'installe depuis le
-navigateur et s'ouvre ensuite comme les autres.
+MobAlPlus est une application web : elle s'installe depuis le navigateur et s'ouvre ensuite comme
+les autres.
 
 - **Android (Chrome)** : menu **⋮** › **Ajouter à l'écran d'accueil** (ou **Installer l'application**).
 - **iPhone (Safari)** : bouton **Partager** › **Sur l'écran d'accueil**.
@@ -21,137 +21,150 @@ Connexion : **Continuer avec Google**, ou adresse e-mail et mot de passe.
 
 ## Maintenant
 
-<img src="images/maintenant.jpg" alt="Page Maintenant : une fiche par emplacement avec tendance" width="220" align="right">
+Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesure
+([écran](#ecran-maintenant)).
 
-Une fiche par emplacement : dernière température, humidité, et ancienneté de la mesure.
-
-- Badge **ancienne** : pas de nouvelle mesure depuis un moment (pile faible, capteur hors de portée…).
-- **Flèche de tendance** à côté de la valeur : plus elle est inclinée, plus la variation de la
-  dernière heure est forte (comparée à l'écart habituel de la journée).
-- **Flèche cassée orange** : on vient de passer un **pic** (la température redescend) ou un **creux**
-  (elle remonte). C'est le moment de fermer ou d'ouvrir les fenêtres.
-- Boutons **Temp. / Hum.** en haut : n'afficher que la température (ou que l'humidité).
-- Les fiches suivent l'ordre choisi dans Admin › Emplacements. Les sous-emplacements d'un
-  emplacement parent (ex. Jardin) sont regroupés dans un **cadre en pointillé** qui affiche leur
-  **moyenne** (⌀) et sa tendance ; toucher le titre du cadre ouvre la page du groupe (moyenne,
-  courbes de chaque sous-emplacement et de la moyenne).
-- Le liseré coloré à gauche d'une fiche rappelle la couleur choisie pour l'emplacement dans les
-  courbes.
-- Toucher une fiche ouvre la page de l'emplacement.
-- Les valeurs se mettent à jour toutes les 2 minutes ; ↻ pour forcer.
-
-<p class="gallery"><img src="images/maintenant-groupe.jpg" alt="Emplacement parent : cadre en pointillé et moyenne" width="220"> <img src="images/maintenant-compact.jpg" alt="Présentation compacte, température seule" width="220"></p>
+- <img src="images/icones/hausse.svg" alt="↗" height="16"> <img src="images/icones/stable.svg" alt="→" height="16"> <img src="images/icones/baisse.svg" alt="↘" height="16">
+  **Tendance** : plus la flèche est inclinée, plus la variation de la dernière heure est forte
+  (comparée à l'écart habituel de la journée).
+- <img src="images/icones/pic.svg" alt="pic" height="16"> <img src="images/icones/creux.svg" alt="creux" height="16">
+  **Pic ou creux passé** (flèche cassée orange) : la valeur vient de s'inverser. Moment de fermer ou
+  d'ouvrir les fenêtres.
+- **Alertes** en cours : petite étiquette rouge (⚠ importante) ou bleue (ⓘ info) sous le nom.
+- Badge **ancienne** : pas de mesure récente (piles, portée de la passerelle).
+- **Emplacement parent** (ex. Jardin) : cadre en pointillé regroupant ses sous-emplacements, avec
+  leur **moyenne** ⌀ ; toucher son titre ouvre la page du groupe ([écran](#ecran-groupe)).
+- Liseré coloré à gauche : couleur choisie pour l'emplacement dans les courbes.
+- **Temp. / Hum.** : n'afficher qu'une grandeur ;
+  <img src="images/icones/actualiser.svg" alt="↻" height="16"> pour actualiser (sinon toutes les
+  2 minutes).
 
 ## Courbes
 
-<img src="images/courbes.jpg" alt="Page Courbes : choix des emplacements, emplacements parents en pointillé" width="220" align="right">
+Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-courbes)).
 
-Plusieurs emplacements superposés, une courbe par grandeur (température, humidité).
-
-- **Choisir les emplacements** en touchant leurs noms (8 courbes au plus). La couleur à gauche du
-  nom est celle de la courbe. Pour fixer la couleur d'un emplacement : sur sa page, **Couleur dans
-  les courbes** (droits « gestion ») : palette, gris, marron… ou **Personnalisée…** pour n'importe
-  quelle teinte ; sinon une couleur libre est attribuée automatiquement.
-- **Emplacement parent** (bouton en pointillé, ex. « Jardin ») : affiche la **moyenne** de ses
-  sous-emplacements, tracée en tirets. Ses sous-emplacements suivent sur la même ligne, ou en
-  retrait dessous.
-- **Période** : 24 h, 3 j, 7 j, 30 j, 1 an ; **‹ ›** pour reculer ou avancer ; **Maintenant** pour
-  revenir au présent.
-- **Lire une valeur** : toucher la courbe et glisser le doigt ; l'infobulle donne les valeurs de
-  chaque emplacement à cet instant.
-- **Zoomer** : à deux doigts (ou molette de la souris).
-- **Se déplacer dans le temps** : faire glisser la barre grise sous la courbe, ou tirer ses poignées
-  pour élargir ou réduire la période.
-- **Plein écran** : bouton ⛶ en haut à droite de chaque courbe (tourner le téléphone pour le
-  paysage).
-- **Rendu** :
-  - *Escalier* : fidèle aux mesures (le capteur n'enregistre qu'aux changements) ;
-  - *Lissé* : courbe adoucie passant par toutes les mesures ;
-  - *Simplifié* : supprime les petites marches dues à l'arrondi du capteur au dixième.
-- Le tableau en bas résume la période affichée : valeur actuelle, minimum, maximum.
-
-<p class="gallery"><img src="images/courbes-graphique.jpg" alt="Courbes superposées" width="220"> <img src="images/plein-ecran.jpg" alt="Courbe en plein écran, valeurs au toucher" width="220"></p>
+- **Choisir les emplacements** en touchant leurs noms (8 courbes au plus).
+- **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
+- **Période** : 24 h à 1 an ; **‹ ›** pour reculer ou avancer ; **Maintenant** pour revenir au présent.
+- **Lire une valeur** : toucher la courbe et glisser le doigt.
+- **Zoomer** : à deux doigts (ou molette) ; **se déplacer** : faire glisser la barre sous la courbe.
+- <img src="images/icones/plein-ecran.svg" alt="plein écran" height="16"> **Plein écran**, en haut
+  à droite de chaque courbe ([écran](#ecran-plein-ecran)).
+- **Rendu** : *Escalier* (fidèle aux mesures), *Lissé*, *Simplifié* (sans les marches dues à
+  l'arrondi du capteur).
+- Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran).
 
 ## Page d'un emplacement
 
-<img src="images/emplacement.jpg" alt="Page d'un emplacement : valeurs, tendances, courbes" width="220" align="right">
+Valeurs actuelles et tendances, courbes, minimum, maximum, moyenne, liste des mesures, capteurs
+affectés, **Exporter les données** ([écran](#ecran-emplacement)).
 
-Valeurs actuelles avec leur tendance, courbes de la période, minimum, maximum (avec leur date),
-moyenne, liste des mesures (les plus récentes d'abord), capteurs affectés et leurs périodes, et
-bouton **Exporter les données**.
+- **Couleur dans les courbes** (droits « gestion ») : palette, gris, marron… ou personnalisée.
+- **Seuils d'alerte** : lignes en tirets sur la courbe ; les mesures au-delà sont marquées par des
+  points ([écran](#ecran-emplacement-alertes)).
 
-<p class="gallery"><img src="images/groupe.jpg" alt="Page d'un emplacement parent : moyenne et sous-emplacements" width="220"></p>
+## Alertes
+
+<img src="images/icones/cloche.svg" alt="cloche" height="16"> La **cloche** en haut de l'écran
+indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre la liste
+([écran](#ecran-alertes)).
+
+**Régler les alertes** : page de l'emplacement, sous chaque courbe, rubrique **Alertes**
+(droits « gestion »).
+
+| | <img src="images/icones/info.svg" alt="ⓘ" height="16"> Info | <img src="images/icones/alerte.svg" alt="⚠" height="16"> Importante |
+|---|---|---|
+| **Au-dessus de** | ex. 26 °C | ex. 28 °C |
+| **En dessous de** | ex. 16 °C | ex. 12 °C |
+| **Pic passé** | case à cocher | case à cocher |
+| **Creux passé** | case à cocher | case à cocher |
+
+- Case vide : pas d'alerte. Les pics et creux suivent la sensibilité des flèches de tendance
+  (Options).
+- Vérification **toutes les 10 minutes**. Une alerte de seuil reste **en cours** tant que la valeur
+  dépasse, puis se ferme d'elle-même.
+
+**Liste des alertes** :
+
+- En cours et récentes d'abord ; **Importantes seulement** pour filtrer ; période 7 j, 30 j, 1 an.
+- **Glisser une alerte vers la gauche ou la droite** pour l'**archiver** (elle disparaît de votre
+  liste seulement) ; **Tout archiver** ; **Archivées** pour les revoir et les **restaurer**.
+- **Effacer** (droits « gestion ») : supprime l'alerte pour toute la maison.
+
+**Notifications sur le téléphone** : **Options** › **Notifications des alertes** : *Importantes* ou
+*Toutes*. Sur iPhone, installer d'abord l'application sur l'écran d'accueil.
 
 ## Données
 
-<img src="images/donnees.jpg" alt="Page Données : export et import" width="220" align="right">
-
-- **Exporter** : choisir les emplacements, les grandeurs, la période, puis télécharger un fichier
-  CSV (format Excel français par défaut). Le fichier exemple montre le format.
-- **Importer** (droits « gestion ») : fichier CSV ou Excel au format MobAlPlus, ou ancien tableur
-  Mobile Alerts. L'analyse montre ce qui sera ajouté **avant** d'écrire quoi que ce soit : mesures
-  nouvelles, identiques, ou en conflit (valeur différente à la même heure, à ± 2 minutes près). En
-  cas de conflit, choisir de conserver l'existant ou de le remplacer.
-- Préciser le **fuseau horaire** des dates du fichier : un avertissement s'affiche si les dates
-  semblent décalées d'une ou deux heures.
+- **Exporter** : emplacements, grandeurs, période ; fichier CSV (format Excel français par défaut).
+- **Importer** (droits « gestion ») : CSV ou Excel au format MobAlPlus, ou ancien tableur Mobile
+  Alerts. L'analyse montre les mesures nouvelles, identiques ou en conflit **avant** toute écriture ;
+  en cas de conflit, conserver l'existant ou le remplacer.
+- Préciser le **fuseau horaire** des dates du fichier ([écran](#ecran-donnees)).
 
 ## Options d'affichage
 
-<img src="images/options.jpg" alt="Options d'affichage" width="220" align="right">
+<img src="images/icones/options.svg" alt="réglages" height="16"> Icône à réglettes en haut de
+l'écran ; réglages propres à chaque appareil ([écran](#ecran-options)).
 
-Icône à réglettes en haut de l'écran. Réglages mémorisés sur l'appareil.
-
-- **Taille du texte** et **présentation compacte** (2 colonnes de fiches sur téléphone) : pour voir
-  plus d'emplacements à la fois.
+- **Taille du texte** et **présentation compacte** (2 colonnes de fiches sur téléphone).
 - **Grandeurs affichées** et **rendu des courbes**.
-- **Flèches de tendance** : période de calcul (1 h par défaut), sensibilité, écart minimal pour
-  signaler un pic ou un creux, durée de signalement.
-
-<p class="gallery"><img src="images/options-tendances.jpg" alt="Réglage des flèches de tendance" width="220"></p>
+- **Flèches de tendance** : période de calcul, sensibilité, écart pour signaler un pic ou un creux.
+- **Notifications des alertes** sur cet appareil.
 
 ## Partager la maison
 
-<img src="images/partage.jpg" alt="Message d'invitation à envoyer par WhatsApp" width="220" align="right">
-
-**Admin › Partage** (propriétaire de la maison) : saisir l'adresse e-mail de la personne et ses
-droits, puis **Inviter**.
+**Admin › Partage** (propriétaire) : adresse e-mail de la personne, droits, **Inviter**, puis
+envoyer le message proposé par **WhatsApp**, SMS ou e-mail ([écran](#ecran-partage)).
 
 | Droits | Peut… |
 |---|---|
-| **Lecture** | consulter valeurs, courbes, exporter |
-| **Gestion** | en plus : capteurs, emplacements, import |
+| **Lecture** | consulter, exporter, archiver ses alertes |
+| **Gestion** | en plus : capteurs, emplacements, seuils d'alerte, import |
 | **Propriétaire** | tout, y compris le partage |
 
-L'application n'envoie pas encore d'e-mail : un message tout prêt s'affiche, à envoyer par
-**WhatsApp**, SMS ou e-mail. La personne se connecte avec **cette adresse** (de préférence
-« Continuer avec Google ») et voit aussitôt la maison.
+## Capteurs et emplacements
 
-## Administrer les capteurs et les emplacements
-
-<img src="images/admin-emplacements.jpg" alt="Organisation des emplacements" width="220" align="right">
-
-- **Admin › Emplacements** : créer les pièces et zones. Les ranger les unes dans les autres
-  (ex. Jardin › Bosquet) en les **glissant** sur ordinateur, ou avec les **flèches** sur
-  téléphone (↑ ↓ ordre, ← sortir du parent, → ranger dans l'emplacement du dessus). Un emplacement
-  parent n'a normalement pas de capteur : il sert à regrouper et à faire la moyenne.
-- **Admin › Capteurs** : **Ajouter un capteur** avec son identifiant Mobile Alerts (au dos du
-  capteur) ; ses canaux (température, humidité…) apparaissent après la première collecte.
-  **Affecter** chaque canal à un emplacement, avec la date de début.
-- **Déplacer** un capteur : nouvelle affectation à partir d'une date ; l'historique de chaque
-  emplacement reste juste.
-- **Retirer** un capteur : il n'est plus relevé, son historique est conservé.
+- **Admin › Emplacements** : créer les pièces et zones, les ranger les unes dans les autres en les
+  **glissant** (ordinateur) ou avec les **flèches** (↑ ↓ ordre, ← sortir, → ranger dans celui du
+  dessus) ([écran](#ecran-admin-emplacements)).
+- **Admin › Capteurs** : **Ajouter un capteur** (identifiant Mobile Alerts au dos), puis
+  **affecter** chaque canal à un emplacement. **Déplacer** : nouvelle affectation datée ;
+  **Retirer** : plus relevé, historique conservé.
 
 ## Questions fréquentes
 
 **Une valeur est marquée « ancienne ».** Le capteur n'a rien transmis récemment : vérifier ses
-piles et la portée de la passerelle. Les mesures manquantes sont récupérées automatiquement dès
-qu'il transmet à nouveau (jusqu'à 90 jours en arrière).
+piles et la portée de la passerelle. Les mesures manquantes sont récupérées dès qu'il transmet à
+nouveau (jusqu'à 90 jours en arrière).
 
-**La courbe fait des marches.** Le capteur arrondit au dixième de degré et n'enregistre qu'aux
-changements : choisir le rendu *Simplifié* pour une courbe lisse.
+**La courbe fait des marches.** Le capteur arrondit au dixième : rendu *Simplifié*.
 
-**Je ne vois pas la maison qu'on m'a partagée.** Se connecter avec l'adresse exacte qui a été
-invitée ; s'il y a plusieurs maisons, les choisir dans la liste en haut de l'écran.
+**Je ne vois pas la maison qu'on m'a partagée.** Se connecter avec l'adresse exacte invitée ;
+choisir la maison dans la liste en haut de l'écran.
 
-**L'humidité a disparu.** Elle a été masquée : boutons **Temp. / Hum.** sur la page Maintenant, ou
-**Options**.
+**Je ne reçois pas de notification.** Vérifier **Options › Notifications** sur ce téléphone, les
+autorisations de notification du navigateur, et qu'un seuil est réglé sur l'emplacement.
+
+## Copies d'écran
+
+<a id="copies-decran"></a>Version de démonstration (données fictives). Toucher une image pour
+l'agrandir.
+
+<p class="shots">
+<a id="ecran-maintenant" href="images/maintenant.jpg"><img src="images/maintenant.jpg" alt="Maintenant" title="Maintenant" width="150"></a>
+<a id="ecran-groupe" href="images/maintenant-groupe.jpg"><img src="images/maintenant-groupe.jpg" alt="Emplacement parent et moyenne" title="Emplacement parent et moyenne" width="150"></a>
+<a id="ecran-compact" href="images/maintenant-compact.jpg"><img src="images/maintenant-compact.jpg" alt="Présentation compacte" title="Présentation compacte" width="150"></a>
+<a id="ecran-courbes" href="images/courbes.jpg"><img src="images/courbes.jpg" alt="Courbes : choix des emplacements" title="Courbes : choix des emplacements" width="150"></a>
+<a id="ecran-courbes-graphique" href="images/courbes-graphique.jpg"><img src="images/courbes-graphique.jpg" alt="Courbes superposées" title="Courbes superposées" width="150"></a>
+<a id="ecran-emplacement" href="images/emplacement.jpg"><img src="images/emplacement.jpg" alt="Page d'un emplacement" title="Page d'un emplacement" width="150"></a>
+<a id="ecran-emplacement-alertes" href="images/emplacement-alertes.jpg"><img src="images/emplacement-alertes.jpg" alt="Seuils d'alerte sur la courbe" title="Seuils d'alerte sur la courbe" width="150"></a>
+<a id="ecran-alertes" href="images/alertes.jpg"><img src="images/alertes.jpg" alt="Liste des alertes" title="Liste des alertes" width="150"></a>
+<a id="ecran-page-groupe" href="images/groupe.jpg"><img src="images/groupe.jpg" alt="Page d'un emplacement parent" title="Page d'un emplacement parent" width="150"></a>
+<a id="ecran-donnees" href="images/donnees.jpg"><img src="images/donnees.jpg" alt="Données : export et import" title="Données : export et import" width="150"></a>
+<a id="ecran-options" href="images/options.jpg"><img src="images/options.jpg" alt="Options d'affichage" title="Options d'affichage" width="150"></a>
+<a id="ecran-tendances" href="images/options-tendances.jpg"><img src="images/options-tendances.jpg" alt="Réglage des tendances" title="Réglage des tendances" width="150"></a>
+<a id="ecran-partage" href="images/partage.jpg"><img src="images/partage.jpg" alt="Message d'invitation" title="Message d'invitation" width="150"></a>
+<a id="ecran-admin-emplacements" href="images/admin-emplacements.jpg"><img src="images/admin-emplacements.jpg" alt="Organisation des emplacements" title="Organisation des emplacements" width="150"></a>
+<a id="ecran-plein-ecran" href="images/plein-ecran.jpg"><img src="images/plein-ecran.jpg" alt="Courbe en plein écran" title="Courbe en plein écran" width="300"></a>
+</p>
