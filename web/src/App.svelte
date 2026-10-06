@@ -48,6 +48,7 @@
     { href: "/courbes", label: "Courbes", icon: "M3 17l5-6 4 3 5-7 4 4" },
     { href: "/donnees", label: "Données", icon: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" },
     { href: "/admin", label: "Admin", icon: "M4 6h16M4 12h16M4 18h10" },
+    { href: "/aide", label: "Aide", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" },
   ];
   /** Onglets d'administration accessibles au compte, selon ses droits dans la maison courante */
   const adminTabs = $derived(([
@@ -87,7 +88,7 @@
          title="Options d'affichage">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
       </a>
-      <a href="#/a-propos" class="about" class:active={router.route === "/a-propos" || router.route === "/aide"}
+      <a href="#/a-propos" class="about" class:active={router.route === "/a-propos"}
          aria-label={unseen ? "À propos (nouveautés)" : "À propos"} title="À propos, aide et nouveautés">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
         {#if unseen}<span class="news-dot" aria-hidden="true"></span>{/if}
