@@ -103,6 +103,7 @@ Mise en place pas à pas : [supabase-setup.md](supabase-setup.md), puis [deploie
 | Comptes | **Supabase Auth** (e-mail, Google OAuth) | connexion, jetons JWT lus par les règles d'accès | inclus |
 | Tâches planifiées | **pg_cron**, **pg_net**, **Vault** | collecte toutes les 10 min, maintenance chaque nuit, secrets chiffrés | inclus |
 | Collecteur | **Supabase Edge Functions** (Deno, TypeScript) | appel du site Mobile Alerts et lecture de ses pages | inclus |
+| Météo publique | **Open-Meteo** (prévision, archives ERA5, géocodage), appelé par le navigateur | comparaison extérieure, sans clé | gratuit |
 | Source des mesures | **Mobile Alerts** (site `measurements.mobile-alerts.eu`) | historique complet des 90 derniers jours | gratuit |
 | Code, intégration continue | **GitHub**, **GitHub Actions** | tests à chaque push, déploiement Supabase à la demande | gratuit |
 | Outils PC et tests | **Python 3.12**, psycopg, pytest ; **Node 22** (`node --test`) | import des tableurs, tests de la base et du code partagé | libre |

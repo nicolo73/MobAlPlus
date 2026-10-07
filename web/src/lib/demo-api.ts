@@ -392,6 +392,12 @@ export class DemoApi implements Api {
   private archived = new Set<number>();
   private deleted = new Set<number>();
 
+  private location: { lat: number; lon: number; label: string | null } | null = { lat: 48.8566, lon: 2.3522, label: "Paris" };
+  async homeLocation(_homeId: number) { return delay(this.location); }
+  async setHomeLocation(_homeId: number, loc: { lat: number; lon: number; label: string | null } | null) {
+    this.location = loc;
+    await delay(null);
+  }
   async placeIssues() {
     const out: { place_id: number; place_name: string; channels: number }[] = [];
     for (const p of places) {

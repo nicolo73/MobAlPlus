@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { display, setCurve, toggleProp, visibleProps } from "../lib/display.svelte";
+  import { display, setCurve, setWeather, toggleProp, visibleProps } from "../lib/display.svelte";
+  import { homeWeather } from "../lib/weather-state.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
   interface Props {
@@ -8,8 +9,10 @@
     curves?: boolean;
     /** Version discrète, plus petite */
     small?: boolean;
+    /** Bouton « Météo » (si la position de la maison est connue) */
+    weatherToggle?: boolean;
   }
-  let { properties, curves = true, small = false }: Props = $props();
+  let { properties, curves = true, small = false, weatherToggle = true }: Props = $props();
 
   const codes = $derived(properties.map((p) => p.code));
   const visible = $derived(visibleProps(codes));
@@ -33,6 +36,15 @@
           {p.name}
         </button>
       {/each}
+    </div>
+  {/if}
+  {#if weatherToggle && homeWeather.loc}
+    <div class="seg" role="group" aria-label="Météo publique">
+      <button class:active={display.weather} aria-pressed={display.weather} onclick={() => setWeather(!display.weather)}
+              title="Température et humidité extérieures publiques (Open-Meteo) à {homeWeather.loc.label ?? 'la position de la maison'}">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
+        Météo
+      </button>
     </div>
   {/if}
   {#if curves}

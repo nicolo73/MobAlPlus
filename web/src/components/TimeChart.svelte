@@ -19,6 +19,8 @@
     points: Point[];
     /** Courbe calculée (moyenne d'un groupe) : tracé en tirets */
     dashed?: boolean;
+    /** Courbe de référence (météo publique) : pointillés fins */
+    dotted?: boolean;
   }
 
   interface Props {
@@ -74,6 +76,7 @@
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
     const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
+    const dotted = new Set(series.filter((s) => s.dotted).map((s) => s.name));
     // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
     const prepared = series.map((s) => ({ s, data: curveData(s.points, curve, cutAfter) }));
     const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
@@ -125,7 +128,7 @@
             .filter((r): r is { s: ChartSeries; v: number } => r.v !== null)
             .sort((a, b) => b.v - a.v)
             .map(({ s, v }) => `<div style="display:flex;align-items:center;gap:.5rem">
-              <span style="display:inline-block;width:14px;border-top:2px ${dashed.has(s.name) ? "dashed" : "solid"} ${s.color}"></span>
+              <span style="display:inline-block;width:14px;border-top:2px ${dotted.has(s.name) ? "dotted" : dashed.has(s.name) ? "dashed" : "solid"} ${s.color}"></span>
               <b style="min-width:4.5rem">${fmt(v)} ${escapeHtml(unit)}</b>
               <span style="color:${muted}">${escapeHtml(s.name)}</span></div>`)
             .join("");
@@ -151,7 +154,7 @@
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
         showSymbol: false, symbolSize: 8, sampling: undefined,
-        lineStyle: { width: 2, color: s.color, type: s.dashed ? [6, 4] : "solid" }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
+        lineStyle: { width: s.dotted ? 1.5 : 2, color: s.color, type: s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
         emphasis: { focus: "series", lineStyle: { width: 2 } },
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },

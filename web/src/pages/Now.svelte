@@ -10,6 +10,8 @@
   import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
   import { currentAlerts, describe, shortText } from "../lib/alerts.svelte";
+  import { homeWeather } from "../lib/weather-state.svelte";
+  import { currentWeather, weatherSeries, type CurrentWeather, type WeatherSeries } from "../lib/weather";
   import { display, visibleProps } from "../lib/display.svelte";
 
   let values = $state<CurrentValue[] | null>(null);
@@ -39,6 +41,28 @@
   // Grandeur réaffichée : ses tendances sont chargées à leur tour
   $effect(() => { void visible; if (values) setTimeout(() => loadTrends(), 0); });
 
+  // Météo publique : conditions actuelles et tendance (au plus toutes les 10 minutes)
+  let meteo = $state<CurrentWeather | null>(null);
+  let meteoDay = $state<WeatherSeries | null>(null);
+  let meteoAt = 0;
+  let meteoKey = "";
+  async function loadMeteo() {
+    const loc = homeWeather.loc;
+    if (!display.weather || !loc) { meteo = null; return; }
+    const key = `${loc.lat},${loc.lon}`;
+    if (key === meteoKey && Date.now() - meteoAt < 10 * 60_000) return;
+    meteoKey = key;
+    meteoAt = Date.now();
+    try {
+      [meteo, meteoDay] = await Promise.all([currentWeather(loc), weatherSeries(loc, Date.now() - 25 * 3_600_000, Date.now())]);
+    } catch { meteo = null; meteoKey = ""; }
+  }
+  $effect(() => { void homeWeather.loc; void display.weather; loadMeteo(); });
+  const meteoTrend = (prop: string) => {
+    const pts = prop === "temperature" ? meteoDay?.temperature : meteoDay?.humidity;
+    return pts?.length ? computeTrend(pts, prop, display.trend) : null;
+  };
+
   async function load() {
     try {
       const [cur, pl] = await Promise.all([api.currentValues(), api.places().catch(() => places)]);
@@ -47,6 +71,7 @@
       now = Date.now();
       error = "";
       setTimeout(() => loadTrends(), 0);
+      setTimeout(() => loadMeteo(), 0);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -119,7 +144,7 @@
 <div class="row head">
   <h1 style="margin:0">Maintenant</h1>
   <span class="spacer"></span>
-  {#if properties.length > 1}<DisplayBar {properties} curves={false} small />{/if}
+  {#if properties.length > 1}<DisplayBar {properties} curves={false} small weatherToggle={false} />{/if}
   <button class="refresh" onclick={load} title="Actualiser" aria-label="Actualiser">
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
   </button>
@@ -195,6 +220,26 @@
   {/snippet}
 
   <div class="grid now" class:compact={display.density === "compact"}>
+    {#if meteo && homeWeather.loc}
+      <div class="card place meteo" title="Météo publique (Open-Meteo), mise à jour toutes les 15 minutes environ">
+        <h2>
+          <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
+          Météo · {homeWeather.loc.label ?? "extérieur"}</span>
+        </h2>
+        <div class="values">
+          {#each visible.filter((p) => p === "temperature" || p === "humidity") as prop (prop)}
+            {@const v = prop === "temperature" ? meteo.temperature : meteo.humidity}
+            {@const tr = meteoTrend(prop)}
+            <div class="value {prop}">
+              <span class="num big">{fmtValue(v, prop === "temperature" ? "°C" : "%")}{#if tr}<span class="arrow"><TrendArrow
+                trend={tr} unit={prop === "temperature" ? "°C" : "%"} detail={display.density !== "compact"} /></span>{/if}</span>
+              <small class:hide={visible.length === 1 && display.density === "compact"}>{prop === "temperature" ? "température" : "humidité"} publique</small>
+            </div>
+          {/each}
+        </div>
+        <small>Open-Meteo · {fmtAgo(new Date(meteo.ts).toISOString(), now)}</small>
+      </div>
+    {/if}
     {#each tree as n (n.id)}{@render node(n)}{/each}
   </div>
 {/if}
@@ -223,6 +268,8 @@
   .temperature .big { color: var(--temp); }
   .humidity .big { color: var(--hum); }
   .stale .big { opacity: 0.6; }
+  .meteo { border-style: dotted; background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
+  .meteo h2 svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; vertical-align: -0.15em; }
   .alerts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: -0.25rem 0 0.4rem; }
   .alert { font-size: 0.75rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: 6px; white-space: nowrap;
            background: color-mix(in srgb, var(--hum) 12%, var(--surface)); color: var(--hum); }

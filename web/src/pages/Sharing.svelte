@@ -4,6 +4,7 @@
   import { ctx, currentHome, loadContext, selectHome } from "../lib/home.svelte";
   import type { HomeRole, Member } from "../lib/types";
   import InviteSend from "../components/InviteSend.svelte";
+  import WeatherLocation from "../components/WeatherLocation.svelte";
 
   const ROLES: Record<HomeRole, { label: string; help: string; rights: string }> = {
     owner: { label: "Propriétaire", help: "tout, y compris le partage", rights: "comme propriétaire" },
@@ -168,6 +169,11 @@
       <button type="submit" disabled={!homeName.trim() || homeName.trim() === currentHome()?.name}>Renommer</button>
     </div>
   </form>
+
+  <section class="card stack">
+    <h2 style="margin:0">Météo publique</h2>
+    <WeatherLocation {homeId} />
+  </section>
 
   {#if ctx.platformAdmin}
     <form class="card stack" onsubmit={create}>

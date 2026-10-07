@@ -18,6 +18,8 @@ export const display = $state({
   hidden: [] as string[],
   text: "normal" as TextSize,
   density: "comfort" as Density,
+  /** Courbe et fiche de la météo publique (si la position de la maison est connue) */
+  weather: true,
   trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
 });
 
@@ -26,6 +28,7 @@ try {
   if (MODES.includes(saved.curve)) display.curve = saved.curve;
   if (TEXTS.includes(saved.text)) display.text = saved.text;
   if (DENSITIES.includes(saved.density)) display.density = saved.density;
+  if (typeof saved.weather === "boolean") display.weather = saved.weather;
   if (saved.trend && typeof saved.trend === "object") {
     const t = saved.trend;
     const num = (v: unknown, d: number) => (typeof v === "number" && v > 0 ? v : d);
@@ -70,6 +73,11 @@ export function setTrend(patch: Partial<TrendOptions>) {
 
 export function resetTrend() {
   display.trend = structuredClone(TREND_DEFAULTS);
+  save();
+}
+
+export function setWeather(on: boolean) {
+  display.weather = on;
   save();
 }
 

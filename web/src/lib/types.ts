@@ -273,6 +273,9 @@ export interface Api {
   saveTolerance(propertyId: number, tolerance: number | null): Promise<void>;
   collectNow(maIds?: string[]): Promise<CollectResult[]>;
   runMaintenance(): Promise<Record<string, unknown>>;
+  /** Position de la maison (météo publique) */
+  homeLocation(homeId: number): Promise<{ lat: number; lon: number; label: string | null } | null>;
+  setHomeLocation(homeId: number, loc: { lat: number; lon: number; label: string | null } | null): Promise<void>;
   /** Emplacements parents qui ont encore un capteur affecté (incohérence à corriger) */
   placeIssues(): Promise<{ place_id: number; place_name: string; channels: number }[]>;
   alertRules(seriesIds: number[]): Promise<AlertRule[]>;

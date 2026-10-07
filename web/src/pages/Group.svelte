@@ -15,6 +15,8 @@
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
+  import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import type { WeatherSeries } from "../lib/weather";
 
   let { placeId, places, series }: { placeId: number; places: Place[]; series: SeriesInfo[] } = $props();
 
@@ -75,6 +77,13 @@
   load();
   loadCurrent();
 
+  let weather = $state<WeatherSeries | null>(null);
+  $effect(() => {
+    const [a, b] = loaded, on = display.weather;
+    void homeWeather.loc;
+    loadWeather(on, a, b).then((w) => (weather = w));
+  });
+
   function setWindow(w: Window) {
     win = w;
     if (needsReload(w, loaded)) load(loadRange(w));
@@ -120,6 +129,7 @@
     const unit = series.find((s) => s.property === prop)?.unit ?? "";
     if (curves.length > 1)
       curves.unshift({ id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: averagePoints(curves.map((c) => c.points)) });
+    curves.push(...weatherCurve(weather, prop));
     return [{ prop, title: p.name, unit, curves }];
   }));
 

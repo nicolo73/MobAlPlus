@@ -294,6 +294,17 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("admin_run_maintenance")) as Record<string, unknown>;
   }
 
+  async homeLocation(homeId: number) {
+    const { data, error } = await this.sb.from("home").select("lat, lon, location_label").eq("id", homeId).maybeSingle();
+    if (error || !data || data.lat == null || data.lon == null) return null;
+    return { lat: data.lat as number, lon: data.lon as number, label: (data.location_label as string | null) ?? null };
+  }
+
+  async setHomeLocation(homeId: number, loc: { lat: number; lon: number; label: string | null } | null) {
+    check(await this.sb.from("home").update({ lat: loc?.lat ?? null, lon: loc?.lon ?? null, location_label: loc?.label ?? null })
+      .eq("id", homeId));
+  }
+
   async placeIssues() {
     const { data, error } = await this.sb.rpc("place_issues");
     if (error) return [];  // base pas encore à jour

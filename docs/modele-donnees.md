@@ -59,6 +59,7 @@ erDiagram
     float lat
     float lon
     text timezone "Europe/Paris"
+    text location_label "commune (météo publique)"
     timestamptz created_at
   }
   home_member {

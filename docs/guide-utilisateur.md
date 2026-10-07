@@ -55,6 +55,18 @@ Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-cou
   l'arrondi du capteur).
 - Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran).
 
+## Météo publique
+
+<img src="images/icones/meteo.svg" alt="météo" height="16"> Température et humidité **extérieures
+publiques** (Open-Meteo, gratuit) à la position de la maison, pour comparer avec vos capteurs :
+
+- **Régler la position** : **Admin › Partage › Météo publique** (propriétaire) : chercher la commune,
+  ou **Ma position**.
+- **Maintenant** : fiche « Météo · commune » en tête, avec la tendance.
+- **Courbes**, page d'un emplacement et page d'un groupe : courbe **grise en pointillés**
+  « Météo (Open-Meteo) », comprise dans l'infobulle ; historique disponible sur toutes les périodes.
+- Bouton **Météo** (à côté de Température / Humidité) pour l'afficher ou la masquer.
+
 ## Page d'un emplacement
 
 Valeurs actuelles et tendances, courbes, minimum, maximum, moyenne, liste des mesures, capteurs

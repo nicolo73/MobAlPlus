@@ -6,7 +6,9 @@
 
 
 ## 7 octobre 2026
-- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
+- **Météo publique** (Open-Meteo) : température et humidité extérieures à la position de la maison,
+  en fiche sur Maintenant et en courbe grise en pointillés sur les graphiques, historique compris.
+  Position à régler dans Admin › Partage.- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
   la courbe d'un emplacement.
 - Courbes : **lignes verticales** aux graduations du temps, trait plus net à minuit.- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
   haute à la plus basse), même quand leurs mesures ne tombent pas à la même minute.

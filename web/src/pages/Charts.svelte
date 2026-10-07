@@ -6,6 +6,8 @@
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import type { AlertEvent } from "../lib/types";
+  import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import type { WeatherSeries } from "../lib/weather";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -128,6 +130,14 @@
     }
   }
 
+  // Météo publique de la période chargée (si activée et position connue)
+  let weather = $state<WeatherSeries | null>(null);
+  $effect(() => {
+    const [a, b] = loaded, on = display.weather;
+    void homeWeather.loc;
+    loadWeather(on, a, b).then((w) => (weather = w));
+  });
+
   // Alertes importantes de la période, marquées sur les courbes des emplacements eux-mêmes
   let events = $state<AlertEvent[]>([]);
   async function loadEvents(from: number) {
@@ -193,6 +203,7 @@
         if (points) chart.series.push({ id: c.key, name: c.name, color: colorOf(c.key), points, dashed: c.avg });
       }
     }
+    for (const [prop, c] of byProp) if (c.series.length) c.series.push(...weatherCurve(weather, prop));
     return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
   });
 
