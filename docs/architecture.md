@@ -41,6 +41,7 @@ flowchart TB
     auth["<b>Auth</b><br/>e-mail · Google"]
     api["<b>API REST</b> PostgREST<br/>tables + fonctions SQL"]
     fn["<b>Edge Function collect</b><br/>Deno · TypeScript"]
+    wfn["<b>Edge Function weather</b><br/>météo publique"]
     db[("<b>PostgreSQL</b><br/>données · règles d'accès<br/>maintenance nocturne")]
     cron["<b>pg_cron</b> + <b>pg_net</b> + <b>Vault</b><br/>planificateur, appel HTTP, secrets"]
   end
@@ -52,6 +53,7 @@ flowchart TB
   end
 
   google["Google<br/>connexion OAuth"]
+  om["🌦 Open-Meteo<br/>prévision · archives ERA5"]
 
   subgraph gh["GitHub"]
     direction TB
@@ -71,6 +73,9 @@ flowchart TB
   fn -->|enregistre| db
   cron -.-|dans la base| db
   fn -->|lit les pages HTML| site
+  cron -->|toutes les 30 min| wfn
+  wfn -->|enregistre| db
+  wfn -->|API JSON| om
   sensors --> site
   repo -->|chaque push : construction| cf
   actions -->|migrations + fonction| sb
@@ -82,6 +87,7 @@ flowchart TB
 | Application web (PWA) | valeurs actuelles, courbes, données, administration ; installable | `web/` |
 | Base de données | stockage, règles d'accès, calculs (séries, export, import, maintenance) | `supabase/migrations/` |
 | Collecteur | récupère les mesures sur le site Mobile Alerts toutes les 10 minutes | `supabase/functions/collect/` |
+| Collecteur météo | relève les stations météo publiques (Open-Meteo) toutes les 30 minutes | `supabase/functions/weather/` |
 | Outils PC | import des anciens tableurs, rattrapage manuel, tests de la base | `backend/` |
 | Documentation | architecture, mise en place, feuille de route, textes de l'application | `docs/` |
 
@@ -103,7 +109,7 @@ Mise en place pas à pas : [supabase-setup.md](supabase-setup.md), puis [deploie
 | Comptes | **Supabase Auth** (e-mail, Google OAuth) | connexion, jetons JWT lus par les règles d'accès | inclus |
 | Tâches planifiées | **pg_cron**, **pg_net**, **Vault** | collecte toutes les 10 min, maintenance chaque nuit, secrets chiffrés | inclus |
 | Collecteur | **Supabase Edge Functions** (Deno, TypeScript) | appel du site Mobile Alerts et lecture de ses pages | inclus |
-| Météo publique | **Open-Meteo** (prévision, archives ERA5, géocodage), appelé par le navigateur | comparaison extérieure, sans clé | gratuit |
+| Météo publique | **Open-Meteo** (prévision, archives ERA5) appelé par le serveur ; géocodage par le navigateur à la création d'une station | stations météo virtuelles, sans clé | gratuit |
 | Source des mesures | **Mobile Alerts** (site `measurements.mobile-alerts.eu`) | historique complet des 90 derniers jours | gratuit |
 | Code, intégration continue | **GitHub**, **GitHub Actions** | tests à chaque push, déploiement Supabase à la demande | gratuit |
 | Outils PC et tests | **Python 3.12**, psycopg, pytest ; **Node 22** (`node --test`) | import des tableurs, tests de la base et du code partagé | libre |
@@ -143,6 +149,20 @@ sequenceDiagram
 - Le site n'enregistre une mesure que lorsque la valeur change (environ toutes les 7 minutes) :
   le rendu fidèle est donc en **escalier**.
 - Les identifiants Mobile Alerts sont des secrets de la fonction, jamais dans le dépôt.
+
+### Météo publique : stations virtuelles
+
+Une **station météo** est un capteur virtuel (`device.vendor = 'open_meteo'`, position `lat` / `lon`)
+affecté à un emplacement de type `weather`. Elle passe par le même chemin que les vrais capteurs
+(`ingest_readings`, séries, alertes, tendances) ; seul le collecteur diffère :
+
+- Edge Function `weather`, toutes les 30 minutes (pg_cron, minutes 7 et 37) : `weather_targets()`
+  donne les stations actives et leur dernière mesure ; un appel Open-Meteo par station (valeurs
+  horaires des derniers jours + valeur actuelle) ; à la création, un an d'historique (archives ERA5).
+- Les navigateurs ne contactent plus Open-Meteo pour les mesures : pas de risque de blocage, une
+  seule requête par station et par demi-heure quel que soit le nombre d'utilisateurs.
+- Création : `add_weather_station(maison, nom, lat, lon)` (gestionnaire de la maison), depuis
+  Admin › Partage › Météo publique ; l'application lance aussitôt une collecte.
 
 ## Stockage en trois niveaux
 
@@ -285,7 +305,7 @@ flowchart LR
   dev["Modification<br/>(code ou docs/*.md)"] -->|git push| gh["GitHub"]
   gh -->|automatique| tests["Actions « Tests »<br/>pytest · node --test ·<br/>svelte-check · build"]
   gh -->|automatique| cfp["Cloudflare Pages<br/>construit et publie l'application"]
-  gh -->|"à la demande<br/>(Run workflow)"| dep["Actions « Déploiement Supabase »<br/>supabase db push +<br/>functions deploy collect"]
+  gh -->|"à la demande<br/>(Run workflow)"| dep["Actions « Déploiement Supabase »<br/>supabase db push +<br/>functions deploy collect, notify, weather"]
   dep --> sbp[("Supabase")]
 ```
 

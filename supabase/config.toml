@@ -8,3 +8,7 @@ verify_jwt = false
 [functions.notify]
 # Appelée par pg_cron avec le jeton de collecte (vérifié dans la fonction)
 verify_jwt = false
+
+[functions.weather]
+# Appelée par pg_cron (jeton de collecte) ou par un compte connecté (vérifié dans la fonction)
+verify_jwt = false

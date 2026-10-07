@@ -31,3 +31,5 @@ jobs:
         run: supabase functions deploy collect --project-ref "$PROJECT_REF"
       - name: Déployer l'Edge Function notify (notifications d'alertes)
         run: supabase functions deploy notify --project-ref "$PROJECT_REF"
+      - name: Déployer l'Edge Function weather (météo publique)
+        run: supabase functions deploy weather --project-ref "$PROJECT_REF"

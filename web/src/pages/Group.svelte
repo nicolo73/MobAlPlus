@@ -16,7 +16,7 @@
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
   import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
-  import type { WeatherSeries } from "../lib/weather";
+  import type { WeatherSeries } from "../lib/weather-parse";
 
   let { placeId, places, series }: { placeId: number; places: Place[]; series: SeriesInfo[] } = $props();
 
@@ -80,7 +80,7 @@
   let weather = $state<WeatherSeries | null>(null);
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
-    void homeWeather.loc;
+    void homeWeather.stations;
     loadWeather(on, a, b).then((w) => (weather = w));
   });
 
@@ -129,7 +129,7 @@
     const unit = series.find((s) => s.property === prop)?.unit ?? "";
     if (curves.length > 1)
       curves.unshift({ id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: averagePoints(curves.map((c) => c.points)) });
-    curves.push(...weatherCurve(weather, prop));
+    curves.push(...weatherCurve(weather, prop, members.map((m) => m.node.id)));
     return [{ prop, title: p.name, unit, curves }];
   }));
 

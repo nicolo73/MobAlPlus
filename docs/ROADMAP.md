@@ -15,7 +15,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | ✅ fait |
 | 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | ✅ fait |
 | 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | ✅ fait (reste : e-mails, capteur muet) |
-| 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | ✅ température et humidité |
+| 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | ✅ stations météo virtuelles |
 | 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P2 | M | en partie : moyenne d'un emplacement parent sur les courbes |
 | 10 | [Reprise de l'historique des Google Sheets](#10-reprise-de-lhistorique-des-google-sheets) | P1 | – | outils prêts (application ou PC), à lancer |
 | 11 | [Module carto / plan intérieur](#11-module-carto--plan-intérieur) | P3 | L | idée |
@@ -197,6 +197,14 @@ Maintenant). Pistes : **autres lieux météo** traités comme des emplacements (
 vacances : fiches, courbes, comparaison), stocker la météo dans la base (alertes « plus chaud dehors que dedans »),
 autres grandeurs (pluie, vent, ensoleillement), station Météo-France la plus proche.
 
+**Refonte (07/10/2026)** : la fiche disparaissait (appels directs du navigateur, multipliés par les
+rafraîchissements, risque de blocage). La météo devient une **station virtuelle** stockée dans la
+base : capteur `open_meteo` + emplacement `weather`, collecté côté serveur toutes les 30 minutes
+(Edge Function `weather`), un an d'historique à la création. Plusieurs stations par maison,
+rangées librement ; fiches, courbes, tendances et alertes comme un vrai capteur. Les maisons ayant
+déjà une position reçoivent automatiquement leur station. Reste à faire : alerte comparant deux
+emplacements (« plus chaud dehors que dedans »), autres grandeurs.
+
 ## 9. Statistiques par groupe d'emplacements
 
 **Fait en partie (05/10/2026)** : page Courbes organisée selon l'imbrication des emplacements ;
@@ -353,6 +361,7 @@ frais que l'intérieur.
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
 | 07/10/2026 | Météo publique (Open-Meteo) : fiche Maintenant et courbe de comparaison |
+| 07/10/2026 | Météo publique collectée par le serveur : stations météo virtuelles, plusieurs par maison |
 | 07/10/2026 | Alerte « capteur muet », périodes sans mesure grisées ; lignes verticales sur les courbes |
 | 06/10/2026 | Alertes (seuils, pics, creux ; cloche, page Alertes, notifications sur téléphone) |
 | 06/10/2026 | Maintenant regroupé par emplacement parent, page de groupe, liseré de couleur |

@@ -7,7 +7,7 @@
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import type { AlertEvent } from "../lib/types";
   import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
-  import type { WeatherSeries } from "../lib/weather";
+  import type { WeatherSeries } from "../lib/weather-parse";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -134,7 +134,7 @@
   let weather = $state<WeatherSeries | null>(null);
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
-    void homeWeather.loc;
+    void homeWeather.stations;
     loadWeather(on, a, b).then((w) => (weather = w));
   });
 
@@ -203,7 +203,7 @@
         if (points) chart.series.push({ id: c.key, name: c.name, color: colorOf(c.key), points, dashed: c.avg });
       }
     }
-    for (const [prop, c] of byProp) if (c.series.length) c.series.push(...weatherCurve(weather, prop));
+    for (const [prop, c] of byProp) if (c.series.length) c.series.push(...weatherCurve(weather, prop, selected.map((x) => x.node.id)));
     return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
   });
 

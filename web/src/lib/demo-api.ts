@@ -59,7 +59,7 @@ let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
 }).filter((d): d is Device => d !== null);
 
 // Troisième sous-emplacement du Jardin : abri de jardin
-const EXTRA_DEFS: typeof PLACE_DEFS = [["abri", "Abri de jardin", "outdoor", 12.4, 84]];
+const EXTRA_DEFS: typeof PLACE_DEFS = [["abri", "Abri de jardin", "outdoor", 12.4, 84], ["meteo-demo1", "Météo · Paris", "outdoor", 12.5, 80]];
 places.push({ id: 14, code: "abri", name: "Abri de jardin", exposure: "outdoor", parent_id: 10, kind: "room" });
 const defOf = (code: string | undefined) =>
   PLACE_DEFS.find((x) => x[0] === code) ?? EXTRA_DEFS.find((x) => x[0] === code) ?? PLACE_DEFS[0];
@@ -71,6 +71,18 @@ devices.push({
     { id: 202, channel_no: 2, label: "Humidité relative", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: 14, since: iso(400 * 86_400_000) },
   ],
 });
+
+// Station météo publique (capteur virtuel Open-Meteo), en tête de liste
+places.push({ id: 15, code: "meteo-demo1", name: "Météo · Paris", exposure: "outdoor", parent_id: null, kind: "weather", sort_order: -1 });
+const weatherDevice = (id: number, place: number, label: string): Device => ({
+  id, ma_id: `METEO-DEMO${id}`, name: `Météo · ${label}`, ma_name: null, model: "Open-Meteo", vendor: "open_meteo", active: true,
+  added_at: iso(366 * 86_400_000), retired_at: null,
+  channels: [
+    { id: id * 10 + 1, channel_no: 1, label: "Température", property: "temperature", property_name: "Température", unit: "°C", place_id: place, since: iso(366 * 86_400_000) },
+    { id: id * 10 + 2, channel_no: 2, label: "Humidité", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: place, since: iso(366 * 86_400_000) },
+  ],
+});
+devices.push(weatherDevice(21, 15, "Paris"));
 
 const STEP = 7 * 60_000;           // une mesure toutes les 7 minutes
 const HISTORY = 400 * 86_400_000;  // historique fictif disponible
@@ -392,12 +404,16 @@ export class DemoApi implements Api {
   private archived = new Set<number>();
   private deleted = new Set<number>();
 
-  private location: { lat: number; lon: number; label: string | null } | null = { lat: 48.8566, lon: 2.3522, label: "Paris" };
-  async homeLocation(_homeId: number) { return delay(this.location); }
-  async setHomeLocation(_homeId: number, loc: { lat: number; lon: number; label: string | null } | null) {
-    this.location = loc;
-    await delay(null);
+  async addWeatherStation(label: string, _lat: number, _lon: number) {
+    const placeId = Math.max(...places.map((p) => p.id)) + 1;
+    const code = `meteo-demo${placeId}`;
+    EXTRA_DEFS.push([code, `Météo · ${label}`, "outdoor", 13, 78]);
+    places.push({ id: placeId, code, name: `Météo · ${label}`, exposure: "outdoor", parent_id: null, kind: "weather",
+                  sort_order: Math.max(...places.filter((p) => p.parent_id === null).map((p) => p.sort_order ?? 0)) + 1 });
+    devices.push(weatherDevice(Math.max(...devices.map((d) => d.id)) + 1, placeId, label));
+    return delay(placeId);
   }
+  async collectWeather() { await delay(null); }
   async placeIssues() {
     const out: { place_id: number; place_name: string; channels: number }[] = [];
     for (const p of places) {

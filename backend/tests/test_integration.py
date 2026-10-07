@@ -757,3 +757,25 @@ def test_alert_silent_sensor(conn):
     conn.execute("SELECT evaluate_alerts(%s)", (t0 + timedelta(hours=6, minutes=5),))
     assert conn.execute("SELECT ended_at FROM alert_event").fetchone()[0] == t0 + timedelta(hours=6)
     conn.commit()
+
+
+def test_weather_station(conn):
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    place = conn.execute("SELECT add_weather_station(%s, 'Toulouse', 43.6045, 1.4440)", (home,)).fetchone()[0]
+    name, kind, exposure = conn.execute("SELECT name, kind, exposure FROM place WHERE id = %s", (place,)).fetchone()
+    assert (name, kind, exposure) == ("Météo · Toulouse", "weather", "outdoor")
+    dev = conn.execute("SELECT ma_id, vendor FROM device WHERE vendor = 'open_meteo'").fetchone()
+    assert dev[0].startswith("METEO-")
+    # Le collecteur Mobile Alerts l'ignore ; la collecte météo la voit, avec un an d'historique à prendre
+    assert dev[0] not in [r[0] for r in conn.execute("SELECT ma_id FROM collect_targets()").fetchall()]
+    targets = conn.execute("SELECT ma_id, lat, since FROM weather_targets()").fetchall()
+    assert targets[0][0] == dev[0] and targets[0][1] == pytest.approx(43.6045)
+    # Mesures ingérées comme pour un capteur : séries température et humidité de l'emplacement
+    ts = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
+    conn.execute("SELECT ingest_readings(%s, NULL, %s, %s, now(), %s)",
+                 (dev[0], ["Température", "Humidité"], Jsonb([{"ts": ts.isoformat(), "v": [18.4, 62]}]), ts))
+    vals = conn.execute("""SELECT op.code, o.value FROM series s JOIN observed_property op ON op.id = s.property_id
+                           CROSS JOIN LATERAL series_observations(s.id, %s, %s) o WHERE s.place_id = %s ORDER BY 1""",
+                        (ts - timedelta(hours=1), ts + timedelta(hours=1), place)).fetchall()
+    assert vals == [("humidity", 62.0), ("temperature", pytest.approx(18.4))]
+    conn.commit()

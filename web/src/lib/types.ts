@@ -69,6 +69,8 @@ export interface Device {
   name: string | null;
   ma_name: string | null;
   model: string | null;
+  /** Origine des mesures : capteur Mobile Alerts, ou station météo publique (Open-Meteo, collectée par le serveur) */
+  vendor?: "mobile_alerts" | "open_meteo";
   active: boolean;
   added_at: string;
   retired_at: string | null;
@@ -273,9 +275,10 @@ export interface Api {
   saveTolerance(propertyId: number, tolerance: number | null): Promise<void>;
   collectNow(maIds?: string[]): Promise<CollectResult[]>;
   runMaintenance(): Promise<Record<string, unknown>>;
-  /** Position de la maison (météo publique) */
-  homeLocation(homeId: number): Promise<{ lat: number; lon: number; label: string | null } | null>;
-  setHomeLocation(homeId: number, loc: { lat: number; lon: number; label: string | null } | null): Promise<void>;
+  /** Crée une station météo publique (capteur virtuel + emplacement) ; renvoie l'emplacement */
+  addWeatherStation(label: string, lat: number, lon: number): Promise<number>;
+  /** Lance la collecte météo (après création d'une station) */
+  collectWeather(): Promise<void>;
   /** Emplacements parents qui ont encore un capteur affecté (incohérence à corriger) */
   placeIssues(): Promise<{ place_id: number; place_name: string; channels: number }[]>;
   alertRules(seriesIds: number[]): Promise<AlertRule[]>;

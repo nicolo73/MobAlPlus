@@ -9,7 +9,6 @@
   import { router } from "../lib/router.svelte";
   import { nowHidden, setNowHidden } from "../lib/display.svelte";
   import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
-  import { homeWeather } from "../lib/weather-state.svelte";
 
   // Page Maintenant : fiches affichées (emplacements mesurés, groupes, météo), propre à la maison
   let nowNodes = $state<PlaceNode[]>([]);
@@ -168,11 +167,6 @@
     <p class="muted" style="margin:0">Fiches affichées sur cet appareil, pour la maison « {ctx.homes.find((h) => h.id === ctx.homeId)?.name} ».
       Décocher un emplacement parent masque tout son groupe.</p>
     <ul class="now-list">
-      {#if homeWeather.loc}
-        <li><label><input type="checkbox" checked={!nowHidden(ctx.homeId, "meteo")}
-                          onchange={(e) => setNowHidden(ctx.homeId, "meteo", !(e.currentTarget as HTMLInputElement).checked)} />
-          Météo · {homeWeather.loc.label ?? "extérieur"}</label></li>
-      {/if}
       {#each nowNodes as n (n.id)}
         <li style="padding-left:{n.depth * 1.25}rem">
           <label class:off={hiddenAncestor(n)}>

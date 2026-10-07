@@ -15,7 +15,6 @@
   import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
   import { currentAlerts, describe, shortText } from "../lib/alerts.svelte";
-  import { homeWeather, refreshCurrentWeather } from "../lib/weather-state.svelte";
   import { display, nowHidden, visibleProps } from "../lib/display.svelte";
   import { ctx } from "../lib/home.svelte";
 
@@ -48,14 +47,6 @@
   // Grandeur réaffichée : ses tendances sont chargées à leur tour
   $effect(() => { void visible; if (values) setTimeout(() => loadTrends(), 0); });
 
-  // Météo publique : dernière valeur connue (mémorisée sur l'appareil), mise à jour en arrière-plan
-  const meteo = $derived(display.weather ? homeWeather.current : null);
-  $effect(() => { void homeWeather.loc; if (display.weather) refreshCurrentWeather(); });
-  const meteoTrend = (prop: string) => {
-    const pts = prop === "temperature" ? homeWeather.day?.temperature : homeWeather.day?.humidity;
-    return pts?.length ? computeTrend(pts, prop, display.trend) : null;
-  };
-
   async function load() {
     try {
       const [cur, pl] = await Promise.all([api.currentValues(), api.places().catch(() => places)]);
@@ -65,7 +56,6 @@
       now = Date.now();
       error = "";
       setTimeout(() => loadTrends(), 0);
-      if (display.weather) setTimeout(() => refreshCurrentWeather(), 0);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -144,33 +134,9 @@
   </button>
 </div>
 
-{#snippet meteoCard()}
-{#if meteo && homeWeather.loc && !nowHidden(ctx.homeId, "meteo")}
-  <div class="card place meteo" title="Météo publique (Open-Meteo), mise à jour toutes les 15 minutes environ">
-    <h2>
-      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
-      Météo · {homeWeather.loc.label ?? "extérieur"}</span>
-    </h2>
-    <div class="values">
-      {#each visible.filter((p) => p === "temperature" || p === "humidity") as prop (prop)}
-        {@const v = prop === "temperature" ? meteo.temperature : meteo.humidity}
-        {@const tr = meteoTrend(prop)}
-        <div class="value {prop}">
-          <span class="num big">{fmtValue(v, prop === "temperature" ? "°C" : "%")}{#if tr}<span class="arrow"><TrendArrow
-            trend={tr} unit={prop === "temperature" ? "°C" : "%"} detail={display.density !== "compact"} /></span>{/if}</span>
-          <small class:hide={visible.length === 1 && display.density === "compact"}>{prop === "temperature" ? "température" : "humidité"} publique</small>
-        </div>
-      {/each}
-    </div>
-    <small>Open-Meteo · {fmtAgo(new Date(meteo.ts).toISOString(), now)}{#if now - meteo.ts > 3_600_000} (dernière valeur connue){/if}</small>
-  </div>
-{/if}
-{/snippet}
-
 {#if error}
   <div class="notice err">{error}</div>
 {:else if values === null}
-  <div class="grid now" class:compact={display.density === "compact"}>{@render meteoCard()}</div>
   <p class="muted">Chargement…</p>
 {:else if values.length === 0}
   <div class="card">
@@ -183,9 +149,10 @@
     {@const ts = items[0]?.ts ?? null}
     {@const stale = isStale(ts, now)}
     {@const mark = markOf(n)}
-    <a class="card place" class:stale class:marked={mark} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}{n.children.length ? '?seul' : ''}"
+    <a class="card place" class:stale class:marked={mark} class:meteo={n.weather} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}{n.children.length ? '?seul' : ''}"
        aria-label="{n.name} : historique et courbes">
-      <h2>{n.name} <span class="chev" aria-hidden="true">›</span></h2>
+      <h2><span>{#if n.weather}<svg viewBox="0 0 24 24" width="16" height="16" aria-label="météo publique"><path
+        d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg> {/if}{n.name}</span> <span class="chev" aria-hidden="true">›</span></h2>
       {#if alertsByPlace.get(n.id)?.length}
         <div class="alerts">
           {#each alertsByPlace.get(n.id)!.slice(0, 2) as e (e.id)}
@@ -199,11 +166,12 @@
           <div class="value {v.property}">
             <span class="num big">{fmtValue(v.value, v.unit)}{#if trends.get(v.series_id)}<span class="arrow"><TrendArrow
               trend={trends.get(v.series_id)!} unit={v.unit} detail={display.density !== "compact"} /></span>{/if}</span>
-            <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}</small>
+            <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}{n.weather ? " publique" : ""}</small>
           </div>
         {/each}
       </div>
       <small title={fmtDate(ts)}>
+        {#if n.weather}Open-Meteo · {/if}
         {#if stale}<span class="badge warn">ancienne</span>{/if}
         {fmtAgo(ts, now)}
       </small>
@@ -240,7 +208,6 @@
   {/snippet}
 
   <div class="grid now" class:compact={display.density === "compact"}>
-    {@render meteoCard()}
     {#each tree as n (n.id)}{@render node(n)}{/each}
   </div>
 {/if}
@@ -273,7 +240,7 @@
   .humidity .big { color: var(--hum); }
   .stale .big { opacity: 0.6; }
   .meteo { border-style: dotted; background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
-  .meteo h2 svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; vertical-align: -0.15em; }
+  .meteo h2 svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; vertical-align: -0.15em; margin-right: 0.3rem; }
   .alerts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: -0.25rem 0 0.4rem; }
   .alert { font-size: 0.75rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: 6px; white-space: nowrap;
            background: color-mix(in srgb, var(--hum) 12%, var(--surface)); color: var(--hum); }

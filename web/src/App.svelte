@@ -18,7 +18,7 @@
   import Help from "./pages/Help.svelte";
   import Alerts from "./pages/Alerts.svelte";
   import { currentAlerts, loadAlerts } from "./lib/alerts.svelte";
-  import { loadHomeLocation } from "./lib/weather-state.svelte";
+  import { loadWeatherStations } from "./lib/weather-state.svelte";
   import "./lib/display.svelte"; // applique taille du texte et densité dès le démarrage
   import { hasUnseenNews } from "./lib/content";
 
@@ -53,7 +53,7 @@
   $effect(() => {
     if (!loggedIn || ctx.homeId === null) return;
     loadAlerts();
-    loadHomeLocation(ctx.homeId);
+    loadWeatherStations(ctx.homeId);
     const t = setInterval(() => document.visibilityState === "visible" && router.route !== "/alertes" && loadAlerts(), 120_000);
     return () => clearInterval(t);
   });

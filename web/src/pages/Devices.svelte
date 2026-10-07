@@ -118,7 +118,11 @@
             <button onclick={() => run(() => api.reactivateDevice(d.id), "Capteur réactivé.")}>Réactiver</button>
           {/if}
         </div>
-        <small class="num">{d.ma_id}{#if d.ma_name && d.ma_name !== d.name} · « {d.ma_name} » sur Mobile Alerts{/if}</small>
+        {#if d.vendor === "open_meteo"}
+          <small><span class="badge">météo publique</span> station virtuelle Open-Meteo, collectée par le serveur toutes les 30 minutes</small>
+        {:else}
+          <small class="num">{d.ma_id}{#if d.ma_name && d.ma_name !== d.name} · « {d.ma_name} » sur Mobile Alerts{/if}</small>
+        {/if}
 
         {#if d.channels.length === 0}
           <p class="muted" style="margin-top:0.75rem">Canaux pas encore détectés : ils apparaîtront après la prochaine collecte.</p>

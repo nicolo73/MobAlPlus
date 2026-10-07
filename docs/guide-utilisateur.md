@@ -60,14 +60,19 @@ Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-cou
 ## Météo publique
 
 <img src="images/icones/meteo.svg" alt="météo" height="16"> Température et humidité **extérieures
-publiques** (Open-Meteo, gratuit) à la position de la maison, pour comparer avec vos capteurs :
+publiques** (Open-Meteo, gratuit), pour comparer avec vos capteurs. Chaque commune suivie est une
+**station météo** : un capteur virtuel relevé par le serveur toutes les 30 minutes, avec un an
+d'historique dès sa création.
 
-- **Régler la position** : **Admin › Partage › Météo publique** (propriétaire) : chercher la commune,
-  ou **Ma position**.
-- **Maintenant** : fiche « Météo · commune » en tête, avec la tendance.
-- **Courbes**, page d'un emplacement et page d'un groupe : courbe **grise en pointillés**
-  « Météo (Open-Meteo) », comprise dans l'infobulle ; historique disponible sur toutes les périodes.
-- Bouton **Météo** (à côté de Température / Humidité) pour l'afficher ou la masquer.
+- **Ajouter une station** : **Admin › Partage › Météo publique** : chercher la commune, ou
+  **Ma position**. Plusieurs communes possibles ; **retirer** arrête la collecte (historique gardé).
+- Une station est un **emplacement** comme les autres : fiche sur Maintenant (cadre pointillé,
+  icône nuage), page avec courbes, tendances et **alertes** ; elle se range librement dans
+  Admin › Emplacements (par exemple dans un groupe « Sites météo »). Elle ne compte pas dans la
+  moyenne d'un groupe qui contient de vrais capteurs.
+- **Courbes**, page d'un emplacement et page d'un groupe : la première station est ajoutée en courbe
+  **grise en pointillés**, comprise dans l'infobulle. Bouton **Météo** (à côté de Température /
+  Humidité) pour l'afficher ou la masquer.
 
 ## Page d'un emplacement
 

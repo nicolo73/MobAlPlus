@@ -6,12 +6,19 @@
 
 
 ## 7 octobre 2026
+- **Météo publique** collectée par le serveur et enregistrée : chaque commune suivie devient une
+  **station météo**, un emplacement comme les autres (fiche, courbes, tendances, alertes), rangeable
+  où l'on veut ; plusieurs communes possibles (Admin › Partage › Météo publique). La fiche Météo ne
+  dépend plus du téléphone et ne disparaît plus.
 - Page **Maintenant** : choisir les fiches affichées (emplacements, groupes, météo) dans Options ;
-  la fiche Météo ne disparaît plus au renouvellement de la connexion.- **Météo publique** (Open-Meteo) : température et humidité extérieures à la position de la maison,
+  la fiche Météo ne disparaît plus au renouvellement de la connexion.
+- **Météo publique** (Open-Meteo) : température et humidité extérieures à la position de la maison,
   en fiche sur Maintenant et en courbe grise en pointillés sur les graphiques, historique compris.
-  Position à régler dans Admin › Partage.- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
+  Position à régler dans Admin › Partage.
+- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
   la courbe d'un emplacement.
-- Courbes : **lignes verticales** aux graduations du temps, trait plus net à minuit.- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
+- Courbes : **lignes verticales** aux graduations du temps, trait plus net à minuit.
+- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
   haute à la plus basse), même quand leurs mesures ne tombent pas à la même minute.
 - Plein écran : quadrillage plus fin (lignes intermédiaires sans étiquette).
 - Nouveau symbole « capteur » dans Admin › Emplacements.- Un **emplacement parent ne peut plus recevoir de capteur** (et un emplacement équipé ne peut plus

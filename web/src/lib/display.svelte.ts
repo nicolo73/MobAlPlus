@@ -18,10 +18,10 @@ export const display = $state({
   hidden: [] as string[],
   text: "normal" as TextSize,
   density: "comfort" as Density,
-  /** Courbe et fiche de la météo publique (si la position de la maison est connue) */
+  /** Courbe de comparaison avec la station météo publique (s'il y en a une) */
   weather: true,
-  /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement, « meteo ») */
-  nowHidden: {} as Record<string, (number | "meteo")[]>,
+  /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement) */
+  nowHidden: {} as Record<string, number[]>,
   trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
 });
 
@@ -79,11 +79,11 @@ export function resetTrend() {
   save();
 }
 
-/** Fiche masquée sur la page Maintenant (emplacement ou « meteo ») */
-export const nowHidden = (homeId: number | null, key: number | "meteo") =>
+/** Fiche masquée sur la page Maintenant */
+export const nowHidden = (homeId: number | null, key: number) =>
   (display.nowHidden[String(homeId)] ?? []).includes(key);
 
-export function setNowHidden(homeId: number | null, key: number | "meteo", hidden: boolean) {
+export function setNowHidden(homeId: number | null, key: number, hidden: boolean) {
   const k = String(homeId);
   const list = (display.nowHidden[k] ?? []).filter((x) => x !== key);
   display.nowHidden = { ...display.nowHidden, [k]: hidden ? [...list, key] : list };

@@ -203,7 +203,7 @@ export class SupabaseApi implements Api {
 
   async devices(): Promise<Device[]> {
     const rows = check(await this.sb.from("device")
-      .select("id, ma_id, name, ma_name, model, active, added_at, retired_at, " +
+      .select("id, ma_id, name, ma_name, model, vendor, active, added_at, retired_at, " +
               "device_channel(id, channel_no, label, observed_property(code, name, unit), " +
               "deployment(valid, series(place_id)))")
       .eq("home_id", this.homeId ?? -1)
@@ -294,15 +294,13 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("admin_run_maintenance")) as Record<string, unknown>;
   }
 
-  async homeLocation(homeId: number) {
-    const { data, error } = await this.sb.from("home").select("lat, lon, location_label").eq("id", homeId).maybeSingle();
-    if (error || !data || data.lat == null || data.lon == null) return null;
-    return { lat: data.lat as number, lon: data.lon as number, label: (data.location_label as string | null) ?? null };
+  async addWeatherStation(label: string, lat: number, lon: number) {
+    return check(await this.sb.rpc("add_weather_station", { p_home: this.homeId, p_label: label, p_lat: lat, p_lon: lon })) as number;
   }
 
-  async setHomeLocation(homeId: number, loc: { lat: number; lon: number; label: string | null } | null) {
-    check(await this.sb.from("home").update({ lat: loc?.lat ?? null, lon: loc?.lon ?? null, location_label: loc?.label ?? null })
-      .eq("id", homeId));
+  async collectWeather() {
+    const { error } = await this.sb.functions.invoke("weather", { body: {} });
+    if (error) throw new Error(error.message);
   }
 
   async placeIssues() {

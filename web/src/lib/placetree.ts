@@ -13,7 +13,12 @@ export interface PlaceNode {
   color: number | null;
   /** Couleur personnalisée (#rrggbb), prioritaire */
   custom: string | null;
-  /** Emplacements mesurés de la branche (lui compris) : de quoi calculer une moyenne */
+  /** Station météo publique (capteur virtuel) */
+  weather: boolean;
+  /**
+   * Emplacements mesurés de la branche (lui compris) : de quoi calculer une moyenne. Les stations
+   * météo n'y comptent que si la branche n'a pas de vrai capteur (groupe « sites météo »).
+   */
   measured: number[];
   children: PlaceNode[];
 }
@@ -43,14 +48,18 @@ export function placeTree(places: Place[], series: SeriesInfo[]): PlaceNode[] {
   const all = [...places];
   for (const s of series) if (!ids.has(s.place_id)) { ids.add(s.place_id); all.push({ id: s.place_id, code: "", name: s.place_name, parent_id: null, kind: null, exposure: s.exposure }); }
 
+  const weatherIds = new Set(all.filter((p) => p.kind === "weather").map((p) => p.id));
   const build = (parent: number | null, depth: number, seen: Set<number>): PlaceNode[] =>
     all.filter((p) => (parent === null ? p.parent_id === null || !ids.has(p.parent_id) : p.parent_id === parent) && !seen.has(p.id))
       .sort(placeOrder)
       .map((p) => {
         const children = build(p.id, depth + 1, new Set([...seen, p.id]));
         const own = byPlace.get(p.id) ?? [];
-        return { id: p.id, name: p.name, depth, series: own, children, color: p.color_slot ?? null, custom: p.color ?? null,
-                 measured: [...(own.length ? [p.id] : []), ...children.flatMap((c) => c.measured)] };
+        const weather = p.kind === "weather";
+        const sub = children.flatMap((c) => c.measured);
+        const real = sub.filter((id) => !weatherIds.has(id));
+        return { id: p.id, name: p.name, depth, series: own, children, color: p.color_slot ?? null, custom: p.color ?? null, weather,
+                 measured: [...(own.length ? [p.id] : []), ...(real.length || (own.length && !weather) ? real : sub)] };
       });
   return build(null, 0, new Set());
 }

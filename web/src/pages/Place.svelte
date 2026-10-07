@@ -11,7 +11,7 @@
   import ColorPicker from "../components/ColorPicker.svelte";
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
   import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
-  import type { WeatherSeries } from "../lib/weather";
+  import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
   import { router } from "../lib/router.svelte";
@@ -133,7 +133,7 @@
   let weather = $state<WeatherSeries | null>(null);
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
-    void homeWeather.loc;
+    void homeWeather.stations;
     loadWeather(on, a, b).then((w) => (weather = w));
   });
 
@@ -280,7 +280,7 @@
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] },
-                         ...weatherCurve(weather, s.property)]}
+                         ...weatherCurve(weather, s.property, [s.place_id])]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
                  curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={silenceOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
