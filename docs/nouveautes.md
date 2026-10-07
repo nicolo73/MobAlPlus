@@ -6,7 +6,10 @@
 
 
 ## 7 octobre 2026
-- Un **emplacement parent ne peut plus recevoir de capteur** (et un emplacement équipé ne peut plus
+- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
+  haute à la plus basse), même quand leurs mesures ne tombent pas à la même minute.
+- Plein écran : quadrillage plus fin (lignes intermédiaires sans étiquette).
+- Nouveau symbole « capteur » dans Admin › Emplacements.- Un **emplacement parent ne peut plus recevoir de capteur** (et un emplacement équipé ne peut plus
   contenir d'autres emplacements) ; les cas existants sont signalés dans Admin › Emplacements.
 - La page d'un emplacement parent s'affiche aussi s'il avait encore un capteur (courbe « capteur
   propre »).

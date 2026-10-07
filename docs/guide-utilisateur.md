@@ -46,10 +46,11 @@ Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-cou
 - **Choisir les emplacements** en touchant leurs noms (8 courbes au plus).
 - **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
 - **Période** : 24 h à 1 an ; **‹ ›** pour reculer ou avancer ; **Maintenant** pour revenir au présent.
-- **Lire une valeur** : toucher la courbe et glisser le doigt.
+- **Lire les valeurs** : toucher la courbe et glisser le doigt ; l'infobulle donne la valeur de
+  **chaque courbe** à cet instant, de la plus haute à la plus basse.
 - **Zoomer** : à deux doigts (ou molette) ; **se déplacer** : faire glisser la barre sous la courbe.
 - <img src="images/icones/plein-ecran.svg" alt="plein écran" height="16"> **Plein écran**, en haut
-  à droite de chaque courbe ([écran](#ecran-plein-ecran)).
+  à droite de chaque courbe ([écran](#ecran-plein-ecran)), avec un quadrillage plus fin.
 - **Rendu** : *Escalier* (fidèle aux mesures), *Lissé*, *Simplifié* (sans les marches dues à
   l'arrondi du capteur).
 - Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran).
@@ -129,7 +130,7 @@ envoyer le message proposé par **WhatsApp**, SMS ou e-mail ([écran](#ecran-par
 
 - **Admin › Emplacements** : créer les pièces et zones, les ranger les unes dans les autres en les
   **glissant** (ordinateur) ou avec les **flèches** (↑ ↓ ordre, ← sortir, → ranger dans celui du
-  dessus) ([écran](#ecran-admin-emplacements)). 📡 signale un emplacement équipé d'un capteur. Un
+  dessus) ([écran](#ecran-admin-emplacements)). <img src="images/icones/capteur.svg" alt="capteur" height="16"> signale un emplacement équipé d'un capteur. Un
   **emplacement parent ne reçoit pas de capteur** (il fait la moyenne de ses sous-emplacements) et un
   emplacement équipé ne peut pas contenir d'autres emplacements : l'application le refuse.
 - **Admin › Capteurs** : **Ajouter un capteur** (identifiant Mobile Alerts au dos), puis

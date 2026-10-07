@@ -46,3 +46,22 @@ function plateaus(seg: Point[]): XY[] {
   push(last.ts, last.value);
   return out;
 }
+
+/**
+ * Valeur d'une courbe tracée à l'instant `t` (infobulle) : dernière mesure (escalier) ou
+ * interpolation entre les points voisins (lissé, simplifié). null hors de la courbe ou dans une coupure.
+ */
+export function valueAt(data: XY[], t: number, interpolate: boolean, tail = 30 * 60_000): number | null {
+  let lo = 0, hi = data.length - 1, i = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (data[mid][0] <= t) { i = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  if (i < 0) return null;
+  const [x0, y0] = data[i];
+  if (y0 === null) return null;
+  const next = data[i + 1];
+  if (!next || next[1] === null) return t - x0 <= tail ? y0 : null;  // après la dernière mesure
+  if (!interpolate || next[0] === x0) return y0;
+  return y0 + ((next[1] - y0) * (t - x0)) / (next[0] - x0);
+}

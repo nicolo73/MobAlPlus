@@ -10,7 +10,7 @@
   import { cssVar } from "../lib/colors";
   import type { Window } from "../lib/period";
   import type { Point } from "../lib/types";
-  import { curveData, type CurveMode } from "../lib/curve";
+  import { curveData, valueAt, type CurveMode } from "../lib/curve";
 
   export interface ChartSeries {
     id: number | string;
@@ -70,6 +70,8 @@
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
     const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
+    // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
+    const prepared = series.map((s) => ({ s, data: curveData(s.points, curve) }));
     const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
     const showPoints = alertPoints.length > 0 && (!alertsWideOnly || full || (el?.clientWidth ?? 0) >= 500);
     // Échelle : les seuils proches des mesures sont inclus, les seuils lointains n'écrasent pas la courbe
@@ -97,21 +99,32 @@
         max: (v: { min: number; max: number }) => Math.max(v.max, ...near(v)),
         axisLabel: { color: muted, formatter: (v: number) => fmt(v) },
         splitLine: { lineStyle: { color: border, opacity: 0.6 } },
+        // Plein écran : graduations plus nombreuses et lignes intermédiaires sans étiquette
+        splitNumber: full ? 8 : 5,
+        minorTick: { show: full, splitNumber: 5, lineStyle: { color: border } },
+        minorSplitLine: { show: full, lineStyle: { color: border, opacity: 0.3 } },
       },
       tooltip: {
         trigger: "axis",
         backgroundColor: surface, borderColor: border, textStyle: { color: text },
         confine: true,
         axisPointer: { type: "line", lineStyle: { color: muted, width: 1 } },
-        formatter: (params: { axisValue: number; seriesName: string; seriesType: string; color: string; value: [number, number | null] }[]) => {
-          const rows = params
-            .filter((p) => p.value[1] != null && p.seriesType === "line")
-            .map((p) => `<div style="display:flex;align-items:center;gap:.5rem">
-              <span style="display:inline-block;width:14px;border-top:2px ${dashed.has(p.seriesName) ? "dashed" : "solid"} ${p.color}"></span>
-              <b style="min-width:4.5rem">${fmt(p.value[1]!)} ${escapeHtml(unit)}</b>
-              <span style="color:${muted}">${escapeHtml(p.seriesName)}</span></div>`)
+        // Toutes les courbes à l'instant pointé, même si leurs mesures ne tombent pas au même instant
+        // (ECharts ne garderait que la courbe dont un point est le plus proche) ; de la plus haute à
+        // la plus basse, comme sur le graphique
+        formatter: (params: { axisValue: number }[]) => {
+          const t = params[0]?.axisValue;
+          if (t == null) return "";
+          const rows = prepared
+            .map(({ s, data }) => ({ s, v: valueAt(data, t, curve !== "step") }))
+            .filter((r): r is { s: ChartSeries; v: number } => r.v !== null)
+            .sort((a, b) => b.v - a.v)
+            .map(({ s, v }) => `<div style="display:flex;align-items:center;gap:.5rem">
+              <span style="display:inline-block;width:14px;border-top:2px ${dashed.has(s.name) ? "dashed" : "solid"} ${s.color}"></span>
+              <b style="min-width:4.5rem">${fmt(v)} ${escapeHtml(unit)}</b>
+              <span style="color:${muted}">${escapeHtml(s.name)}</span></div>`)
             .join("");
-          return `<div style="font-size:12px;color:${muted};margin-bottom:4px">${fmtTime(params[0]?.axisValue)}</div>${rows}`;
+          return `<div style="font-size:12px;color:${muted};margin-bottom:4px">${fmtTime(t)}</div>${rows}`;
         },
       },
       dataZoom: [
@@ -128,7 +141,7 @@
             new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
           brushSelect: false },
       ],
-      series: [...series.map((s, i) => ({
+      series: [...prepared.map(({ s, data }, i) => ({
         id: String(s.id), name: s.name, type: "line",
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
@@ -137,7 +150,7 @@
         emphasis: { focus: "series", lineStyle: { width: 2 } },
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
-        data: curveData(s.points, curve),
+        data,
         ...(i === 0 && thresholds.length ? {
           markLine: {
             silent: true, symbol: "none", animation: false,

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { curveData } from "../src/lib/curve.ts";
+import { curveData, valueAt } from "../src/lib/curve.ts";
 
 const pts = (...vals: [number, number][]) => vals.map(([ts, value]) => ({ ts, value, quality: "raw" as const }));
 
@@ -25,4 +25,15 @@ test("simplifié : un pic isolé est conservé", () => {
 test("coupure sur les longues absences de mesure", () => {
   const p = pts([0, 1], [10, 1], [1000, 2], [1010, 2]);
   assert.deepEqual(curveData(p, "simple", 100), [[0, 1], [5, 1], [10, 1], [11, null], [1000, 2], [1005, 2], [1010, 2]]);
+});
+
+test("valeur d'une courbe à un instant (infobulle)", () => {
+  const d = curveData(pts([0, 10], [600, 20], [1200, 30]), "step");
+  assert.equal(valueAt(d, -1, false), null);          // avant la courbe
+  assert.equal(valueAt(d, 300, false), 10);           // escalier : dernière mesure
+  assert.equal(valueAt(d, 300, true), 15);            // lissé : interpolation
+  assert.equal(valueAt(d, 1200 + 60_000, true), 30);  // juste après la dernière mesure
+  assert.equal(valueAt(d, 1200 + 3_600_000, true), null);
+  const cut = curveData(pts([0, 1], [10, 1], [1000, 2]), "step", 100);
+  assert.equal(valueAt(cut, 500, false), null);       // dans une coupure
 });

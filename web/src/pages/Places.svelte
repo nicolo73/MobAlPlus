@@ -4,6 +4,7 @@
   import { isWithin, placeOrder } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
   import ColorPicker from "../components/ColorPicker.svelte";
+  import SensorIcon from "../components/SensorIcon.svelte";
 
   const dark = isDark();
 
@@ -207,7 +208,7 @@
       <p class="muted">Aucun emplacement.</p>
     {:else}
       <p class="muted hint">Glisser un emplacement sur un autre pour l'y ranger (au milieu de la ligne) ou le placer
-        avant / après ; ou utiliser les flèches. 📡 : capteur affecté. Un emplacement parent ne reçoit pas de
+        avant / après ; ou utiliser les flèches. <SensorIcon /> : capteur affecté. Un emplacement parent ne reçoit pas de
         capteur (il fait la moyenne de ses sous-emplacements) et un emplacement équipé ne contient pas
         d'autres emplacements.</p>
       <ul class="tree" class:busy>
@@ -222,7 +223,7 @@
             <span class="handle" aria-hidden="true">⠿</span>
             {#if depth}<span class="elbow" aria-hidden="true">└</span>{/if}
             <span class="name">{place.name}</span>
-            {#if occupied.has(place.id)}<span class="sensor" title="capteur affecté">📡</span>{/if}
+            {#if occupied.has(place.id)}<span class="sensor"><SensorIcon /></span>{/if}
             {#if place.color != null || place.color_slot != null}<span class="dot" style="--c:{placeColor(place, dark, 0)}" title="couleur dans les courbes"></span>{/if}
             <span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>
             <span class="spacer"></span>
