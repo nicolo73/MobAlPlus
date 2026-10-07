@@ -18,9 +18,16 @@
   let dragged = $state<number | null>(null);
   let target = $state<{ id: number; where: "before" | "inside" | "after" } | null>(null);
 
+  /** Emplacements qui ont un capteur affecté, et emplacements parents équipés (incohérence) */
+  let occupied = $state(new Set<number>());
+  let issues = $state<{ place_id: number; place_name: string; channels: number }[]>([]);
   async function load() {
     try {
-      places = await api.places();
+      const [pl, devs, iss] = await Promise.all([api.places(), api.devices(), api.placeIssues()]);
+      occupied = new Set(devs.filter((d) => d.active).flatMap((d) => d.channels.map((c) => c.place_id))
+        .filter((id): id is number => id != null));
+      issues = iss;
+      places = pl;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -115,7 +122,12 @@
   /** Entrer dans l'emplacement précédent, en dernier */
   function indent(p: Place, index: number) {
     const prev = siblingsOf(p.parent_id)[index - 1];
-    if (prev) move(p.id, prev.id, siblingsOf(prev.id).length);
+    if (!prev) return;
+    if (occupied.has(prev.id)) {
+      error = `« ${prev.name} » a un capteur affecté : il ne peut pas contenir de sous-emplacement (déplacez d'abord son capteur, Admin › Capteurs).`;
+      return;
+    }
+    move(p.id, prev.id, siblingsOf(prev.id).length);
   }
 
   function dragOver(e: DragEvent, p: Place) {
@@ -123,7 +135,9 @@
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const y = (e.clientY - r.top) / r.height;
-    target = { id: p.id, where: y < 0.3 ? "before" : y > 0.7 ? "after" : "inside" };
+    const where = y < 0.3 ? "before" : y > 0.7 ? "after" : "inside";
+    // Un emplacement équipé d'un capteur ne peut pas contenir de sous-emplacement
+    target = where === "inside" && occupied.has(p.id) ? null : { id: p.id, where };
   }
   function drop(e: DragEvent, p: Place) {
     e.preventDefault();
@@ -146,6 +160,11 @@
   </div>
 
   {#if error}<div class="notice err" role="alert">{error}</div>{/if}
+  {#each issues as i (i.place_id)}
+    <div class="notice warn">« {i.place_name} » contient des sous-emplacements mais a encore {i.channels} canal{i.channels > 1 ? "aux" : ""}
+      de capteur affecté{i.channels > 1 ? "s" : ""} : un emplacement parent ne fait que la moyenne de ses sous-emplacements.
+      Affectez ce capteur à un sous-emplacement (<a href="#/admin/capteurs">Admin › Capteurs</a>).</div>
+  {/each}
 
   {#if draft}
     <form class="card stack" onsubmit={save}>
@@ -155,7 +174,10 @@
         <label>Dans
           <select bind:value={draft.parent_id}>
             <option value={null}>— aucun —</option>
-            {#each (places ?? []).filter((p) => p.id !== draft?.id) as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+            {#each (places ?? []).filter((p) => p.id !== draft?.id) as p (p.id)}
+              <option value={p.id} disabled={occupied.has(p.id) && draft.parent_id !== p.id}>
+                {p.name}{occupied.has(p.id) ? " (a un capteur)" : ""}</option>
+            {/each}
           </select>
         </label>
         <div class="field">Couleur dans les courbes
@@ -185,7 +207,9 @@
       <p class="muted">Aucun emplacement.</p>
     {:else}
       <p class="muted hint">Glisser un emplacement sur un autre pour l'y ranger (au milieu de la ligne) ou le placer
-        avant / après ; ou utiliser les flèches.</p>
+        avant / après ; ou utiliser les flèches. 📡 : capteur affecté. Un emplacement parent ne reçoit pas de
+        capteur (il fait la moyenne de ses sous-emplacements) et un emplacement équipé ne contient pas
+        d'autres emplacements.</p>
       <ul class="tree" class:busy>
         {#each tree as { place, depth, index, count } (place.id)}
           {@const t = target?.id === place.id ? target.where : null}
@@ -198,6 +222,7 @@
             <span class="handle" aria-hidden="true">⠿</span>
             {#if depth}<span class="elbow" aria-hidden="true">└</span>{/if}
             <span class="name">{place.name}</span>
+            {#if occupied.has(place.id)}<span class="sensor" title="capteur affecté">📡</span>{/if}
             {#if place.color != null || place.color_slot != null}<span class="dot" style="--c:{placeColor(place, dark, 0)}" title="couleur dans les courbes"></span>{/if}
             <span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>
             <span class="spacer"></span>
@@ -235,6 +260,7 @@
   .handle { color: var(--muted); cursor: grab; }
   .elbow { color: var(--muted); }
   .name { font-weight: 500; }
+  .sensor { font-size: 0.8rem; }
   .dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--c); }
   .field { display: grid; gap: 0.35rem; font-size: 0.9rem; }
   .actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.35rem; margin-left: auto; white-space: nowrap; }

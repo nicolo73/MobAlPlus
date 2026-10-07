@@ -129,7 +129,9 @@ envoyer le message proposé par **WhatsApp**, SMS ou e-mail ([écran](#ecran-par
 
 - **Admin › Emplacements** : créer les pièces et zones, les ranger les unes dans les autres en les
   **glissant** (ordinateur) ou avec les **flèches** (↑ ↓ ordre, ← sortir, → ranger dans celui du
-  dessus) ([écran](#ecran-admin-emplacements)).
+  dessus) ([écran](#ecran-admin-emplacements)). 📡 signale un emplacement équipé d'un capteur. Un
+  **emplacement parent ne reçoit pas de capteur** (il fait la moyenne de ses sous-emplacements) et un
+  emplacement équipé ne peut pas contenir d'autres emplacements : l'application le refuse.
 - **Admin › Capteurs** : **Ajouter un capteur** (identifiant Mobile Alerts au dos), puis
   **affecter** chaque canal à un emplacement. **Déplacer** : nouvelle affectation datée ;
   **Retirer** : plus relevé, historique conservé.

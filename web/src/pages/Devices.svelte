@@ -136,7 +136,11 @@
                         <div class="stack assign">
                           <select bind:value={editing.placeId} aria-label="Emplacement">
                             <option value={null}>— non affecté —</option>
-                            {#each places as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+                            {#each places as p (p.id)}
+                              {@const parent = places.some((c) => c.parent_id === p.id)}
+                              <option value={p.id} disabled={parent && editing.placeId !== p.id}>
+                                {p.name}{parent ? " (groupe : choisir un sous-emplacement)" : ""}</option>
+                            {/each}
                           </select>
                           <label>à partir du
                             <input type="datetime-local" bind:value={editing.from} />

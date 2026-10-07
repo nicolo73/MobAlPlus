@@ -232,7 +232,7 @@ erDiagram
 |---|---|---|
 | `home` | maison : regroupe emplacements et capteurs | toutes les règles d'accès partent d'elle |
 | `home_member` | membres d'une maison, par e-mail | invitation possible avant la 1re connexion ; au moins un propriétaire |
-| `place` | emplacements, en arborescence | même maison que son parent ; pas de boucle ; ordre `sort_order` |
+| `place` | emplacements, en arborescence | même maison que son parent ; pas de boucle ; ordre `sort_order` ; un emplacement parent n'a pas de capteur affecté (et un emplacement équipé ne contient pas d'autres emplacements) |
 | `device` | capteurs physiques | `active = false` : plus collecté, historique conservé |
 | `device_channel` | canaux d'un capteur (une grandeur chacun) | créés automatiquement à la 1re collecte |
 | `observed_property` | grandeurs mesurées | tolérance de simplification par grandeur |
@@ -263,6 +263,7 @@ erDiagram
 | `collect_targets()`, `ingest_readings()`, `record_sync_error()` | collecteur |
 | `run_maintenance()`, `compact_readings()`, `simplify_old()` | maintenance nocturne |
 | `assign_channel()`, `retire_device()`, `reorder_places()` | administration |
+| `place_issues()` | emplacements parents ayant encore un capteur affecté (incohérence ancienne à corriger) |
 | `export_csv()`, `import_preview()`, `import_values()` | export et import de fichiers |
 | `my_context()`, `my_home_ids()`, `my_place_ids()`… | droits du compte connecté (règles d'accès) |
 | `evaluate_alerts()`, `set_alert_rules()` | alertes : évaluation toutes les 10 minutes, réglage des seuils |

@@ -294,6 +294,13 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("admin_run_maintenance")) as Record<string, unknown>;
   }
 
+  async placeIssues() {
+    const { data, error } = await this.sb.rpc("place_issues");
+    if (error) return [];  // base pas encore à jour
+    const ids = new Set((await this.places()).map((p) => p.id));  // maison courante seulement
+    return (data as { place_id: number; place_name: string; channels: number }[]).filter((r) => ids.has(r.place_id));
+  }
+
   async alertRules(seriesIds: number[]) {
     if (!seriesIds.length) return [];
     return check(await this.sb.from("alert_rule").select("series_id, kind, level, threshold, enabled")

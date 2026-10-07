@@ -5,6 +5,12 @@
 -->
 
 
+## 7 octobre 2026
+- Un **emplacement parent ne peut plus recevoir de capteur** (et un emplacement équipé ne peut plus
+  contenir d'autres emplacements) ; les cas existants sont signalés dans Admin › Emplacements.
+- La page d'un emplacement parent s'affiche aussi s'il avait encore un capteur (courbe « capteur
+  propre »).
+
 ## 6 octobre 2026
 - **Alertes** : seuils haut et bas, pics et creux, sur deux niveaux (info, importante), réglés sur
   la page de chaque emplacement. Cloche 🔔 avec le nombre d'alertes, page **Alertes** (glisser pour

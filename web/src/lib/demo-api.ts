@@ -58,16 +58,17 @@ let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
   };
 }).filter((d): d is Device => d !== null);
 
-// Capteur placé directement dans un emplacement parent (« Jardin ») : cas réel à couvrir
-const EXTRA_DEFS: typeof PLACE_DEFS = [["jardin", "Jardin", "outdoor", 12.4, 84]];
+// Troisième sous-emplacement du Jardin : abri de jardin
+const EXTRA_DEFS: typeof PLACE_DEFS = [["abri", "Abri de jardin", "outdoor", 12.4, 84]];
+places.push({ id: 14, code: "abri", name: "Abri de jardin", exposure: "outdoor", parent_id: 10, kind: "room" });
 const defOf = (code: string | undefined) =>
   PLACE_DEFS.find((x) => x[0] === code) ?? EXTRA_DEFS.find((x) => x[0] === code) ?? PLACE_DEFS[0];
 devices.push({
   id: 20, ma_id: "03DEMO000020", name: "Capteur abri de jardin", ma_name: "20-Abri Mesures", model: null, active: true,
   added_at: iso(400 * 86_400_000), retired_at: null,
   channels: [
-    { id: 201, channel_no: 1, label: "Température", property: "temperature", property_name: "Température", unit: "°C", place_id: 10, since: iso(400 * 86_400_000) },
-    { id: 202, channel_no: 2, label: "Humidité relative", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: 10, since: iso(400 * 86_400_000) },
+    { id: 201, channel_no: 1, label: "Température", property: "temperature", property_name: "Température", unit: "°C", place_id: 14, since: iso(400 * 86_400_000) },
+    { id: 202, channel_no: 2, label: "Humidité relative", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: 14, since: iso(400 * 86_400_000) },
   ],
 });
 
@@ -310,7 +311,13 @@ export class DemoApi implements Api {
     p.color = typeof color === "string" ? color : null;
     await delay(null);
   }
+  private checkParent(parentId: number | null) {
+    if (parentId === null) return;
+    const occupied = devices.some((d) => d.active && d.channels.some((c) => c.place_id === parentId));
+    if (occupied) throw new Error(`« ${places.find((p) => p.id === parentId)?.name} » a un capteur affecté : il ne peut pas contenir de sous-emplacement (déplacez d'abord son capteur, Admin › Capteurs)`);
+  }
   async reorderPlaces(parentId: number | null, ids: number[]) {
+    if (ids.some((id) => places.find((p) => p.id === id)?.parent_id !== parentId)) this.checkParent(parentId);
     if (parentId !== null && ids.some((id) => isWithin(places, parentId, id)))
       throw new Error("Un emplacement ne peut pas être placé dans l'un de ses sous-emplacements");
     ids.forEach((id, i) => { const p = places.find((x) => x.id === id)!; p.parent_id = parentId; p.sort_order = i + 1; });
@@ -331,10 +338,13 @@ export class DemoApi implements Api {
   }
   async reactivateDevice(id: number) { devices = devices.map((d) => (d.id === id ? { ...d, active: true, retired_at: null } : d)); }
   async assignChannel(channelId: number, placeId: number | null, from: Date) {
+    const parent = places.find((p) => p.id === placeId && places.some((c) => c.parent_id === p.id));
+    if (parent) throw new Error(`« ${parent.name} » contient des sous-emplacements : affectez le capteur à l'un d'eux (un emplacement parent fait la moyenne de ses sous-emplacements)`);
     devices = devices.map((d) => ({ ...d, channels: d.channels.map((c) =>
       c.id === channelId ? { ...c, place_id: placeId, since: placeId ? from.toISOString() : null } : c) }));
   }
   async savePlace(place: Omit<Place, "id"> & { id?: number }) {
+    if (place.parent_id !== (places.find((p) => p.id === place.id)?.parent_id ?? null)) this.checkParent(place.parent_id);
     if (place.id) {
       const i = places.findIndex((p) => p.id === place.id);
       places[i] = { ...places[i], ...place } as Place;
@@ -374,6 +384,15 @@ export class DemoApi implements Api {
   private archived = new Set<number>();
   private deleted = new Set<number>();
 
+  async placeIssues() {
+    const out: { place_id: number; place_name: string; channels: number }[] = [];
+    for (const p of places) {
+      if (!places.some((c) => c.parent_id === p.id)) continue;
+      const n = devices.filter((d) => d.active).flatMap((d) => d.channels).filter((c) => c.place_id === p.id).length;
+      if (n) out.push({ place_id: p.id, place_name: p.name, channels: n });
+    }
+    return delay(out);
+  }
   async alertRules(seriesIds: number[]) { return delay(this.rules.filter((r) => seriesIds.includes(r.series_id))); }
   async saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]) {
     this.rules = [...this.rules.filter((r) => r.series_id !== seriesId), ...rules.map((r) => ({ ...r, series_id: seriesId }))];

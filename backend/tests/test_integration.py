@@ -709,3 +709,32 @@ def test_alerts_one_per_crossing(conn):
     conn.execute("SELECT evaluate_alerts(%s)", (later,))
     assert conn.execute("SELECT count(*) FROM alert_event").fetchone()[0] == 2   # nouveau franchissement
     conn.commit()
+
+
+def test_parent_place_has_no_sensor(conn):
+    salon = conn.execute("SELECT id FROM place WHERE code = 'salon'").fetchone()[0]
+    garage = conn.execute("SELECT id FROM place WHERE code = 'garage'").fetchone()[0]
+    conn.execute("INSERT INTO place (code, name) VALUES ('maison', 'Maison')")
+    maison = conn.execute("SELECT id FROM place WHERE code = 'maison'").fetchone()[0]
+    # Ranger des emplacements mesurés dans un parent sans capteur : autorisé
+    conn.execute("UPDATE place SET parent_id = %s WHERE id IN (%s, %s)", (maison, salon, garage))
+    # Affecter un capteur au parent : refusé
+    ch = channel_id(conn, "03BBBBBBBBBB", 1)
+    with pytest.raises(psycopg.errors.RaiseException, match="sous-emplacements"):
+        conn.execute("SELECT assign_channel(%s, %s, now())", (ch, maison))
+    conn.rollback()
+    # Ranger un emplacement dans un emplacement qui a un capteur (le salon) : refusé
+    conn.execute("INSERT INTO place (code, name) VALUES ('coin', 'Coin lecture')")
+    with pytest.raises(psycopg.errors.RaiseException, match="capteur affecté"):
+        conn.execute("UPDATE place SET parent_id = (SELECT id FROM place WHERE code = 'salon') WHERE code = 'coin'")
+    conn.rollback()
+    # Incohérence ancienne (règles contournées) : signalée par place_issues()
+    conn.execute("ALTER TABLE place DISABLE TRIGGER place_parent_no_sensor_check")
+    conn.execute("INSERT INTO place (code, name, parent_id) VALUES ('coin', 'Coin lecture', (SELECT id FROM place WHERE code = 'salon'))")
+    conn.execute("ALTER TABLE place ENABLE TRIGGER place_parent_no_sensor_check")
+    assert [r[1] for r in conn.execute("SELECT * FROM place_issues()").fetchall()] == ["Salon"]
+    # Déplacer le capteur vers un sous-emplacement règle le problème
+    conn.execute("SELECT assign_channel(%s, (SELECT id FROM place WHERE code = 'coin'), now())", (channel_id(conn, "07AAAAAAAAAA", 1),))
+    conn.execute("SELECT assign_channel(%s, (SELECT id FROM place WHERE code = 'coin'), now())", (channel_id(conn, "07AAAAAAAAAA", 2),))
+    assert conn.execute("SELECT * FROM place_issues()").fetchall() == []
+    conn.rollback()

@@ -273,6 +273,8 @@ export interface Api {
   saveTolerance(propertyId: number, tolerance: number | null): Promise<void>;
   collectNow(maIds?: string[]): Promise<CollectResult[]>;
   runMaintenance(): Promise<Record<string, unknown>>;
+  /** Emplacements parents qui ont encore un capteur affecté (incohérence à corriger) */
+  placeIssues(): Promise<{ place_id: number; place_name: string; channels: number }[]>;
   alertRules(seriesIds: number[]): Promise<AlertRule[]>;
   /** Remplace les règles d'une série (droits « gestion ») */
   saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]): Promise<void>;
