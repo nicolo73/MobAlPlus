@@ -91,7 +91,8 @@
           color: muted, hideOverlap: true,
           formatter: { year: "{yyyy}", month: "{MMM} {yyyy}", day: "{d} {MMM}", hour: "{HH}:{mm}", minute: "{HH}:{mm}", second: "{HH}:{mm}:{ss}" },
         },
-        splitLine: { show: false },
+        // Lignes verticales aux graduations (heures, jours, semaines… selon le zoom)
+        splitLine: { show: true, lineStyle: { color: border, opacity: 0.45 } },
       },
       yAxis: {
         type: "value", scale: true,
@@ -162,6 +163,15 @@
           },
         } : {}),
       })),
+      // Minuits marqués d'un trait plus net tant que la période chargée ne dépasse pas ~ 45 jours
+      ...(loaded[1] - loaded[0] <= 45 * 86_400_000 ? [{
+        id: "jours", type: "line", data: [], silent: true,
+        markLine: {
+          silent: true, symbol: "none", animation: false, label: { show: false },
+          lineStyle: { color: muted, type: "solid", width: 1, opacity: 0.35 },
+          data: midnights(loaded[0], loaded[1]).map((t) => ({ xAxis: t })),
+        },
+      }] : []),
       ...(showPoints ? [{
         id: "alertes", name: "Alertes", type: "scatter", silent: true, z: 5, animation: false,
         symbolSize: alertsWideOnly ? 9 : 6,
@@ -172,6 +182,15 @@
         })),
       }] : [])],
     };
+  }
+
+  /** Minuits (heure locale) d'une période */
+  function midnights(from: number, to: number): number[] {
+    const out: number[] = [];
+    const d = new Date(from);
+    d.setHours(24, 0, 0, 0);
+    for (; d.getTime() < to && out.length < 400; d.setDate(d.getDate() + 1)) out.push(d.getTime());
+    return out;
   }
 
   function render() {
