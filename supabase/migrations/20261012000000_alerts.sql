@@ -190,6 +190,8 @@ BEGIN
 END $$;
 
 -- Notifications à envoyer : alertes récentes non notifiées × abonnements des membres de la maison
+-- (DROP : la signature a évolué depuis, voir 20261018000000 ; permet de rejouer les migrations)
+DROP FUNCTION IF EXISTS pending_notifications(interval);
 CREATE OR REPLACE FUNCTION pending_notifications(p_max_age interval DEFAULT interval '3 hours')
 RETURNS TABLE (event_id bigint, kind text, level text, value real, threshold real, started_at timestamptz,
                place_id int, place_name text, property text, unit text,

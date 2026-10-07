@@ -6,6 +6,9 @@
 
 
 ## 7 octobre 2026
+- Nouvelles **alertes** : **comparaison de deux emplacements** (« plus chaud dehors que dedans » :
+  Extérieur plus haut que Salon de plus de 0 °C, aussi avec une station météo) et **montée ou baisse
+  rapide** (plus de x °C par heure). À régler sous chaque courbe, rubrique Alertes.
 - **Météo publique** collectée par le serveur et enregistrée : chaque commune suivie devient une
   **station météo**, un emplacement comme les autres (fiche, courbes, tendances, alertes), rangeable
   où l'on veut ; plusieurs communes possibles (Admin › Partage › Météo publique). La fiche Météo ne

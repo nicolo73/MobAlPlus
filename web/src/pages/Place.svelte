@@ -122,9 +122,16 @@
       }
       if (level) out.push({ ts: p.ts, value: p.value, level });
     }
+    const pts = (data.get(id) ?? []).filter((p) => p.quality !== "rejected");
     for (const e of events) {
-      if (e.series_id === id && (e.kind === "peak" || e.kind === "trough") && e.value !== null)
+      if (e.series_id !== id) continue;
+      if ((e.kind === "peak" || e.kind === "trough") && e.value !== null)
         out.push({ ts: e.started_at, value: e.value, level: e.level });
+      // Comparaison, montée / baisse rapide : marque sur la courbe au début de l'alerte
+      if (e.kind === "gap_above" || e.kind === "gap_below" || e.kind === "rise" || e.kind === "fall") {
+        const at = pts.filter((p) => p.ts <= e.started_at).at(-1);
+        if (at) out.push({ ts: e.started_at, value: at.value, level: e.level });
+      }
     }
     return out;
   }

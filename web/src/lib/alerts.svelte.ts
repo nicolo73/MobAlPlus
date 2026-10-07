@@ -28,10 +28,17 @@ export const isCurrent = (e: AlertEvent, now = Date.now()) =>
 
 export const currentAlerts = () => alerts.events.filter((e) => isCurrent(e));
 
-/** Texte court : « > 26 °C », « pic 22,8 °C » */
+/** Écart ou variation : toujours signé (« +1,2 °C ») */
+const signed = (x: number | null, unit: string) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}${fmtValue(Math.abs(x), unit)}`);
+
+/** Texte court : « > 26 °C », « pic 22,8 °C », « > Salon », « ↓ 1,5 °C/h » */
 export function shortText(e: AlertEvent): string {
   const v = (x: number | null) => fmtValue(x, e.unit);
   switch (e.kind) {
+    case "gap_above": return `> ${e.ref_place_name ?? "référence"}`;
+    case "gap_below": return `< ${e.ref_place_name ?? "référence"}`;
+    case "rise": return `↑ ${v(e.threshold)}/h`;
+    case "fall": return `↓ ${v(e.threshold)}/h`;
     case "above": return `> ${v(e.threshold)}`;
     case "below": return `< ${v(e.threshold)}`;
     case "peak": return `pic ${v(e.value)}`;
@@ -55,6 +62,17 @@ export function describe(e: AlertEvent): string {
     return e.ended_at === null
       ? `Capteur muet : aucune mesure depuis ${time(e.started_at)} (piles, portée de la passerelle ?)`
       : `Capteur muet de ${time(e.started_at)} à ${time(e.ended_at)}`;
+  }
+  const period = e.ended_at === null ? `depuis ${time(e.started_at)}` : `de ${time(e.started_at)} à ${time(e.ended_at)}`;
+  if (e.kind === "gap_above" || e.kind === "gap_below") {
+    const ref = e.ref_place_name ?? "l'emplacement de référence";
+    const side = e.kind === "gap_above" ? "plus élevée qu'à" : "plus basse qu'à";
+    const by = e.threshold ? ` de plus de ${v(e.threshold)}` : "";
+    return `${what} ${side} ${ref}${by} ${period} (écart max ${v(e.value)})`;
+  }
+  if (e.kind === "rise" || e.kind === "fall") {
+    const dir = e.kind === "rise" ? "Montée" : "Baisse";
+    return `${dir} rapide de la ${what.toLowerCase()} : plus de ${v(e.threshold)} par heure ${period} (max ${signed(e.kind === "rise" ? e.value : e.value == null ? null : -e.value, e.unit)}/h)`;
   }
   if (e.kind === "peak" || e.kind === "trough") {
     return `${what} : ${e.kind === "peak" ? "pic" : "creux"} à ${v(e.value)} (${time(e.started_at)})`;

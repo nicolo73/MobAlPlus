@@ -2,7 +2,7 @@
 
 export interface Pending {
   event_id: number;
-  kind: "above" | "below" | "peak" | "trough" | "silent";
+  kind: "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall";
   level: "info" | "warning";
   value: number | null;
   threshold: number | null;
@@ -14,6 +14,8 @@ export interface Pending {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** Comparaison : emplacement de référence */
+  ref_place_name?: string | null;
 }
 
 export interface Db {
@@ -37,6 +39,10 @@ export function message(p: Pending): { title: string; body: string } {
     p.kind === "above" ? `${what} ${fmt(p.value, p.unit)} : au-dessus de ${fmt(p.threshold, p.unit)}`
     : p.kind === "below" ? `${what} ${fmt(p.value, p.unit)} : en dessous de ${fmt(p.threshold, p.unit)}`
     : p.kind === "silent" ? `capteur muet depuis ${new Date(p.started_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} (piles ? portée ?)`
+    : p.kind === "gap_above" ? `${what} plus élevée qu'à ${p.ref_place_name ?? "la référence"} (écart ${fmt(p.value, p.unit)})`
+    : p.kind === "gap_below" ? `${what} plus basse qu'à ${p.ref_place_name ?? "la référence"} (écart ${fmt(p.value, p.unit)})`
+    : p.kind === "rise" ? `${what} en hausse rapide : +${fmt(p.value, p.unit)} en une heure`
+    : p.kind === "fall" ? `${what} en baisse rapide : −${fmt(p.value, p.unit)} en une heure`
     : p.kind === "peak" ? `pic de ${what} passé (${fmt(p.value, p.unit)}), en baisse`
     : `creux de ${what} passé (${fmt(p.value, p.unit)}), en hausse`;
   return { title: `${icon} ${p.place_name}`, body: body.charAt(0).toUpperCase() + body.slice(1) };

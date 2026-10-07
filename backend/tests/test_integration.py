@@ -759,6 +759,60 @@ def test_alert_silent_sensor(conn):
     conn.commit()
 
 
+def test_alert_compare_places(conn):
+    salon, garage = series_id(conn, "salon", "temperature"), series_id(conn, "garage", "temperature")
+    ch_s, ch_g = channel_id(conn, "07AAAAAAAAAA", 1), channel_id(conn, "03BBBBBBBBBB", 1)
+    # « Plus chaud au garage qu'au salon » (écart > 0 °C)
+    conn.execute("SELECT set_alert_rules(%s, %s)", (garage, Jsonb([
+        {"kind": "gap_above", "level": "warning", "threshold": 0, "ref_series_id": salon}])))
+    t0 = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    # Salon stable à 21 °C ; garage 20,0 → 21,6 puis redescend à 20,8
+    db.insert_readings(conn, [(ch_s, t0, 21.0)])
+    garage_vals = [20.0, 20.5, 21.0, 21.2, 21.6, 21.4, 21.0, 20.8]
+    for i, v in enumerate(garage_vals):
+        ts = t0 + timedelta(minutes=10 * (i + 1))
+        db.insert_readings(conn, [(ch_g, ts, v)])
+        conn.execute("SELECT evaluate_alerts(%s)", (ts,))
+    rows = conn.execute("SELECT kind, started_at, ended_at, value, ref_series_id FROM alert_event").fetchall()
+    assert len(rows) == 1
+    kind, start, end, value, ref = rows[0]
+    assert (kind, ref) == ("gap_above", salon)
+    assert start == t0 + timedelta(minutes=40)            # 21,2 > 21,0
+    assert value == pytest.approx(0.6)                    # écart maximal
+    assert end == t0 + timedelta(minutes=80)              # 20,8 : sous l'écart d'au moins un pas
+    # Référence d'une autre grandeur : refusée
+    with pytest.raises(psycopg.errors.RaiseException, match="autre grandeur"):
+        conn.execute("SELECT set_alert_rules(%s, %s)", (garage, Jsonb([
+            {"kind": "gap_above", "level": "info", "threshold": 0, "ref_series_id": series_id(conn, "salon", "humidity")}])))
+    conn.rollback()
+    with pytest.raises(psycopg.errors.CheckViolation):  # comparaison sans référence
+        conn.execute("SELECT set_alert_rules(%s, %s)", (garage, Jsonb([{"kind": "gap_below", "level": "info", "threshold": 1}])))
+    conn.rollback()
+
+
+def test_alert_rate(conn):
+    sid = series_id(conn, "salon", "temperature")
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([
+        {"kind": "fall", "level": "warning", "threshold": 1.5},
+        {"kind": "rise", "level": "info", "threshold": 1.5}])))
+    t0 = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    # Stable à 21 °C pendant 1 h, puis chute de 0,5 °C toutes les 10 min (fenêtre ouverte), puis stable
+    vals = [21.0] * 7 + [20.5, 20.0, 19.5, 19.0] + [19.0] * 9
+    for i, v in enumerate(vals):
+        ts = t0 + timedelta(minutes=10 * i)
+        db.insert_readings(conn, [(ch, ts, v)])
+        conn.execute("SELECT evaluate_alerts(%s)", (ts,))
+    rows = conn.execute("SELECT kind, started_at, ended_at, value FROM alert_event").fetchall()
+    assert len(rows) == 1
+    kind, start, end, value = rows[0]
+    assert kind == "fall"
+    assert start == t0 + timedelta(minutes=100)           # 21,0 → 19,0 en une heure (19,5 : −1,5 tout juste, pas plus)
+    assert value == pytest.approx(2.0)                    # baisse maximale sur une heure
+    assert end == t0 + timedelta(minutes=140)             # plus que −1 °C sur l'heure : fin de la chute
+    conn.commit()
+
+
 def test_weather_station(conn):
     home = conn.execute("SELECT default_home_id()").fetchone()[0]
     place = conn.execute("SELECT add_weather_station(%s, 'Toulouse', 43.6045, 1.4440)", (home,)).fetchone()[0]

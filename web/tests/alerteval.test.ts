@@ -46,3 +46,27 @@ test("capteur muet : silences de plus de N heures, en cours jusqu'à maintenant"
   const ev = evaluateRule(p, { kind: "silent", level: "warning", threshold: 3, enabled: true }, "temperature", 410 * M + 4 * H);
   assert.deepEqual(ev.map((e) => [e.started_at, e.ended_at]), [[20 * M, 400 * M], [410 * M, null]]);
 });
+
+test("comparaison de deux emplacements : plus chaud au garage qu'au salon", () => {
+  const t0 = Date.UTC(2026, 9, 6, 12);
+  const salon = [{ ts: t0, value: 21, quality: "ok" as const }];
+  const garage = [20.0, 20.5, 21.0, 21.2, 21.6, 21.4, 21.0, 20.8]
+    .map((value, i) => ({ ts: t0 + (i + 1) * 600_000, value, quality: "ok" as const }));
+  const ev = evaluateRule(garage, { kind: "gap_above", level: "warning", threshold: 0, enabled: true }, "temperature",
+                          t0 + 9 * 600_000, salon);
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].started_at, t0 + 4 * 600_000);
+  assert.ok(Math.abs(ev[0].value - 0.6) < 1e-6);
+  assert.equal(ev[0].ended_at, t0 + 8 * 600_000);
+});
+
+test("baisse rapide : plus de 1,5 °C en une heure", () => {
+  const t0 = Date.UTC(2026, 9, 6, 12);
+  const vals = [...Array(7).fill(21), 20.5, 20, 19.5, 19, ...Array(9).fill(19)];
+  const ev = evaluateRule(vals.map((value, i) => ({ ts: t0 + i * 600_000, value, quality: "ok" as const })),
+                          { kind: "fall", level: "warning", threshold: 1.5, enabled: true }, "temperature");
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].started_at, t0 + 10 * 600_000);
+  assert.equal(ev[0].value, 2);
+  assert.equal(ev[0].ended_at, t0 + 14 * 600_000);
+});

@@ -192,7 +192,7 @@ export interface ExportOptions {
 
 export type ImportRows = { s?: number; c?: number; t: string; v: number; q?: string }[];
 
-export type AlertKind = "above" | "below" | "peak" | "trough" | "silent";
+export type AlertKind = "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall";
 export type AlertLevel = "info" | "warning";
 
 /** Règle d'alerte d'une série : seuil haut / bas, ou pic / creux (seuil = montée minimale) */
@@ -202,6 +202,8 @@ export interface AlertRule {
   level: AlertLevel;
   threshold: number | null;
   enabled: boolean;
+  /** Comparaison (gap_above / gap_below) : série de référence, même grandeur, autre emplacement */
+  ref_series_id?: number | null;
 }
 
 export interface AlertEvent {
@@ -216,7 +218,10 @@ export interface AlertEvent {
   threshold: number | null;
   started_at: number;          // millisecondes
   ended_at: number | null;     // null : dépassement en cours
-  value: number | null;        // valeur extrême
+  value: number | null;        // valeur extrême (écart ou variation horaire pour une comparaison ou une pente)
+  ref_series_id?: number | null;
+  /** Comparaison : emplacement de référence */
+  ref_place_name?: string | null;
   archived: boolean;           // masquée par le compte connecté
 }
 

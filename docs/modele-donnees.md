@@ -48,6 +48,7 @@ erDiagram
   device_channel ||--o{ correction : "corrections"
   series |o--o{ annotation : "annotée"
   series ||--o{ alert_rule : "seuils d'alerte"
+  series |o--o{ alert_rule : "référence (comparaison)"
   series ||--o{ alert_event : "alertes"
   alert_rule |o--o{ alert_event : "déclenche"
   alert_event ||--o{ alert_archive : "archivée par"
@@ -166,9 +167,10 @@ erDiagram
   alert_rule {
     int id PK
     int series_id FK
-    text kind "above | below | peak | trough | silent"
+    text kind "above | below | peak | trough | silent | gap_above | gap_below | rise | fall"
     text level "info | warning"
-    real threshold "seuil ; montée minimale du pic ; heures (silent)"
+    real threshold "seuil ; montée du pic ; heures (silent) ; écart (gap) ; par heure (rise, fall)"
+    int ref_series_id FK "comparaison : autre série, même grandeur"
     bool enabled
   }
   alert_event {
@@ -181,6 +183,7 @@ erDiagram
     timestamptz started_at
     timestamptz ended_at "NULL = en cours"
     real value "valeur extrême"
+    int ref_series_id "comparaison"
     timestamptz notified_at
   }
   alert_archive {
@@ -246,7 +249,7 @@ erDiagram
 | `reading_day` | mesures anciennes, une ligne par canal et par jour | tableaux `t` / `v` ; `simplified` au-delà de 3 ans |
 | `correction` | valeurs rejetées ou remplacées | appliquées à la lecture, le brut reste intact |
 | `annotation` | commentaires sur une période | par série, par emplacement ou globaux |
-| `alert_rule` | seuils d'alerte d'une série (au-dessus, en dessous, pic, creux ; info ou importante) | une règle par type et niveau |
+| `alert_rule` | seuils d'alerte d'une série (au-dessus, en dessous, pic, creux, muet, comparaison avec un autre emplacement, montée / baisse rapide ; info ou importante) | une règle par type et niveau ; comparaison : même grandeur |
 | `alert_event` | alertes déclenchées | en cours tant que `ended_at` est vide ; effacement réservé à « gestion » |
 | `alert_archive` | alertes archivées (masquées) | propre à chaque compte |
 | `push_subscription` | appareils abonnés aux notifications | supprimés quand le service les déclare expirés |
@@ -271,6 +274,6 @@ erDiagram
 | `place_issues()` | emplacements parents ayant encore un capteur affecté (incohérence ancienne à corriger) |
 | `export_csv()`, `import_preview()`, `import_values()` | export et import de fichiers |
 | `my_context()`, `my_home_ids()`, `my_place_ids()`… | droits du compte connecté (règles d'accès) |
-| `evaluate_alerts()`, `set_alert_rules()` | alertes : évaluation toutes les 10 minutes, réglage des seuils |
+| `evaluate_alerts()`, `set_alert_rules()`, `alert_derived()` | alertes : évaluation toutes les 10 minutes, réglage des seuils, courbe d'écart ou de pente |
 | `pending_notifications()`, `mark_notified()` | notifications à envoyer (Edge Function `notify`) |
 | `admin_stats()`, `stats()` | statistiques d'occupation |

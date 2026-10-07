@@ -99,9 +99,19 @@ indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre 
 | **Pic passé** | case à cocher | case à cocher |
 | **Creux passé** | case à cocher | case à cocher |
 | **Muet depuis plus de** | ex. 3 h | ex. 6 h |
+| **Plus haut que** *emplacement* | ex. Salon, de plus de 0 °C | |
+| **Plus bas que** *emplacement* | | ex. Extérieur, de plus de 15 °C |
+| **Monte de plus de** | ex. 2 °C/h | |
+| **Baisse de plus de** | | ex. 1,5 °C/h |
 
 - Case vide : pas d'alerte. Les pics et creux suivent la sensibilité des flèches de tendance
   (Options).
+- **Comparaison** : la courbe est plus haute (ou plus basse) que celle d'un autre emplacement, de
+  la même grandeur, d'au moins l'écart choisi. Exemple « plus chaud dehors que dedans » : sur la
+  température de l'Extérieur (ou d'une station météo), **Plus haut que** Salon, de plus de 0 °C :
+  le moment d'ouvrir ou de fermer les fenêtres. L'alerte dure tant que l'écart persiste.
+- **Montée / baisse rapide** : variation de plus de la valeur choisie sur la dernière heure
+  (fenêtre ouverte, chauffage en panne, porte de congélateur restée ouverte…).
 - **Capteur muet** : plus aucune mesure depuis la durée choisie (piles vides, capteur hors de portée).
   Un réglage sur une seule courbe suffit. Les périodes sans mesure apparaissent en **gris** sur la
   courbe de l'emplacement.

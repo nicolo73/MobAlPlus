@@ -174,6 +174,13 @@ la courbe, triangles des alertes importantes sur les courbes superposées (grand
 application fermée. Restent : récapitulatif par e-mail (voir 15), alerte « capteur muet » (voir 6),
 seuils déplaçables à la souris sur la courbe.
 
+**Fait (07/10/2026)** : alertes de **comparaison** entre deux emplacements de même grandeur
+(« plus haut / plus bas que *emplacement* de plus de x », ex. plus chaud dehors que dedans, y compris
+avec une station météo) et de **pente** (« monte / baisse de plus de x par heure », variation sur la
+dernière heure). Évaluées comme un dépassement de seuil sur une courbe dérivée (`alert_derived()`).
+Pistes : comparaison à la moyenne d'un groupe, durée minimale avant alerte, lien avec les actions
+(volets, fenêtres : voir 17).
+
 ## 8. Données météo publiques
 
 **Besoin** : superposer la météo extérieure aux courbes des capteurs.

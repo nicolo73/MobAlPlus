@@ -1,5 +1,6 @@
 // Évaluation des règles d'alerte sur une suite de mesures, comme la base (evaluate_alerts) :
-// sert au mode démo et aux tests. Dépassement : de la première mesure au-delà du seuil jusqu'au
+// sert au mode démo et aux tests. Comparaison (écart avec un autre emplacement) et pente
+// (variation sur une heure) : dépassement de seuil sur la courbe dérivée. Dépassement : de la première mesure au-delà du seuil jusqu'au
 // retour en deçà d'au moins un pas de mesure ; pic / creux : extrême précédé d'une montée d'au moins
 // le seuil et suivi d'une baisse d'au moins la moitié (et de deux pas de mesure).
 
@@ -21,10 +22,45 @@ export interface EvalEvent {
   value: number;
 }
 
-export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">, property: string, now = Date.now()): EvalEvent[] {
-  const pts = points.filter((p) => p.quality !== "rejected");
+const HOUR = 3_600_000;
+
+/** Dernière valeur connue à l'instant t (mesures triées), avec son horodatage */
+function asOf(pts: Point[], t: number): Point | null {
+  let lo = 0, hi = pts.length - 1, out: Point | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid].ts <= t) { out = pts[mid]; lo = mid + 1; } else hi = mid - 1;
+  }
+  return out;
+}
+
+/**
+ * Courbe dérivée d'une règle de comparaison (écart avec la série de référence, dernières valeurs
+ * de moins de 3 h) ou de pente (variation depuis la valeur d'il y a une heure), orientée « plus
+ * grand = plus d'alerte » : comme alert_derived() dans la base.
+ */
+export function derivedPoints(pts: Point[], kind: "gap_above" | "gap_below" | "rise" | "fall", ref: Point[] = []): Point[] {
+  const gap = kind === "gap_above" || kind === "gap_below";
+  const times = [...new Set([...pts.map((p) => p.ts), ...(gap ? ref.map((p) => p.ts) : [])])].sort((a, b) => a - b);
+  const out: Point[] = [];
+  for (const t of times) {
+    const a = asOf(pts, t);
+    if (!a || t - a.ts > 3 * HOUR) continue;
+    const b = gap ? asOf(ref, t) : asOf(pts, t - HOUR);
+    if (!b || t - b.ts > (gap ? 3 : 4) * HOUR) continue;
+    const d = kind === "gap_above" || kind === "rise" ? a.value - b.value : b.value - a.value;
+    out.push({ ts: t, value: Math.round(d * 1000) / 1000, quality: "ok" });
+  }
+  return out;
+}
+
+export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">, property: string, now = Date.now(),
+                             ref: Point[] = []): EvalEvent[] {
+  let pts = points.filter((p) => p.quality !== "rejected");
   const res = RESOLUTION[property] ?? 0;
-  const sign = rule.kind === "above" || rule.kind === "peak" ? 1 : -1;
+  const derived = rule.kind === "gap_above" || rule.kind === "gap_below" || rule.kind === "rise" || rule.kind === "fall";
+  if (derived) pts = derivedPoints(pts, rule.kind as "rise", ref.filter((p) => p.quality !== "rejected"));
+  const sign = rule.kind === "below" || rule.kind === "trough" ? -1 : 1;
   const out: EvalEvent[] = [];
   if (!rule.enabled) return out;
 
@@ -40,7 +76,7 @@ export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">
     return out;
   }
 
-  if (rule.kind === "above" || rule.kind === "below") {
+  if (rule.kind !== "peak" && rule.kind !== "trough") {
     if (rule.threshold == null) return out;
     const t = rule.threshold;
     let open: EvalEvent | null = null;

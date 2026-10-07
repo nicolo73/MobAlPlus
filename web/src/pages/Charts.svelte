@@ -145,7 +145,8 @@
   }
   function markersOf(prop: string) {
     const shown = new Set(selected.filter((c) => !c.avg).map((c) => c.node.id));
-    return events.filter((e) => e.property === prop && shown.has(e.place_id))
+    // (comparaisons et pentes : leur valeur n'est pas sur l'échelle de la courbe, pas de marque ici)
+    return events.filter((e) => e.property === prop && shown.has(e.place_id) && ["above", "below", "peak", "trough"].includes(e.kind))
       .map((e) => ({ ts: e.started_at, value: (e.kind === "above" || e.kind === "below" ? e.threshold : e.value) ?? 0, level: e.level }));
   }
 

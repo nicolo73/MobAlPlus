@@ -256,7 +256,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   rules[("alert_rule<br/>seuils par série")] --> ev
-  cron1["pg_cron<br/>toutes les 10 min (+4)"] --> ev["evaluate_alerts()<br/>dépassements, pics, creux"]
+  cron1["pg_cron<br/>toutes les 10 min (+4)"] --> ev["evaluate_alerts()<br/>dépassements, pics, creux,<br/>écarts, pentes"]
   ev --> events[("alert_event")]
   events -->|API| app["Application : cloche,<br/>page Alertes, fiches, courbes"]
   cron2["pg_cron (+5)"] -->|pg_net| notify["Edge Function notify<br/>Web Push (clés VAPID)"]
@@ -270,6 +270,10 @@ flowchart LR
   refranchissement dans l'heure rouvre la même alerte : une notification par franchissement.
 - Les pics et creux reprennent l'algorithme des flèches de tendance (`trend.ts`) ;
   `alerteval.ts` en est la version JavaScript (mode démo, tests).
+- Comparaison (`gap_above` / `gap_below`, avec `ref_series_id`) et pente (`rise` / `fall`) :
+  `alert_derived()` calcule la courbe de l'écart avec l'autre emplacement (dernières valeurs
+  connues de chacun) ou de la variation sur une heure, puis la même logique de dépassement de seuil
+  s'applique (hystérésis, réarmement, une notification par épisode).
 - Chaque compte archive ses alertes pour lui-même ; l'effacement vaut pour toute la maison.
 
 ## Sécurité et droits

@@ -14,6 +14,9 @@ test("texte des notifications", () => {
     "Humidité 28 % : en dessous de 30 %");
   assert.match(message({ ...base, kind: "silent", value: null, started_at: "2026-10-07T06:00:00Z" }).body,
     /^Capteur muet depuis 7 oct\.,? 08:00/);
+  assert.equal(message({ ...base, place_name: "Extérieur", kind: "gap_above", value: 1.2, threshold: 0, ref_place_name: "Salon" }).body,
+    "Température plus élevée qu'à Salon (écart 1,2 °C)");
+  assert.equal(message({ ...base, kind: "fall", value: 2, threshold: 1.5 }).body, "Température en baisse rapide : −2 °C en une heure");
 });
 
 test("envoi, abonnements expirés supprimés, alertes marquées notifiées", async () => {

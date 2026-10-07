@@ -312,7 +312,7 @@ export class SupabaseApi implements Api {
 
   async alertRules(seriesIds: number[]) {
     if (!seriesIds.length) return [];
-    return check(await this.sb.from("alert_rule").select("series_id, kind, level, threshold, enabled")
+    return check(await this.sb.from("alert_rule").select("series_id, kind, level, threshold, enabled, ref_series_id")
       .in("series_id", seriesIds)) as AlertRule[];
   }
 
@@ -322,7 +322,7 @@ export class SupabaseApi implements Api {
 
   async alertEvents({ since, seriesIds }: { since: number; seriesIds?: number[] }): Promise<AlertEvent[]> {
     let q = this.sb.from("alert_event")
-      .select("id, series_id, kind, level, threshold, started_at, ended_at, value, "
+      .select("id, series_id, kind, level, threshold, started_at, ended_at, value, ref_series_id, "
         + "series!inner(place_id, place!inner(name, home_id), observed_property(code, unit)), alert_archive(user_id)")
       .eq("series.place.home_id", this.homeId ?? -1)
       .or(`ended_at.is.null,started_at.gte.${new Date(since).toISOString()}`)
@@ -334,10 +334,18 @@ export class SupabaseApi implements Api {
       series: { place_id: number; place: { name: string }; observed_property: { code: string; unit: string } };
       alert_archive: unknown[];
     })[];
+    // Comparaisons : nom de l'emplacement de référence
+    const refs = [...new Set(rows.map((r) => r.ref_series_id).filter((x): x is number => x != null))];
+    const refName = new Map<number, string>();
+    if (refs.length) {
+      const rs = check(await this.sb.from("series").select("id, place(name)").in("id", refs)) as unknown as { id: number; place: { name: string } }[];
+      for (const x of rs) refName.set(x.id, x.place.name);
+    }
     return rows.map(({ series, alert_archive, ...r }) => ({
       ...r, started_at: Date.parse(r.started_at), ended_at: r.ended_at ? Date.parse(r.ended_at) : null,
       place_id: series.place_id, place_name: series.place.name, property: series.observed_property.code,
       unit: series.observed_property.unit, archived: alert_archive.length > 0,
+      ref_place_name: r.ref_series_id != null ? refName.get(r.ref_series_id) ?? null : null,
     }));
   }
 
