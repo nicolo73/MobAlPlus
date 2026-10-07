@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  // Dernières valeurs par maison, gardées entre deux visites de la page (affichage immédiat)
+  const memo = new Map<number | null, { values: import("../lib/types").CurrentValue[]; places: import("../lib/types").Place[] }>();
+</script>
+
 <script lang="ts">
   import { api } from "../lib/api";
   import { canEdit } from "../lib/home.svelte";
@@ -10,13 +15,14 @@
   import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
   import { currentAlerts, describe, shortText } from "../lib/alerts.svelte";
-  import { homeWeather } from "../lib/weather-state.svelte";
-  import { currentWeather, weatherSeries, type CurrentWeather, type WeatherSeries } from "../lib/weather";
+  import { homeWeather, refreshCurrentWeather } from "../lib/weather-state.svelte";
   import { display, nowHidden, visibleProps } from "../lib/display.svelte";
   import { ctx } from "../lib/home.svelte";
 
-  let values = $state<CurrentValue[] | null>(null);
-  let places = $state<Place[]>([]);
+  // svelte-ignore state_referenced_locally
+  let values = $state<CurrentValue[] | null>(memo.get(ctx.homeId)?.values ?? null);
+  // svelte-ignore state_referenced_locally
+  let places = $state<Place[]>(memo.get(ctx.homeId)?.places ?? []);
   const dark = isDark();
   let error = $state("");
   let now = $state(Date.now());
@@ -42,25 +48,11 @@
   // Grandeur réaffichée : ses tendances sont chargées à leur tour
   $effect(() => { void visible; if (values) setTimeout(() => loadTrends(), 0); });
 
-  // Météo publique : conditions actuelles et tendance (au plus toutes les 10 minutes)
-  let meteo = $state<CurrentWeather | null>(null);
-  let meteoDay = $state<WeatherSeries | null>(null);
-  let meteoAt = 0;
-  let meteoKey = "";
-  async function loadMeteo() {
-    const loc = homeWeather.loc;
-    if (!display.weather || !loc) { meteo = null; meteoKey = ""; return; }
-    const key = `${loc.lat},${loc.lon}`;
-    if (key === meteoKey && Date.now() - meteoAt < 10 * 60_000) return;
-    meteoKey = key;
-    meteoAt = Date.now();
-    try {
-      [meteo, meteoDay] = await Promise.all([currentWeather(loc), weatherSeries(loc, Date.now() - 25 * 3_600_000, Date.now())]);
-    } catch { meteoKey = ""; /* on garde la dernière valeur connue ; nouvel essai au prochain rafraîchissement */ }
-  }
-  $effect(() => { void homeWeather.loc; void display.weather; loadMeteo(); });
+  // Météo publique : dernière valeur connue (mémorisée sur l'appareil), mise à jour en arrière-plan
+  const meteo = $derived(display.weather ? homeWeather.current : null);
+  $effect(() => { void homeWeather.loc; if (display.weather) refreshCurrentWeather(); });
   const meteoTrend = (prop: string) => {
-    const pts = prop === "temperature" ? meteoDay?.temperature : meteoDay?.humidity;
+    const pts = prop === "temperature" ? homeWeather.day?.temperature : homeWeather.day?.humidity;
     return pts?.length ? computeTrend(pts, prop, display.trend) : null;
   };
 
@@ -69,10 +61,11 @@
       const [cur, pl] = await Promise.all([api.currentValues(), api.places().catch(() => places)]);
       places = pl;
       values = cur;
+      memo.set(ctx.homeId, { values: cur, places: pl });
       now = Date.now();
       error = "";
       setTimeout(() => loadTrends(), 0);
-      setTimeout(() => loadMeteo(), 0);
+      if (display.weather) setTimeout(() => refreshCurrentWeather(), 0);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -151,9 +144,33 @@
   </button>
 </div>
 
+{#snippet meteoCard()}
+{#if meteo && homeWeather.loc && !nowHidden(ctx.homeId, "meteo")}
+  <div class="card place meteo" title="Météo publique (Open-Meteo), mise à jour toutes les 15 minutes environ">
+    <h2>
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
+      Météo · {homeWeather.loc.label ?? "extérieur"}</span>
+    </h2>
+    <div class="values">
+      {#each visible.filter((p) => p === "temperature" || p === "humidity") as prop (prop)}
+        {@const v = prop === "temperature" ? meteo.temperature : meteo.humidity}
+        {@const tr = meteoTrend(prop)}
+        <div class="value {prop}">
+          <span class="num big">{fmtValue(v, prop === "temperature" ? "°C" : "%")}{#if tr}<span class="arrow"><TrendArrow
+            trend={tr} unit={prop === "temperature" ? "°C" : "%"} detail={display.density !== "compact"} /></span>{/if}</span>
+          <small class:hide={visible.length === 1 && display.density === "compact"}>{prop === "temperature" ? "température" : "humidité"} publique</small>
+        </div>
+      {/each}
+    </div>
+    <small>Open-Meteo · {fmtAgo(new Date(meteo.ts).toISOString(), now)}{#if now - meteo.ts > 3_600_000} (dernière valeur connue){/if}</small>
+  </div>
+{/if}
+{/snippet}
+
 {#if error}
   <div class="notice err">{error}</div>
 {:else if values === null}
+  <div class="grid now" class:compact={display.density === "compact"}>{@render meteoCard()}</div>
   <p class="muted">Chargement…</p>
 {:else if values.length === 0}
   <div class="card">
@@ -223,26 +240,7 @@
   {/snippet}
 
   <div class="grid now" class:compact={display.density === "compact"}>
-    {#if meteo && homeWeather.loc && !nowHidden(ctx.homeId, "meteo")}
-      <div class="card place meteo" title="Météo publique (Open-Meteo), mise à jour toutes les 15 minutes environ">
-        <h2>
-          <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
-          Météo · {homeWeather.loc.label ?? "extérieur"}</span>
-        </h2>
-        <div class="values">
-          {#each visible.filter((p) => p === "temperature" || p === "humidity") as prop (prop)}
-            {@const v = prop === "temperature" ? meteo.temperature : meteo.humidity}
-            {@const tr = meteoTrend(prop)}
-            <div class="value {prop}">
-              <span class="num big">{fmtValue(v, prop === "temperature" ? "°C" : "%")}{#if tr}<span class="arrow"><TrendArrow
-                trend={tr} unit={prop === "temperature" ? "°C" : "%"} detail={display.density !== "compact"} /></span>{/if}</span>
-              <small class:hide={visible.length === 1 && display.density === "compact"}>{prop === "temperature" ? "température" : "humidité"} publique</small>
-            </div>
-          {/each}
-        </div>
-        <small>Open-Meteo · {fmtAgo(new Date(meteo.ts).toISOString(), now)}</small>
-      </div>
-    {/if}
+    {@render meteoCard()}
     {#each tree as n (n.id)}{@render node(n)}{/each}
   </div>
 {/if}

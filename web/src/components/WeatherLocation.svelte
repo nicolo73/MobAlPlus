@@ -2,7 +2,7 @@
   // Position de la maison pour la météo publique : recherche d'une commune ou position du téléphone.
   import { api } from "../lib/api";
   import { searchPlace, type Location } from "../lib/weather";
-  import { homeWeather } from "../lib/weather-state.svelte";
+  import { homeWeather, refreshCurrentWeather } from "../lib/weather-state.svelte";
 
   let { homeId }: { homeId: number } = $props();
 
@@ -30,6 +30,9 @@
     try {
       await api.setHomeLocation(homeId, loc);
       homeWeather.loc = loc;
+      homeWeather.current = null;
+      homeWeather.day = null;
+      if (loc) refreshCurrentWeather(true);
       results = [];
       query = "";
       info = loc ? `Météo : ${loc.label ?? "position enregistrée"}.` : "Météo désactivée pour cette maison.";
