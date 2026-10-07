@@ -159,7 +159,7 @@
           {:else if router.route === "/donnees"}
             {#key router.query.toString()}<Data />{/key}
           {:else if router.route === "/lieu" && router.param}
-            {#key router.param}<Place placeId={Number(router.param)} />{/key}
+            {#key `${router.param}?${router.query}`}<Place placeId={Number(router.param)} />{/key}
           {:else}
             <Now />
           {/if}

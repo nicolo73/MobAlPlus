@@ -58,6 +58,19 @@ let devices: Device[] = PLACE_DEFS.map(([code, name], i): Device | null => {
   };
 }).filter((d): d is Device => d !== null);
 
+// Capteur placé directement dans un emplacement parent (« Jardin ») : cas réel à couvrir
+const EXTRA_DEFS: typeof PLACE_DEFS = [["jardin", "Jardin", "outdoor", 12.4, 84]];
+const defOf = (code: string | undefined) =>
+  PLACE_DEFS.find((x) => x[0] === code) ?? EXTRA_DEFS.find((x) => x[0] === code) ?? PLACE_DEFS[0];
+devices.push({
+  id: 20, ma_id: "03DEMO000020", name: "Capteur abri de jardin", ma_name: "20-Abri Mesures", model: null, active: true,
+  added_at: iso(400 * 86_400_000), retired_at: null,
+  channels: [
+    { id: 201, channel_no: 1, label: "Température", property: "temperature", property_name: "Température", unit: "°C", place_id: 10, since: iso(400 * 86_400_000) },
+    { id: 202, channel_no: 2, label: "Humidité relative", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: 10, since: iso(400 * 86_400_000) },
+  ],
+});
+
 const STEP = 7 * 60_000;           // une mesure toutes les 7 minutes
 const HISTORY = 400 * 86_400_000;  // historique fictif disponible
 
@@ -65,7 +78,7 @@ const HISTORY = 400 * 86_400_000;  // historique fictif disponible
 function synth(seriesId: number, t: number): number {
   const d = devices.flatMap((x) => x.channels).find((c) => c.id === seriesId);
   const place = places.find((p) => p.id === d?.place_id);
-  const def = PLACE_DEFS.find((x) => x[0] === place?.code) ?? PLACE_DEFS[0];
+  const def = defOf(place?.code);
   const temp = d?.property !== "humidity";
   const day = 86_400_000;
   const outdoor = def[2] === "outdoor";
@@ -156,7 +169,7 @@ export class DemoApi implements Api {
       for (const c of d.channels) {
         const place = places.find((p) => p.id === c.place_id);
         if (!place) continue;
-        const def = PLACE_DEFS.find((x) => x[0] === place.code)!;
+        const def = defOf(place.code);
         const base = c.property === "temperature" ? def[3] : def[4];
         const stale = place.code === "garage";
         out.push({

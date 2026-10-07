@@ -12,6 +12,7 @@
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
+  import { router } from "../lib/router.svelte";
   import { loadAlerts } from "../lib/alerts.svelte";
   import { computeTrend } from "../lib/trend";
   import { display, visibleProps } from "../lib/display.svelte";
@@ -207,6 +208,7 @@
 <div class="stack">
   <div class="row">
     <a href="#/" class="back">‹ Maintenant</a>
+    {#if router.query.has("seul")}<a href="#/lieu/{placeId}" class="back">‹ Groupe</a>{/if}
     <span class="spacer"></span>
     <a href="#/donnees?lieu={placeId}" class="btn">Exporter les données</a>
   </div>

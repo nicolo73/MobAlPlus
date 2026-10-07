@@ -140,7 +140,7 @@
     {@const ts = items[0]?.ts ?? null}
     {@const stale = isStale(ts, now)}
     {@const mark = markOf(n)}
-    <a class="card place" class:stale class:marked={mark} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}"
+    <a class="card place" class:stale class:marked={mark} style={mark ? `--mark:${mark}` : ""} href="#/lieu/{n.id}{n.children.length ? '?seul' : ''}"
        aria-label="{n.name} : historique et courbes">
       <h2>{n.name} <span class="chev" aria-hidden="true">›</span></h2>
       {#if alertsByPlace.get(n.id)?.length}

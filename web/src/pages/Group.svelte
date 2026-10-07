@@ -113,7 +113,7 @@
     const curves: ChartSeries[] = [];
     for (const m of members) {
       const s = seriesOf(m.node.id, prop);
-      if (s) curves.push({ id: s.id, name: m.node.name, color: m.color, points: data.get(s.id) ?? [] });
+      if (s) curves.push({ id: s.id, name: m.node.id === placeId ? `${m.node.name} (capteur propre)` : m.node.name, color: m.color, points: data.get(s.id) ?? [] });
     }
     if (!curves.length) return [];
     const p = properties.find((x) => x.code === prop)!;
@@ -188,7 +188,11 @@
           .sort((a, b) => rank(a.property) - rank(b.property))}
         <li>
           <span class="key" style="--c:{m.color}"></span>
-          <a href="#/lieu/{m.node.id}">{m.node.name}</a>
+          {#if m.node.id === placeId}
+            <a href="#/lieu/{m.node.id}?seul">{m.node.name}</a> <small class="muted">capteur propre</small>
+          {:else}
+            <a href="#/lieu/{m.node.id}">{m.node.name}</a>
+          {/if}
           <span class="spacer"></span>
           {#each cur as v (v.series_id)}
             <span class="num {v.property}" class:stale={isStale(v.ts)}>{fmtValue(v.value, v.unit)}</span>
