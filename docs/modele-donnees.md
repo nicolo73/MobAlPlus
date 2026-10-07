@@ -162,9 +162,9 @@ erDiagram
   alert_rule {
     int id PK
     int series_id FK
-    text kind "above | below | peak | trough"
+    text kind "above | below | peak | trough | silent"
     text level "info | warning"
-    real threshold "seuil, ou montée minimale du pic"
+    real threshold "seuil ; montée minimale du pic ; heures (silent)"
     bool enabled
   }
   alert_event {

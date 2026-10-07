@@ -190,7 +190,7 @@ export interface ExportOptions {
 
 export type ImportRows = { s?: number; c?: number; t: string; v: number; q?: string }[];
 
-export type AlertKind = "above" | "below" | "peak" | "trough";
+export type AlertKind = "above" | "below" | "peak" | "trough" | "silent";
 export type AlertLevel = "info" | "warning";
 
 /** Règle d'alerte d'une série : seuil haut / bas, ou pic / creux (seuil = montée minimale) */

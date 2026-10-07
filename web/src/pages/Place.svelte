@@ -94,6 +94,19 @@
       return { value: r.threshold!, level: r.level,
                label: `${r.level === "warning" ? "⚠" : "ⓘ"} ${fmtValue(r.threshold, u)}` };
     });
+  /** Silence au-delà duquel une période est « sans mesure » : seuil « capteur muet » de la série, 3 h sinon */
+  const silenceOf = (id: number) => (rules.find((r) => r.series_id === id && r.kind === "silent" && r.enabled)?.threshold ?? 3) * 3_600_000;
+  /** Périodes sans mesure, grisées et sans tracé sur la courbe */
+  function gapsOf(id: number): [number, number][] {
+    const gap = silenceOf(id);
+    const pts = (data.get(id) ?? []).filter((p) => p.quality !== "rejected");
+    const out: [number, number][] = [];
+    for (let i = 1; i < pts.length; i++) if (pts[i].ts - pts[i - 1].ts > gap) out.push([pts[i - 1].ts, pts[i].ts]);
+    const last = pts.at(-1);
+    if (last && Date.now() - last.ts > gap && loaded[1] >= Date.now() - gap) out.push([last.ts, Date.now()]);
+    return out;
+  }
+
   /** Mesures au-delà d'un seuil (niveau le plus élevé atteint) et pics / creux signalés */
   function alertPointsOf(id: number) {
     const rs = rules.filter((r) => r.series_id === id && r.enabled && r.threshold != null);
@@ -258,7 +271,7 @@
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] }]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
-                 curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)}
+                 curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={silenceOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
       {#if st}
         <dl class="stats">

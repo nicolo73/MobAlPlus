@@ -79,9 +79,13 @@ indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre 
 | **En dessous de** | ex. 16 °C | ex. 12 °C |
 | **Pic passé** | case à cocher | case à cocher |
 | **Creux passé** | case à cocher | case à cocher |
+| **Muet depuis plus de** | ex. 3 h | ex. 6 h |
 
 - Case vide : pas d'alerte. Les pics et creux suivent la sensibilité des flèches de tendance
   (Options).
+- **Capteur muet** : plus aucune mesure depuis la durée choisie (piles vides, capteur hors de portée).
+  Un réglage sur une seule courbe suffit. Les périodes sans mesure apparaissent en **gris** sur la
+  courbe de l'emplacement.
 - Vérification **toutes les 10 minutes**. **Une seule alerte (et une seule notification) par
   franchissement** : elle reste **en cours** tant que la valeur dépasse, puis se ferme d'elle-même.
   Si la valeur oscille autour du seuil, l'alerte est simplement rouverte pendant l'heure qui suit,

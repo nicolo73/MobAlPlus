@@ -21,12 +21,24 @@ export interface EvalEvent {
   value: number;
 }
 
-export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">, property: string): EvalEvent[] {
+export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">, property: string, now = Date.now()): EvalEvent[] {
   const pts = points.filter((p) => p.quality !== "rejected");
   const res = RESOLUTION[property] ?? 0;
   const sign = rule.kind === "above" || rule.kind === "peak" ? 1 : -1;
   const out: EvalEvent[] = [];
   if (!rule.enabled) return out;
+
+  // Capteur muet : silences de plus de « threshold » heures entre deux mesures, ou jusqu'à maintenant
+  if (rule.kind === "silent") {
+    const gap = (rule.threshold ?? 3) * 3_600_000;
+    for (let i = 0; i < pts.length; i++) {
+      const next = i + 1 < pts.length ? pts[i + 1].ts : now;
+      if (next - pts[i].ts > gap)
+        out.push({ kind: "silent", level: rule.level, threshold: rule.threshold, started_at: pts[i].ts,
+                   ended_at: i + 1 < pts.length ? next : null, value: NaN });
+    }
+    return out;
+  }
 
   if (rule.kind === "above" || rule.kind === "below") {
     if (rule.threshold == null) return out;

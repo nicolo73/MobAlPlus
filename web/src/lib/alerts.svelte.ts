@@ -35,6 +35,7 @@ export function shortText(e: AlertEvent): string {
     case "above": return `> ${v(e.threshold)}`;
     case "below": return `< ${v(e.threshold)}`;
     case "peak": return `pic ${v(e.value)}`;
+    case "silent": return "capteur muet";
     default: return `creux ${v(e.value)}`;
   }
 }
@@ -50,6 +51,11 @@ const time = (t: number) => {
 export function describe(e: AlertEvent): string {
   const v = (x: number | null) => fmtValue(x, e.unit);
   const what = e.property === "temperature" ? "Température" : e.property === "humidity" ? "Humidité" : e.property;
+  if (e.kind === "silent") {
+    return e.ended_at === null
+      ? `Capteur muet : aucune mesure depuis ${time(e.started_at)} (piles, portée de la passerelle ?)`
+      : `Capteur muet de ${time(e.started_at)} à ${time(e.ended_at)}`;
+  }
   if (e.kind === "peak" || e.kind === "trough") {
     return `${what} : ${e.kind === "peak" ? "pic" : "creux"} à ${v(e.value)} (${time(e.started_at)})`;
   }

@@ -738,3 +738,22 @@ def test_parent_place_has_no_sensor(conn):
     conn.execute("SELECT assign_channel(%s, (SELECT id FROM place WHERE code = 'coin'), now())", (channel_id(conn, "07AAAAAAAAAA", 2),))
     assert conn.execute("SELECT * FROM place_issues()").fetchall() == []
     conn.rollback()
+
+
+def test_alert_silent_sensor(conn):
+    sid = series_id(conn, "salon", "temperature")
+    dev = conn.execute("SELECT id FROM device WHERE ma_id = '07AAAAAAAAAA'").fetchone()[0]
+    t0 = datetime(2026, 10, 7, 8, 0, tzinfo=UTC)
+    conn.execute("INSERT INTO device_sync (device_id, last_ts) VALUES (%s, %s) "
+                 "ON CONFLICT (device_id) DO UPDATE SET last_ts = excluded.last_ts", (dev, t0))
+    conn.execute("SELECT set_alert_rules(%s, %s)", (sid, Jsonb([{"kind": "silent", "level": "warning", "threshold": 3}])))
+    assert conn.execute("SELECT evaluate_alerts(%s)", (t0 + timedelta(hours=2),)).fetchone()[0] == 0
+    assert conn.execute("SELECT evaluate_alerts(%s)", (t0 + timedelta(hours=4),)).fetchone()[0] == 1
+    assert conn.execute("SELECT evaluate_alerts(%s)", (t0 + timedelta(hours=5),)).fetchone()[0] == 0  # une seule
+    ev = conn.execute("SELECT kind, started_at, ended_at FROM alert_event").fetchone()
+    assert ev == ("silent", t0, None)
+    # Le capteur émet de nouveau : l'alerte se ferme
+    conn.execute("UPDATE device_sync SET last_ts = %s WHERE device_id = %s", (t0 + timedelta(hours=6), dev))
+    conn.execute("SELECT evaluate_alerts(%s)", (t0 + timedelta(hours=6, minutes=5),))
+    assert conn.execute("SELECT ended_at FROM alert_event").fetchone()[0] == t0 + timedelta(hours=6)
+    conn.commit()

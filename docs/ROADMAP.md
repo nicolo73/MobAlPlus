@@ -13,7 +13,7 @@ Priorités : **P1** prochaine étape · **P2** ensuite · **P3** plus tard · **
 | 4 | [Maisons, comptes et partage](#4-maisons-comptes-et-partage) | P1 | L | ✅ fait (reste : identifiants Mobile Alerts par maison) |
 | 5 | [Corrections et annotations](#5-corrections-et-annotations) | P2 | M | à faire |
 | 13 | [Import et export CSV / Excel depuis l'interface](#13-import-et-export-csv--excel-depuis-linterface) | P1 | M | ✅ fait |
-| 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | à faire |
+| 6 | [Périodes sans mesure (piles vides)](#6-périodes-sans-mesure-piles-vides) | P2 | S | ✅ fait |
 | 7 | [Alertes sur seuils](#7-alertes-sur-seuils) | P2 | L | ✅ fait (reste : e-mails, capteur muet) |
 | 8 | [Données météo publiques](#8-données-météo-publiques) | P2 | M | à faire |
 | 9 | [Statistiques par groupe d'emplacements](#9-statistiques-par-groupe-demplacements) | P2 | M | en partie : moyenne d'un emplacement parent sur les courbes |
@@ -133,6 +133,10 @@ connues).
 **Pistes** : seuil de silence par capteur (ex. 3 h sans transmission) ; périodes muettes détectées
 par la collecte, affichées en zones grisées sur les courbes et listées ; option d'annotation
 automatique « capteur muet » ; alerte associée (voir 7).
+
+**Fait (07/10/2026)** : alerte « capteur muet » (règle `silent`, seuil en heures, d'après
+`device_sync.last_ts` ; une alerte par silence, close quand le capteur émet de nouveau), périodes
+sans mesure grisées et courbe interrompue sur la page d'un emplacement.
 
 ## 7. Alertes sur seuils
 
@@ -338,6 +342,7 @@ frais que l'intérieur.
 | 05/10/2026 | Import / export CSV et Excel depuis l'application |
 | 05/10/2026 | Courbes lissées en option, grandeurs masquables (ex. humidité) |
 | 05/10/2026 | Courbes : emplacements imbriqués, courbe moyenne d'un emplacement parent |
+| 07/10/2026 | Alerte « capteur muet », périodes sans mesure grisées ; lignes verticales sur les courbes |
 | 06/10/2026 | Alertes (seuils, pics, creux ; cloche, page Alertes, notifications sur téléphone) |
 | 06/10/2026 | Maintenant regroupé par emplacement parent, page de groupe, liseré de couleur |
 | 06/10/2026 | Couleur des courbes choisie par emplacement |

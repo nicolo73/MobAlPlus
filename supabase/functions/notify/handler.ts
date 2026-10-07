@@ -2,7 +2,7 @@
 
 export interface Pending {
   event_id: number;
-  kind: "above" | "below" | "peak" | "trough";
+  kind: "above" | "below" | "peak" | "trough" | "silent";
   level: "info" | "warning";
   value: number | null;
   threshold: number | null;
@@ -36,6 +36,7 @@ export function message(p: Pending): { title: string; body: string } {
   const body =
     p.kind === "above" ? `${what} ${fmt(p.value, p.unit)} : au-dessus de ${fmt(p.threshold, p.unit)}`
     : p.kind === "below" ? `${what} ${fmt(p.value, p.unit)} : en dessous de ${fmt(p.threshold, p.unit)}`
+    : p.kind === "silent" ? `capteur muet depuis ${new Date(p.started_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} (piles ? portée ?)`
     : p.kind === "peak" ? `pic de ${what} passé (${fmt(p.value, p.unit)}), en baisse`
     : `creux de ${what} passé (${fmt(p.value, p.unit)}), en hausse`;
   return { title: `${icon} ${p.place_name}`, body: body.charAt(0).toUpperCase() + body.slice(1) };

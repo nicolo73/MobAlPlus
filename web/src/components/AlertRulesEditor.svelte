@@ -13,11 +13,12 @@
   let { series, rules, editable, onsaved }: Props = $props();
 
   const LEVELS: { v: AlertLevel; label: string }[] = [{ v: "info", label: "Info" }, { v: "warning", label: "Importante" }];
-  const ROWS: { kind: AlertKind; label: string; value: boolean }[] = [
+  const ROWS: { kind: AlertKind; label: string; value: boolean; unit?: string }[] = [
     { kind: "above", label: "Au-dessus de", value: true },
     { kind: "below", label: "En dessous de", value: true },
     { kind: "peak", label: "Pic passé", value: false },
     { kind: "trough", label: "Creux passé", value: false },
+    { kind: "silent", label: "Muet depuis plus de", value: true, unit: "h" },
   ];
   const key = (k: AlertKind, l: AlertLevel) => `${k}:${l}`;
 
@@ -46,6 +47,8 @@
     const ib = num(draft["below:info"]), wb = num(draft["below:warning"]);
     if (ia != null && wa != null && wa < ia) return "Le seuil haut « important » est d'ordinaire plus élevé que le seuil « info ».";
     if (ib != null && wb != null && wb > ib) return "Le seuil bas « important » est d'ordinaire plus bas que le seuil « info ».";
+    const sh = [num(draft["silent:info"]), num(draft["silent:warning"])].filter((x): x is number => x != null);
+    if (sh.some((h) => h <= 0)) return "La durée de silence doit être positive (en heures).";
     return "";
   });
   const count = $derived(rules.filter((r) => r.enabled).length);
@@ -95,7 +98,7 @@
                   <input inputmode="decimal" disabled={!editable} aria-label="{r.label} ({l.label})" placeholder="—"
                          value={draft[key(r.kind, l.v)] as string}
                          oninput={(e) => (draft[key(r.kind, l.v)] = (e.currentTarget as HTMLInputElement).value)} />
-                  {series.unit}
+                  {r.unit ?? series.unit}
                 </span>
               {:else}
                 <input type="checkbox" disabled={!editable} aria-label="{r.label} ({l.label})"
@@ -116,6 +119,7 @@
       {#if saved}<span class="muted">Enregistré ✓</span>{/if}
     </div>
     <small class="muted">Vide : pas d'alerte. Pic / creux : même sensibilité que les flèches de tendance (Options).
+      Capteur muet : un réglage sur une seule courbe suffit (température et humidité viennent du même capteur).
       Les alertes sont vérifiées toutes les 10 minutes.</small>
   {:else}
     <small class="muted">Réglage réservé aux comptes « gestion » de la maison.</small>

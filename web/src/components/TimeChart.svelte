@@ -10,7 +10,7 @@
   import { cssVar } from "../lib/colors";
   import type { Window } from "../lib/period";
   import type { Point } from "../lib/types";
-  import { curveData, valueAt, type CurveMode } from "../lib/curve";
+  import { GAP, curveData, valueAt, type CurveMode } from "../lib/curve";
 
   export interface ChartSeries {
     id: number | string;
@@ -42,10 +42,14 @@
     alertPoints?: { ts: number; value: number; level: "info" | "warning"; label?: string }[];
     /** Points d'alerte seulement sur grand écran ou en plein écran (courbes superposées) */
     alertsWideOnly?: boolean;
+    /** Périodes sans mesure (capteur muet) : zones grisées */
+    gaps?: [number, number][];
+    /** Durée sans mesure au-delà de laquelle la courbe est coupée (48 h par défaut) */
+    cutAfter?: number;
   }
 
   let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step",
-        thresholds = [], alertPoints = [], alertsWideOnly = false }: Props = $props();
+        thresholds = [], alertPoints = [], alertsWideOnly = false, gaps = [], cutAfter = GAP }: Props = $props();
 
   let el: HTMLDivElement;
   let box: HTMLDivElement;
@@ -71,7 +75,7 @@
     const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
     // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
-    const prepared = series.map((s) => ({ s, data: curveData(s.points, curve) }));
+    const prepared = series.map((s) => ({ s, data: curveData(s.points, curve, cutAfter) }));
     const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
     const showPoints = alertPoints.length > 0 && (!alertsWideOnly || full || (el?.clientWidth ?? 0) >= 500);
     // Échelle : les seuils proches des mesures sont inclus, les seuils lointains n'écrasent pas la courbe
@@ -152,6 +156,14 @@
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
         data,
+        ...(i === 0 && gaps.length ? {
+          markArea: {
+            silent: true, animation: false,
+            itemStyle: { color: muted, opacity: 0.12 },
+            label: { show: true, position: "insideTop", color: muted, fontSize: 10, formatter: "sans mesure" },
+            data: gaps.map(([a, b]) => [{ xAxis: a }, { xAxis: b }]),
+          },
+        } : {}),
         ...(i === 0 && thresholds.length ? {
           markLine: {
             silent: true, symbol: "none", animation: false,
@@ -257,7 +269,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full;
+    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter;
     render();
   });
 

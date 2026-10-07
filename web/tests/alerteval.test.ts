@@ -39,3 +39,10 @@ test("une alerte par franchissement, même si la valeur oscille autour du seuil"
   const two = evaluateRule(pts([25.5, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25.5]), rule, "temperature");
   assert.equal(two.length, 2);
 });
+
+test("capteur muet : silences de plus de N heures, en cours jusqu'à maintenant", () => {
+  const H = 60 * M;
+  const p = [0, 10, 20, 400, 410].map((m) => ({ ts: m * M, value: 20, quality: "ok" as const }));
+  const ev = evaluateRule(p, { kind: "silent", level: "warning", threshold: 3, enabled: true }, "temperature", 410 * M + 4 * H);
+  assert.deepEqual(ev.map((e) => [e.started_at, e.ended_at]), [[20 * M, 400 * M], [410 * M, null]]);
+});

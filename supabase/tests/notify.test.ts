@@ -12,6 +12,8 @@ test("texte des notifications", () => {
   assert.equal(message({ ...base, kind: "peak", level: "info", value: 22.8 }).body, "Pic de température passé (22,8 °C), en baisse");
   assert.equal(message({ ...base, kind: "below", property: "humidity", unit: "%", value: 28, threshold: 30 }).body,
     "Humidité 28 % : en dessous de 30 %");
+  assert.match(message({ ...base, kind: "silent", value: null, started_at: "2026-10-07T06:00:00Z" }).body,
+    /^Capteur muet depuis 7 oct\.,? 08:00/);
 });
 
 test("envoi, abonnements expirés supprimés, alertes marquées notifiées", async () => {

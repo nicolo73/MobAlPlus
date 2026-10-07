@@ -6,7 +6,9 @@
 
 
 ## 7 octobre 2026
-- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
+- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
+  la courbe d'un emplacement.
+- Courbes : **lignes verticales** aux graduations du temps, trait plus net à minuit.- Courbes : l'infobulle donne la valeur de **toutes les courbes** à l'instant pointé (de la plus
   haute à la plus basse), même quand leurs mesures ne tombent pas à la même minute.
 - Plein écran : quadrillage plus fin (lignes intermédiaires sans étiquette).
 - Nouveau symbole « capteur » dans Admin › Emplacements.- Un **emplacement parent ne peut plus recevoir de capteur** (et un emplacement équipé ne peut plus

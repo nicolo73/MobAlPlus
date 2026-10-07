@@ -100,10 +100,17 @@ function series(): SeriesInfo[] {
   }));
 }
 
+/** Le capteur du garage s'est tu il y a 7 heures (piles), et a eu un silence d'une demi-journée il y a 4 jours */
+function silent(id: number, t: number) {
+  const code = places.find((p) => p.id === devices.flatMap((d) => d.channels).find((c) => c.id === id)?.place_id)?.code;
+  return code === "garage" && (t > now - 7 * 3_600_000 || (t > now - 4.5 * 86_400_000 && t < now - 4 * 86_400_000));
+}
+
 function rawPoints(id: number, from: number, to: number): Point[] {
   const out: Point[] = [];
   const start = Math.max(from, now - HISTORY);
   for (let t = Math.ceil(start / STEP) * STEP; t < Math.min(to, now); t += STEP) {
+    if (silent(id, t)) continue;
     out.push({ ts: t, value: synth(id, t), quality: "ok" });
   }
   return out;
@@ -379,6 +386,7 @@ export class DemoApi implements Api {
     { series_id: 13, kind: "trough", level: "info", threshold: null, enabled: true },
     { series_id: 91, kind: "above", level: "warning", threshold: -18.5, enabled: true },
     { series_id: 71, kind: "above", level: "warning", threshold: 16, enabled: true },
+    { series_id: 61, kind: "silent", level: "warning", threshold: 3, enabled: true },
     { series_id: 72, kind: "above", level: "info", threshold: 55, enabled: true },
   ];
   private archived = new Set<number>();
@@ -407,10 +415,10 @@ export class DemoApi implements Api {
       if (!s) continue;
       // Identifiant stable : série, règle, début
       evaluateRule(rawPoints(r.series_id, now - 15 * 86_400_000, now), r, s.property).forEach((e) => {
-        const id = r.series_id * 1e7 + ["above", "below", "peak", "trough"].indexOf(r.kind) * 1e6
+        const id = r.series_id * 1e7 + ["above", "below", "peak", "trough", "silent"].indexOf(r.kind) * 1e6
           + (r.level === "warning" ? 5e5 : 0) + Math.round((now - e.started_at) / 60_000) % 5e5;
         if (this.deleted.has(id) || (e.ended_at !== null && e.started_at < since)) return;
-        out.push({ ...e, id, series_id: r.series_id, place_id: s.place_id, place_name: s.place_name,
+        out.push({ ...e, value: Number.isNaN(e.value) ? null : e.value, id, series_id: r.series_id, place_id: s.place_id, place_name: s.place_name,
                    property: s.property, unit: s.unit, archived: this.archived.has(id) });
       });
     }
