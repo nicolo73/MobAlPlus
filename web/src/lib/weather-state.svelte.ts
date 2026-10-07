@@ -3,13 +3,23 @@
 import { api } from "./api";
 import type { Location } from "./weather";
 
-export const homeWeather = $state({ loc: null as Location | null, loaded: false });
+export const homeWeather = $state({ loc: null as Location | null, loaded: false, homeId: null as number | null });
 
+/** Recharge la position ; la précédente reste affichée pendant le chargement (même maison) */
 export async function loadHomeLocation(homeId: number | null) {
-  homeWeather.loaded = false;
-  homeWeather.loc = null;
+  if (homeId !== homeWeather.homeId) {
+    homeWeather.loc = null;
+    homeWeather.loaded = false;
+    homeWeather.homeId = homeId;
+  }
   if (homeId === null) return;
-  try { homeWeather.loc = await api.homeLocation(homeId); } catch { /* base pas encore à jour */ }
+  try {
+    const loc = await api.homeLocation(homeId);
+    if (homeWeather.homeId !== homeId) return;
+    const same = loc && homeWeather.loc && loc.lat === homeWeather.loc.lat && loc.lon === homeWeather.loc.lon
+      && loc.label === homeWeather.loc.label;
+    if (!same) homeWeather.loc = loc;
+  } catch { /* base pas encore à jour : on garde ce qu'on a */ }
   homeWeather.loaded = true;
 }
 

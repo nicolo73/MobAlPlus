@@ -192,7 +192,9 @@ API de prévision pour les 3 derniers mois et conditions actuelles, API d'archiv
 Position de la maison (`home.lat`, `home.lon`, `home.location_label`) réglée par le propriétaire
 (recherche de commune ou position du téléphone). Fiche « Météo » sur Maintenant (avec tendance),
 courbe grise en pointillés sur les courbes (page Courbes, emplacement, groupe), bouton Météo pour
-la masquer. Pistes : stocker la météo dans la base (alertes « plus chaud dehors que dedans »),
+la masquer. Fiche Météo affichée par défaut, masquable avec les autres fiches (Options › Page
+Maintenant). Pistes : **autres lieux météo** traités comme des emplacements (ville voisine, lieu de
+vacances : fiches, courbes, comparaison), stocker la météo dans la base (alertes « plus chaud dehors que dedans »),
 autres grandeurs (pluie, vent, ensoleillement), station Météo-France la plus proche.
 
 ## 9. Statistiques par groupe d'emplacements

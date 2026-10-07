@@ -48,8 +48,10 @@
   // Alertes de la maison courante : rechargées au changement de maison et toutes les 2 minutes
   const bell = $derived(currentAlerts());
   const bellWarn = $derived(bell.some((e) => e.level === "warning"));
+  // Connexion (et non chaque renouvellement de session, qui remplace l'objet session)
+  const loggedIn = $derived(!!session);
   $effect(() => {
-    if (!session || ctx.homeId === null) return;
+    if (!loggedIn || ctx.homeId === null) return;
     loadAlerts();
     loadHomeLocation(ctx.homeId);
     const t = setInterval(() => document.visibilityState === "visible" && router.route !== "/alertes" && loadAlerts(), 120_000);

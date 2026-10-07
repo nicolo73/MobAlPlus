@@ -4,6 +4,23 @@
   import TrendArrow from "../components/TrendArrow.svelte";
   import { currentSubscription, needsInstall, pushConfigured, pushSupported, savedLevel, subscribe, unsubscribe } from "../lib/push";
   import type { AlertLevel } from "../lib/types";
+  import { onMount } from "svelte";
+  import { ctx } from "../lib/home.svelte";
+  import { router } from "../lib/router.svelte";
+  import { nowHidden, setNowHidden } from "../lib/display.svelte";
+  import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
+  import { homeWeather } from "../lib/weather-state.svelte";
+
+  // Page Maintenant : fiches affichées (emplacements mesurés, groupes, météo), propre à la maison
+  let nowNodes = $state<PlaceNode[]>([]);
+  Promise.all([api.places(), api.seriesList()]).then(([pl, se]) => {
+    nowNodes = flatten(placeTree(pl, se)).filter((n) => n.measured.length > 0);
+  }).catch(() => {});
+  const hiddenAncestor = (n: PlaceNode): boolean => nowNodes.some((p) => p.children.some((c) => c.id === n.id) && (nowHidden(ctx.homeId, p.id) || hiddenAncestor(p)));
+  onMount(() => {
+    const section = router.query.get("section");
+    if (section) setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth" }), 300);
+  });
 
   // Notifications des alertes sur cet appareil
   let pushOn = $state(false);
@@ -146,6 +163,28 @@
     <div><button onclick={resetTrend}>Valeurs par défaut</button></div>
   </section>
 
+  <section class="card stack" id="maintenant">
+    <h2 style="margin:0">Page Maintenant</h2>
+    <p class="muted" style="margin:0">Fiches affichées sur cet appareil, pour la maison « {ctx.homes.find((h) => h.id === ctx.homeId)?.name} ».
+      Décocher un emplacement parent masque tout son groupe.</p>
+    <ul class="now-list">
+      {#if homeWeather.loc}
+        <li><label><input type="checkbox" checked={!nowHidden(ctx.homeId, "meteo")}
+                          onchange={(e) => setNowHidden(ctx.homeId, "meteo", !(e.currentTarget as HTMLInputElement).checked)} />
+          Météo · {homeWeather.loc.label ?? "extérieur"}</label></li>
+      {/if}
+      {#each nowNodes as n (n.id)}
+        <li style="padding-left:{n.depth * 1.25}rem">
+          <label class:off={hiddenAncestor(n)}>
+            <input type="checkbox" disabled={hiddenAncestor(n)} checked={!nowHidden(ctx.homeId, n.id)}
+                   onchange={(e) => setNowHidden(ctx.homeId, n.id, !(e.currentTarget as HTMLInputElement).checked)} />
+            {n.name}{#if n.children.length}<small class="muted"> · groupe</small>{/if}
+          </label>
+        </li>
+      {/each}
+    </ul>
+  </section>
+
   <section class="card stack">
     <h2 style="margin:0">Notifications des alertes sur cet appareil</h2>
     {#if !pushConfigured()}
@@ -180,6 +219,10 @@
 </div>
 
 <style>
+  .now-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+  .now-list label { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2rem; }
+  .now-list input { min-height: 0; width: 1.1rem; height: 1.1rem; }
+  .now-list .off { opacity: 0.5; }
   .opt { display: grid; gap: 0.4rem; justify-items: start; }
   .opt h2, .opt h3 { margin: 0; font-size: 1rem; }
   .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.9rem; }

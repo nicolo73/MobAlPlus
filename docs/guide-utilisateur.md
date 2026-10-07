@@ -35,6 +35,8 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
 - **Emplacement parent** (ex. Jardin) : cadre en pointillé regroupant ses sous-emplacements, avec
   leur **moyenne** ⌀ ; toucher son titre ouvre la page du groupe ([écran](#ecran-groupe)).
 - Liseré coloré à gauche : couleur choisie pour l'emplacement dans les courbes.
+- **Choisir les fiches affichées** (lien en bas de page, ou Options › Page Maintenant) : cocher ou
+  décocher chaque emplacement, groupe ou la fiche Météo ; réglage propre à l'appareil et à la maison.
 - **Temp. / Hum.** : n'afficher qu'une grandeur ;
   <img src="images/icones/actualiser.svg" alt="↻" height="16"> pour actualiser (sinon toutes les
   2 minutes).

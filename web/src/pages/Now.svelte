@@ -12,7 +12,8 @@
   import { currentAlerts, describe, shortText } from "../lib/alerts.svelte";
   import { homeWeather } from "../lib/weather-state.svelte";
   import { currentWeather, weatherSeries, type CurrentWeather, type WeatherSeries } from "../lib/weather";
-  import { display, visibleProps } from "../lib/display.svelte";
+  import { display, nowHidden, visibleProps } from "../lib/display.svelte";
+  import { ctx } from "../lib/home.svelte";
 
   let values = $state<CurrentValue[] | null>(null);
   let places = $state<Place[]>([]);
@@ -48,14 +49,14 @@
   let meteoKey = "";
   async function loadMeteo() {
     const loc = homeWeather.loc;
-    if (!display.weather || !loc) { meteo = null; return; }
+    if (!display.weather || !loc) { meteo = null; meteoKey = ""; return; }
     const key = `${loc.lat},${loc.lon}`;
     if (key === meteoKey && Date.now() - meteoAt < 10 * 60_000) return;
     meteoKey = key;
     meteoAt = Date.now();
     try {
       [meteo, meteoDay] = await Promise.all([currentWeather(loc), weatherSeries(loc, Date.now() - 25 * 3_600_000, Date.now())]);
-    } catch { meteo = null; meteoKey = ""; }
+    } catch { meteoKey = ""; /* on garde la dernière valeur connue ; nouvel essai au prochain rafraîchissement */ }
   }
   $effect(() => { void homeWeather.loc; void display.weather; loadMeteo(); });
   const meteoTrend = (prop: string) => {
@@ -193,7 +194,9 @@
   {/snippet}
 
   {#snippet node(n: PlaceNode)}
-    {#if n.children.length}
+    {#if nowHidden(ctx.homeId, n.id)}
+      <!-- masqué (Options › Page Maintenant) -->
+    {:else if n.children.length}
       {#if n.measured.some((id) => byPlace.has(id))}
         {@const avg = groupValues(n)}
         {@const mark = markOf(n)}
@@ -220,7 +223,7 @@
   {/snippet}
 
   <div class="grid now" class:compact={display.density === "compact"}>
-    {#if meteo && homeWeather.loc}
+    {#if meteo && homeWeather.loc && !nowHidden(ctx.homeId, "meteo")}
       <div class="card place meteo" title="Météo publique (Open-Meteo), mise à jour toutes les 15 minutes environ">
         <h2>
           <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
@@ -244,7 +247,10 @@
   </div>
 {/if}
 
+<p class="custom"><a href="#/options?section=maintenant">Choisir les fiches affichées…</a></p>
+
 <style>
+  .custom { margin: 1rem 0 0; text-align: center; font-size: 0.85rem; }
   .head { margin-bottom: 1rem; flex-wrap: nowrap; gap: 0.5rem; }
   .head h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hide { display: none; }

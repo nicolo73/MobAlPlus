@@ -6,7 +6,8 @@
 
 
 ## 7 octobre 2026
-- **Météo publique** (Open-Meteo) : température et humidité extérieures à la position de la maison,
+- Page **Maintenant** : choisir les fiches affichées (emplacements, groupes, météo) dans Options ;
+  la fiche Météo ne disparaît plus au renouvellement de la connexion.- **Météo publique** (Open-Meteo) : température et humidité extérieures à la position de la maison,
   en fiche sur Maintenant et en courbe grise en pointillés sur les graphiques, historique compris.
   Position à régler dans Admin › Partage.- Alerte **capteur muet** (plus de mesure depuis N heures) et **périodes sans mesure en gris** sur
   la courbe d'un emplacement.
