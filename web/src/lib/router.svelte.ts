@@ -2,6 +2,7 @@
 
 export const routes = {
   "/": "Maintenant",
+  "/synthese": "Synthèse",
   "/courbes": "Courbes",
   "/donnees": "Données",
   "/a-propos": "À propos",

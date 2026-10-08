@@ -5,6 +5,7 @@
   import Login from "./pages/Login.svelte";
   import Now from "./pages/Now.svelte";
   import Charts from "./pages/Charts.svelte";
+  import Summary from "./pages/Summary.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
@@ -58,11 +59,17 @@
     return () => clearInterval(t);
   });
 
+  // Téléphone (barre de navigation en bas) : menu Données masqué (page ouverte depuis Admin)
+  const narrowQuery = matchMedia("(max-width: 899px)");
+  let narrow = $state(narrowQuery.matches);
+  narrowQuery.addEventListener("change", () => (narrow = narrowQuery.matches));
+
   const isAdminRoute = $derived(router.route.startsWith("/admin"));
-  const main: { href: Route; label: string; icon: string }[] = [
+  const main: { href: Route; label: string; icon: string; wide?: boolean }[] = [
     { href: "/", label: "Maintenant", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 8v4l3 2" },
+    { href: "/synthese", label: "Synthèse", icon: "M4 4h16v9H4zM4 13l4-4 3 2 4-4 5 4M4 17h7M4 20h5M15 17h5M15 20h3" },
     { href: "/courbes", label: "Courbes", icon: "M3 17l5-6 4 3 5-7 4 4" },
-    { href: "/donnees", label: "Données", icon: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" },
+    { href: "/donnees", label: "Données", icon: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14", wide: true },
     { href: "/admin", label: "Admin", icon: "M4 6h16M4 12h16M4 18h10" },
     { href: "/aide", label: "Aide", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" },
   ];
@@ -76,6 +83,29 @@
   ] as [Route, boolean][]).filter(([, ok]) => ok).map(([r]) => r));
   // « Admin » ouvre le premier onglet accessible
   const adminRoute = $derived(adminTabs.includes(router.route) ? router.route : adminTabs[0]);
+  /** Rubrique Admin : sur téléphone, elle donne aussi accès à la page Données (lecture comprise) */
+  const showAdmin = $derived(adminTabs.length > 0 || narrow);
+  const adminActive = $derived(isAdminRoute || (narrow && router.route === "/donnees"));
+
+  // Téléphone : glisser horizontalement passe de Maintenant à Synthèse et inversement
+  const SWIPE: Partial<Record<Route, { left?: Route; right?: Route }>> = { "/": { left: "/synthese" }, "/synthese": { right: "/" } };
+  let touch: { x: number; y: number; t: number } | null = null;
+  function onTouchStart(e: TouchEvent) {
+    const target = e.target as HTMLElement;
+    // Pas depuis une courbe (curseur), un champ ou une zone qui défile horizontalement
+    touch = !narrow || e.touches.length !== 1 || !SWIPE[router.route]
+      || target.closest(".box, input, select, textarea, .table-wrap, .tabs, [data-noswipe]")
+      ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }
+  function onTouchEnd(e: TouchEvent) {
+    if (!touch) return;
+    const dx = e.changedTouches[0].clientX - touch.x, dy = e.changedTouches[0].clientY - touch.y;
+    const fast = Date.now() - touch.t < 700;
+    touch = null;
+    if (!fast || Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy)) return;
+    const to = SWIPE[router.route]?.[dx < 0 ? "left" : "right"];
+    if (to) location.hash = "#" + to;
+  }
 </script>
 
 {#if session === undefined}
@@ -118,8 +148,8 @@
     </header>
 
     <nav class="main-nav" aria-label="Navigation principale">
-      {#each main.filter((m) => m.href !== "/admin" || adminTabs.length) as item (item.href)}
-        {@const active = item.href === "/admin" ? isAdminRoute
+      {#each main.filter((m) => (m.href !== "/admin" || showAdmin) && !(m.wide && narrow)) as item (item.href)}
+        {@const active = item.href === "/admin" ? adminActive
           : item.href === "/" ? router.route === "/" || router.route === "/lieu" : router.route === item.href}
         <a href={"#" + item.href} class:active aria-current={active ? "page" : undefined}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d={item.icon} /></svg>
@@ -128,22 +158,26 @@
       {/each}
     </nav>
 
-    <main>
+    <main ontouchstart={onTouchStart} ontouchend={onTouchEnd}>
       {#if ctxError}
         <div class="notice err" style="margin-bottom:1rem">Impossible de lire les droits du compte : {ctxError}</div>
       {:else if !ctx.homes.length}
         <Welcome />
       {:else}
         {#key ctx.homeId}
+          {#if isAdminRoute || adminActive}
+            <nav class="tabs" aria-label="Administration">
+              {#each adminTabs as tab (tab)}
+                <a href={"#" + tab} class:active={isAdminRoute && adminRoute === tab}>{routes[tab]}</a>
+              {/each}
+              {#if narrow}<a href="#/donnees" class:active={router.route === "/donnees"}>Données</a>{/if}
+            </nav>
+          {/if}
           {#if isAdminRoute}
             {#if !adminRoute}
-              <div class="card notice warn">Vous consultez cette maison en lecture : rien à administrer.</div>
+              <div class="card notice warn">Vous consultez cette maison en lecture : rien à administrer.
+                {#if narrow}Export des mesures : onglet <a href="#/donnees">Données</a>.{/if}</div>
             {:else}
-              <nav class="tabs" aria-label="Administration">
-                {#each adminTabs as tab (tab)}
-                  <a href={"#" + tab} class:active={adminRoute === tab}>{routes[tab]}</a>
-                {/each}
-              </nav>
               {#if adminRoute === "/admin"}<Dashboard />
               {:else if adminRoute === "/admin/capteurs"}<Devices />
               {:else if adminRoute === "/admin/emplacements"}<Places />
@@ -152,6 +186,8 @@
             {/if}
           {:else if router.route === "/courbes"}
             <Charts />
+          {:else if router.route === "/synthese"}
+            <Summary />
           {:else if router.route === "/alertes"}
             <Alerts />
           {:else if router.route === "/aide"}
@@ -181,6 +217,8 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr auto;
     grid-template-areas: "header" "main" "nav";
+    /* Rien ne doit élargir la page (sinon le téléphone dézoome, surtout après une rotation) */
+    overflow-x: clip;
   }
   header {
     grid-area: header;

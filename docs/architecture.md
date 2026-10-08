@@ -218,6 +218,7 @@ flowchart TB
   app["App.svelte<br/>en-tête, navigation, routage (#/…)"]
   subgraph pages["Pages"]
     now["Maintenant"]
+    summary["Synthèse<br/>courbes + valeurs au curseur"]
     charts["Courbes"]
     place["Emplacement"]
     data["Données<br/>import / export"]
@@ -232,7 +233,7 @@ flowchart TB
     api["api.ts : interface Api"]
     sapi["supabase-api.ts"]
     demo["demo-api.ts<br/>données fictives"]
-    calc["curve · placetree · trend<br/>dataio · timeutil"]
+    calc["curve · placetree · trend<br/>chartsel · dataio · timeutil"]
     state["home · display · router<br/>(état partagé, préférences)"]
   end
   app --> pages

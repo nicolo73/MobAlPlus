@@ -48,10 +48,20 @@
     gaps?: [number, number][];
     /** Durée sans mesure au-delà de laquelle la courbe est coupée (48 h par défaut) */
     cutAfter?: number;
+    /**
+     * Mode curseur (page Synthèse) : pas d'infobulle ; un trait vertical marque l'instant choisi
+     * (`cursor`), déplacé en touchant ou survolant la courbe (`oncursor`) ; les valeurs sont
+     * affichées par la page, sous le graphique.
+     */
+    cursor?: number | null;
+    oncursor?: (t: number) => void;
+    /** Bouton plein écran */
+    fullscreen?: boolean;
   }
 
   let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step",
-        thresholds = [], alertPoints = [], alertsWideOnly = false, gaps = [], cutAfter = GAP }: Props = $props();
+        thresholds = [], alertPoints = [], alertsWideOnly = false, gaps = [], cutAfter = GAP,
+        cursor = null, oncursor, fullscreen = true }: Props = $props();
 
   let el: HTMLDivElement;
   let box: HTMLDivElement;
@@ -90,7 +100,9 @@
       animation: false,
       backgroundColor: "transparent",
       textStyle: { fontFamily: "inherit" },
-      grid: { left: 8, right: endLabels ? 96 : 16, top: 12, bottom: 64, containLabel: true },
+      // Mode curseur : marge gauche fixe, pour que les traits de plusieurs courbes soient alignés
+      grid: oncursor ? { left: 46, right: 16, top: 12, bottom: 64, containLabel: false }
+        : { left: 8, right: endLabels ? 96 : 16, top: 12, bottom: 64, containLabel: true },
       xAxis: {
         type: "time", min: loaded[0], max: loaded[1],
         axisLine: { lineStyle: { color: border } }, axisTick: { lineStyle: { color: border } },
@@ -112,7 +124,11 @@
         minorTick: { show: full, splitNumber: 5, lineStyle: { color: border } },
         minorSplitLine: { show: full, lineStyle: { color: border, opacity: 0.3 } },
       },
-      tooltip: {
+      tooltip: oncursor ? {
+        // Mode curseur : le pointeur ne sert qu'à choisir l'instant (trait propre, persistant)
+        trigger: "axis", showContent: false,
+        axisPointer: { type: "line", lineStyle: { opacity: 0 } },
+      } : {
         trigger: "axis",
         backgroundColor: surface, borderColor: border, textStyle: { color: text },
         confine: true,
@@ -187,6 +203,7 @@
           data: midnights(loaded[0], loaded[1]).map((t) => ({ xAxis: t })),
         },
       }] : []),
+      ...(oncursor ? [cursorSeries()] : []),
       ...(showPoints ? [{
         id: "alertes", name: "Alertes", type: "scatter", silent: true, z: 5, animation: false,
         symbolSize: alertsWideOnly ? 9 : 6,
@@ -196,6 +213,18 @@
           symbol: alertsWideOnly ? "triangle" : "circle",
         })),
       }] : [])],
+    };
+  }
+
+  /** Trait vertical de l'instant choisi (mode curseur) */
+  function cursorSeries() {
+    return {
+      id: "curseur", type: "line", data: [], silent: true, z: 6,
+      markLine: {
+        silent: true, symbol: ["none", "circle"], symbolSize: 7, animation: false, label: { show: false },
+        lineStyle: { color: cssVar("--primary"), type: "solid", width: 1.5 },
+        data: cursor == null ? [] : [{ xAxis: cursor }],
+      },
     };
   }
 
@@ -214,22 +243,43 @@
     applied = [window[0], window[1]];
   }
 
+  type Orientation = ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
+
+  /**
+   * Taille recalculée après une rotation ou la sortie du plein écran : le navigateur donne la
+   * nouvelle largeur avec retard ; un canevas resté à la largeur du paysage élargirait la page
+   * (affichage rétréci en portrait).
+   */
+  function settle() {
+    for (const ms of [0, 150, 400, 800]) setTimeout(() => chart?.resize(), ms);
+  }
+
   async function toggleFull() {
     if (full) {
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      try { (screen.orientation as Orientation).unlock?.(); } catch { /* non pris en charge */ }
       full = false;
+      settle();
       return;
     }
     full = true;
     try {
       await box.requestFullscreen?.({ navigationUI: "hide" });
-      await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
+      await (screen.orientation as Orientation).lock?.("landscape");
     } catch { /* iPhone, ou paysage refusé : la superposition suffit */ }
   }
 
   onMount(() => {
     // Sortie du plein écran par le système (bouton retour, Échap)
-    const onFs = () => { if (!document.fullscreenElement && full) full = false; };
+    const onFs = () => {
+      if (!document.fullscreenElement && full) {
+        full = false;
+        try { (screen.orientation as Orientation).unlock?.(); } catch { /* non pris en charge */ }
+      }
+      settle();
+    };
+    screen.orientation?.addEventListener?.("change", settle);
+    addEventListener("orientationchange", settle);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && full && !document.fullscreenElement) full = false; };
     document.addEventListener("fullscreenchange", onFs);
     addEventListener("keydown", onKey);
@@ -248,6 +298,11 @@
       if (disposed) return;
       chart = echarts.init(el, null, { locale: "FR", renderer: "canvas" });
       if (group) { chart.group = group; echarts.connect(group); }
+      // Mode curseur : instant pointé (toucher, survol), gardé quand le pointeur quitte la courbe
+      chart.on("updateAxisPointer", (e: unknown) => {
+        const v = (e as { axesInfo?: { axisDim: string; value: number }[] }).axesInfo?.find((a) => a.axisDim === "x")?.value;
+        if (v != null && oncursor) oncursor(Math.round(v));
+      });
       chart.on("datazoom", () => {
         const dz = (chart!.getOption() as { dataZoom: { startValue: number; endValue: number }[] }).dataZoom[0];
         const w: Window = [Math.round(dz.startValue), Math.round(dz.endValue)];
@@ -265,6 +320,8 @@
       ro.disconnect();
       scheme.removeEventListener("change", onScheme);
       document.removeEventListener("fullscreenchange", onFs);
+      screen.orientation?.removeEventListener?.("change", settle);
+      removeEventListener("orientationchange", settle);
       removeEventListener("keydown", onKey);
       chart?.dispose();
     };
@@ -274,6 +331,12 @@
   $effect(() => {
     void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter;
     render();
+  });
+
+  // Instant choisi déplacé : seul le trait est redessiné
+  $effect(() => {
+    void cursor;
+    if (chart && oncursor) chart.setOption({ series: [cursorSeries()] });
   });
 
   // Fenêtre changée par les boutons (et non par un glissement sur la courbe) : on la déplace
@@ -288,17 +351,18 @@
 <div class="box" class:full bind:this={box}>
   {#if full}<div class="full-title">{label}</div>{/if}
   <div class="chart" class:loading style={full ? "" : `height:${height}px`} bind:this={el} role="img" aria-label={label}></div>
-  <button class="fs" onclick={toggleFull} title={full ? "Quitter le plein écran" : "Plein écran"}
+  {#if fullscreen || full}<button class="fs" onclick={toggleFull} title={full ? "Quitter le plein écran" : "Plein écran"}
           aria-label={full ? "Quitter le plein écran" : `Plein écran : ${label}`}>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       {#if full}<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />{:else}<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />{/if}
     </svg>
-  </button>
+  </button>{/if}
 </div>
 
 <style>
-  .box { position: relative; }
-  .chart { width: 100%; transition: opacity 0.2s; touch-action: pan-y; }
+  /* Jamais plus large que son conteneur (canevas pas encore redimensionné après une rotation) */
+  .box { position: relative; max-width: 100%; overflow: hidden; }
+  .chart { width: 100%; max-width: 100%; overflow: hidden; transition: opacity 0.2s; touch-action: pan-y; }
   .loading { opacity: 0.55; }
   .fs { position: absolute; top: 0; right: 0; min-height: 0; padding: 0.3rem; border-radius: 6px;
         background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--muted); z-index: 2; }

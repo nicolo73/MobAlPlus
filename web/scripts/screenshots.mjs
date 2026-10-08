@@ -79,6 +79,10 @@ await wait(1200);
 await shot(p, "courbes", { scrollTo: ".places" });
 await shot(p, "courbes-graphique", { scrollTo: "section.card h2" });
 
+p = await phone();
+await go(p, "#/synthese", 2500);
+await shot(p, "synthese");
+
 p = await phone({}, { viewport: { width: 780, height: 390 } });
 await go(p, "#/courbes");
 await p.getByRole("button", { name: /^Plein écran/ }).first().click();

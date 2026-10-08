@@ -5,6 +5,13 @@
 -->
 
 
+## 8 octobre 2026
+- Nouvelle page **Synthèse** (après Maintenant ; glisser à gauche / à droite pour passer de l'une à
+  l'autre sur le téléphone) : les courbes choisies et, dessous, les valeurs au curseur avec
+  tendances et alertes. Curseur à « maintenant » par défaut.
+- Téléphone : menu **Données** déplacé dans **Admin › Données**.
+- Téléphone : l'affichage ne reste plus rétréci après un passage en paysage (plein écran des courbes).
+
 ## 7 octobre 2026
 - Nouvelles **alertes** : **comparaison de deux emplacements** (« plus chaud dehors que dedans » :
   Extérieur plus haut que Salon de plus de 0 °C, aussi avec une station météo) et **montée ou baisse

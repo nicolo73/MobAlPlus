@@ -41,6 +41,22 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
   <img src="images/icones/actualiser.svg" alt="↻" height="16"> pour actualiser (sinon toutes les
   2 minutes).
 
+## Synthèse
+
+Le résumé d'un coup d'œil, pensé pour le téléphone ([écran](#ecran-synthese)) : les courbes choisies
+dans la page Courbes, sans réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
+
+- Sur le téléphone, **glisser vers la gauche** sur Maintenant ouvre la Synthèse, **vers la droite**
+  revient à Maintenant.
+- Le **curseur** (trait vertical) est à **maintenant** : la légende donne les valeurs actuelles,
+  classées de la plus haute à la plus basse, avec leur **tendance** et une icône
+  <img src="images/icones/alerte.svg" alt="⚠" height="16"> en cas d'alerte.
+- **Toucher ou glisser sur la courbe** pour lire un autre instant : la date s'affiche avec
+  « il y a… » ; **maintenant ›** revient au présent.
+- Groupe : son nom suivi du nombre d'emplacements moyennés, ex. « Jardin (3) ».
+- **Détails / options** : page Courbes, où se choisissent emplacements, période, grandeurs, rendu
+  et météo ; la Synthèse reprend ces choix.
+
 ## Courbes
 
 Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-courbes)).
@@ -132,6 +148,8 @@ indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre 
 
 ## Données
 
+Sur le téléphone : **Admin › Données** (menu Données sur ordinateur).
+
 - **Exporter** : emplacements, grandeurs, période ; fichier CSV (format Excel français par défaut).
 - **Importer** (droits « gestion ») : CSV ou Excel au format MobAlPlus, ou ancien tableur Mobile
   Alerts. L'analyse montre les mesures nouvelles, identiques ou en conflit **avant** toute écriture ;
@@ -193,6 +211,7 @@ l'agrandir.
 <a id="ecran-maintenant" href="images/maintenant.jpg"><img src="images/maintenant.jpg" alt="Maintenant" title="Maintenant" width="150"></a>
 <a id="ecran-groupe" href="images/maintenant-groupe.jpg"><img src="images/maintenant-groupe.jpg" alt="Emplacement parent et moyenne" title="Emplacement parent et moyenne" width="150"></a>
 <a id="ecran-compact" href="images/maintenant-compact.jpg"><img src="images/maintenant-compact.jpg" alt="Présentation compacte" title="Présentation compacte" width="150"></a>
+<a id="ecran-synthese" href="images/synthese.jpg"><img src="images/synthese.jpg" alt="Synthèse" title="Synthèse : courbes et valeurs au curseur" width="150"></a>
 <a id="ecran-courbes" href="images/courbes.jpg"><img src="images/courbes.jpg" alt="Courbes : choix des emplacements" title="Courbes : choix des emplacements" width="150"></a>
 <a id="ecran-courbes-graphique" href="images/courbes-graphique.jpg"><img src="images/courbes-graphique.jpg" alt="Courbes superposées" title="Courbes superposées" width="150"></a>
 <a id="ecran-emplacement" href="images/emplacement.jpg"><img src="images/emplacement.jpg" alt="Page d'un emplacement" title="Page d'un emplacement" width="150"></a>

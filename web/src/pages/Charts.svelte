@@ -1,10 +1,11 @@
 <script lang="ts">
   import { api } from "../lib/api";
-  import { MAX_SERIES, isDark, slotColor } from "../lib/colors";
-  import { DAY, loadRange, needsReload, type Window } from "../lib/period";
+  import { MAX_SERIES, isDark } from "../lib/colors";
+  import { loadRange, needsReload, type Window } from "../lib/period";
   import { fmtValue } from "../lib/format";
   import type { Place, Point, SeriesInfo } from "../lib/types";
-  import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
+  import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
+  import * as sel from "../lib/chartsel";
   import type { AlertEvent } from "../lib/types";
   import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
@@ -15,22 +16,16 @@
 
   import { ctx } from "../lib/home.svelte";
 
-  // Sélection mémorisée par maison
-  const STORE = `mobalplus.charts.${ctx.homeId}`;
+  // Sélection mémorisée par maison (reprise par la page Synthèse)
+  const saved = sel.readSelection(ctx.homeId);
 
   let all = $state<SeriesInfo[] | null>(null);
   let placeList = $state<Place[]>([]);
   let error = $state("");
   // Courbe sélectionnée -> numéro de couleur (conservé tant qu'elle reste sélectionnée).
   // Clé : identifiant de l'emplacement (ses mesures), ou son opposé (moyenne de sa branche).
-  let slots = $state<Record<number, number>>({});
-  const initial = ((): Window => {
-    try {
-      const width = JSON.parse(localStorage.getItem(STORE) ?? "{}").width;
-      if (width > 0) return [Date.now() - width, Date.now()];
-    } catch { /* stockage indisponible */ }
-    return [Date.now() - DAY, Date.now()];
-  })();
+  let slots = $state<sel.Slots>(saved.slots);
+  const initial: Window = [Date.now() - saved.width, Date.now()];
   let win = $state<Window>(initial);
   let loaded = $state<Window>(loadRange(initial));
   let data = $state(new Map<number, Point[]>());
@@ -38,14 +33,7 @@
   let dark = $state(isDark());
   let reqId = 0;
 
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}");
-    if (saved.slots) slots = saved.slots;
-  } catch { /* stockage indisponible : valeurs par défaut */ }
-
-  $effect(() => {
-    try { localStorage.setItem(STORE, JSON.stringify({ slots, width: win[1] - win[0] })); } catch { /* ignoré */ }
-  });
+  $effect(() => sel.saveSelection(ctx.homeId, slots, win[1] - win[0]));
 
   $effect(() => {
     const m = matchMedia("(prefers-color-scheme: dark)");
@@ -58,30 +46,15 @@
   const tree = $derived(placeTree(placeList, all ?? []));
   const nodes = $derived(flatten(tree));
   const byId = $derived(new Map(nodes.map((n) => [n.id, n])));
-  const seriesByPlace = $derived.by(() => {
-    const m = new Map<number, SeriesInfo[]>();
-    for (const s of all ?? []) m.set(s.place_id, [...(m.get(s.place_id) ?? []), s]);
-    return m;
-  });
+  const seriesByPlace = $derived(sel.groupByPlace(all ?? []));
   // Un emplacement parent se sélectionne en entier : moyenne de ses emplacements mesurés (lui compris)
-  const isParent = (n: PlaceNode) => n.children.length > 0;
-  const hasAvg = (n: PlaceNode) => isParent(n) && n.measured.length > 0;
-  const validKey = (k: number) => {
-    const n = byId.get(Math.abs(k));
-    return !!n && (k > 0 ? n.series.length > 0 && !isParent(n) : hasAvg(n));
-  };
-  interface Selected { key: number; node: PlaceNode; avg: boolean; name: string; places: number[] }
-  const selected = $derived<Selected[]>(Object.keys(slots).map(Number).filter(validKey).map((key) => {
-    const node = byId.get(Math.abs(key))!;
-    const avg = key < 0;
-    return { key, node, avg, name: avg && node.measured.length > 1 ? `${node.name} (moyenne de ${node.measured.length})` : node.name,
-             places: avg ? node.measured : [node.id] };
-  }).sort((a, b) => nodes.indexOf(a.node) - nodes.indexOf(b.node) || b.key - a.key));
+  const { isParent, hasAvg } = sel;
+  const validKey = (k: number) => sel.validKey(byId, k);
+  type Selected = sel.Selected;
+  const selected = $derived(sel.selectedCurves(nodes, slots));
   const full = $derived(selected.length >= MAX_SERIES);
-  /** Numéro de palette d'une courbe : celui choisi pour l'emplacement, sinon l'attribution automatique */
-  const slotOf = (key: number) => byId.get(Math.abs(key))?.color ?? slots[key] ?? 0;
-  /** Couleur d'une courbe : personnalisée, sinon celle de la palette */
-  const colorOf = (key: number) => byId.get(Math.abs(key))?.custom ?? slotColor(slotOf(key), dark);
+  const slotOf = (key: number) => sel.slotOf(byId, slots, key);
+  const colorOf = (key: number) => sel.colorOf(byId, slots, key, dark);
   /** Courbes affichées de la même couleur (à signaler) */
   const clashes = $derived.by(() => {
     const byColor = new Map<string, string[]>();
@@ -107,8 +80,7 @@
       all = series;
       // Première visite : les premiers emplacements mesurés (4 au plus, pour garder des courbes lisibles)
       slots = Object.fromEntries(Object.entries(slots).filter(([k]) => validKey(Number(k))));
-      if (!Object.keys(slots).length)
-        nodes.filter((n) => n.series.length && !isParent(n)).slice(0, 4).forEach((n, i) => (slots[n.id] = n.color ?? i));
+      if (!Object.keys(slots).length) slots = sel.defaultSlots(nodes);
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -152,8 +124,7 @@
 
   async function load(range = loadRange(win)) {
     // Les grandeurs masquées ne sont pas chargées
-    const ids = [...new Set(selected.flatMap((c) => c.places.flatMap((id) => seriesByPlace.get(id) ?? []))
-      .filter((s) => visible.includes(s.property)).map((s) => s.id))];
+    const ids = sel.seriesIds(selected, seriesByPlace, visible);
     const id = ++reqId;
     loading = true;
     try {
@@ -183,13 +154,7 @@
     shown = key;
   });
 
-  /** Points d'une courbe pour une grandeur : mesures de l'emplacement, ou moyenne de la branche */
-  function curvePoints(c: Selected, prop: string): Point[] | null {
-    const lists = c.places.flatMap((id) => (seriesByPlace.get(id) ?? []).filter((s) => s.property === prop))
-      .map((s) => data.get(s.id) ?? []);
-    if (!lists.length) return null;
-    return c.avg ? averagePoints(lists) : lists[0];
-  }
+  const curvePoints = (c: Selected, prop: string) => sel.curvePoints(c, prop, seriesByPlace, data);
 
   /** Une courbe par grandeur affichée (jamais deux unités sur un même axe) */
   const charts = $derived.by(() => {
@@ -228,7 +193,7 @@
 </script>
 
 <div class="stack">
-  <div class="row"><h1 style="margin:0">Courbes</h1></div>
+  <div class="row"><h1 style="margin:0">Courbes</h1><span class="spacer"></span><a href="#/synthese" class="btn">Synthèse</a></div>
 
   <PeriodBar window={win} onchange={setWindow} {loading} />
 
