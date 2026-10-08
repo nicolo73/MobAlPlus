@@ -21,6 +21,8 @@
     dashed?: boolean;
     /** Courbe de référence (météo publique) : pointillés fins */
     dotted?: boolean;
+    /** Prévision (dans le futur) : trait mixte, plus pâle */
+    forecast?: boolean;
   }
 
   interface Props {
@@ -80,12 +82,28 @@
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
   }
 
+  const HOUR = 3_600_000;
+  /** Fin de la prévision la plus lointaine (0 sans prévision) */
+  const futureEnd = $derived(Math.max(0, ...series.filter((s) => s.forecast).map((s) => s.points.at(-1)?.ts ?? 0)));
+  /**
+   * Fenêtre affichée : celle de la page, prolongée d'une heure dans le futur quand une prévision
+   * existe et que la fenêtre se termine maintenant (on glisse la barre pour voir plus loin)
+   */
+  function shown([s, e]: Window): Window {
+    const now = Date.now();
+    return futureEnd > now + HOUR / 2 && Math.abs(e - now) <= 10 * 60_000 ? [s, now + HOUR] : [s, e];
+  }
+
   function option() {
     const text = cssVar("--text"), muted = cssVar("--muted"), border = cssVar("--border"), surface = cssVar("--surface");
+    const now = Date.now();
+    const axisMax = Math.max(loaded[1], futureEnd);
+    const [ws, we] = shown(window);
     // Étiquettes en bout de courbe de 2 à 4 séries ; une seule série est nommée par le titre
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
-    const endLabels = series.length >= 2 && series.length <= 4 && (el?.clientWidth ?? 0) >= 500;
-    const dashed = new Set(series.filter((s) => s.dashed).map((s) => s.name));
+    const measured = series.filter((s) => !s.forecast).length;
+    const endLabels = measured >= 2 && measured <= 4 && (el?.clientWidth ?? 0) >= 500;
+    const dashed = new Set(series.filter((s) => s.dashed || s.forecast).map((s) => s.name));
     const dotted = new Set(series.filter((s) => s.dotted).map((s) => s.name));
     // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
     const prepared = series.map((s) => ({ s, data: curveData(s.points, curve, cutAfter) }));
@@ -104,7 +122,7 @@
       grid: oncursor ? { left: 46, right: 16, top: 12, bottom: 64, containLabel: false }
         : { left: 8, right: endLabels ? 96 : 16, top: 12, bottom: 64, containLabel: true },
       xAxis: {
-        type: "time", min: loaded[0], max: loaded[1],
+        type: "time", min: loaded[0], max: axisMax,
         axisLine: { lineStyle: { color: border } }, axisTick: { lineStyle: { color: border } },
         axisLabel: {
           color: muted, hideOverlap: true,
@@ -154,9 +172,9 @@
       dataZoom: [
         // Dans le graphique : zoom seulement (molette, deux doigts) ; un glissement déplace le curseur
         // des valeurs. On se déplace dans le temps avec la barre du dessous et ses poignées.
-        { type: "inside", xAxisIndex: 0, filterMode: "none", startValue: window[0], endValue: window[1],
+        { type: "inside", xAxisIndex: 0, filterMode: "none", startValue: ws, endValue: we,
           zoomOnMouseWheel: true, moveOnMouseMove: false, moveOnMouseWheel: false, preventDefaultMouseMove: false },
-        { type: "slider", xAxisIndex: 0, filterMode: "none", startValue: window[0], endValue: window[1],
+        { type: "slider", xAxisIndex: 0, filterMode: "none", startValue: ws, endValue: we,
           height: 28, bottom: 8, left: 40, right: 40, handleSize: "120%", borderColor: border, fillerColor: "rgba(127,127,127,0.12)",
           dataBackground: { lineStyle: { color: muted, opacity: 0.5 }, areaStyle: { opacity: 0 } },
           selectedDataBackground: { lineStyle: { color: muted }, areaStyle: { opacity: 0 } },
@@ -170,9 +188,11 @@
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
         showSymbol: false, symbolSize: 8, sampling: undefined,
-        lineStyle: { width: s.dotted ? 1.5 : 2, color: s.color, type: s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" }, itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
+        lineStyle: { width: s.dotted ? 1.5 : 2, color: s.color, opacity: s.forecast ? 0.75 : 1,
+                     type: s.forecast ? [7, 3, 1.5, 3] : s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" },
+        itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
         emphasis: { focus: "series", lineStyle: { width: 2 } },
-        endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
+        endLabel: endLabels && !s.forecast ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
         data,
         ...(i === 0 && gaps.length ? {
@@ -202,6 +222,15 @@
           lineStyle: { color: muted, type: "solid", width: 1, opacity: 0.35 },
           data: midnights(loaded[0], loaded[1]).map((t) => ({ xAxis: t })),
         },
+      }] : []),
+      // Futur (prévisions) : zone légèrement grisée, trait « maintenant »
+      ...(futureEnd > now ? [{
+        id: "futur", type: "line", data: [], silent: true,
+        markArea: { silent: true, animation: false, itemStyle: { color: muted, opacity: 0.07 },
+                    label: { show: true, position: "insideTopLeft", color: muted, fontSize: 10, formatter: "prévision" },
+                    data: [[{ xAxis: now }, { xAxis: axisMax }]] },
+        markLine: { silent: true, symbol: "none", animation: false, lineStyle: { color: muted, type: [3, 3], width: 1 },
+                    label: { show: false }, data: [{ xAxis: now }] },
       }] : []),
       ...(oncursor ? [cursorSeries()] : []),
       ...(showPoints ? [{
@@ -344,7 +373,8 @@
     const [s, e] = window;
     if (!chart || (Math.abs(s - applied[0]) < 1000 && Math.abs(e - applied[1]) < 1000)) return;
     applied = [s, e];
-    chart.dispatchAction({ type: "dataZoom", startValue: s, endValue: e });
+    const [ss, se] = shown([s, e]);
+    chart.dispatchAction({ type: "dataZoom", startValue: ss, endValue: se });
   });
 </script>
 

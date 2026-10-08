@@ -1,13 +1,13 @@
 <script lang="ts">
   import { api } from "../lib/api";
   import { MAX_SERIES, isDark } from "../lib/colors";
-  import { loadRange, needsReload, type Window } from "../lib/period";
+  import { loadRange, followsNow, needsReload, type Window } from "../lib/period";
   import { fmtValue } from "../lib/format";
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
   import type { AlertEvent } from "../lib/types";
-  import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
@@ -107,7 +107,16 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+  });
+
+  // Prévision des stations météo choisies
+  let forecast = $state(new Map<number, Point[]>());
+  $effect(() => {
+    const ids = display.forecast ? selected.filter((c) => !c.avg && homeWeather.stations.some((st) => st.placeId === c.node.id))
+      .flatMap((c) => (seriesByPlace.get(c.node.id) ?? []).map((x) => x.id)) : [];
+    void data;
+    loadForecast(ids).then((f) => (forecast = f));
   });
 
   // Alertes importantes de la période, marquées sur les courbes des emplacements eux-mêmes
@@ -166,7 +175,12 @@
     for (const c of selected) {
       for (const [prop, chart] of byProp) {
         const points = curvePoints(c, prop);
-        if (points) chart.series.push({ id: c.key, name: c.name, color: colorOf(c.key), points, dashed: c.avg });
+        if (!points) continue;
+        const base = { id: c.key, name: c.name, color: colorOf(c.key) };
+        chart.series.push({ ...base, points, dashed: c.avg });
+        // Station météo : sa prévision prolonge sa courbe
+        const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === prop)?.id;
+        if (sid !== undefined && forecast.has(sid)) chart.series.push(...forecastCurve(base, points, forecast.get(sid)));
       }
     }
     for (const [prop, c] of byProp) if (c.series.length) c.series.push(...weatherCurve(weather, prop, selected.map((x) => x.node.id)));
@@ -186,7 +200,7 @@
   $effect(() => {
     const t = setInterval(() => {
       const w = win[1] - win[0];
-      if (document.visibilityState === "visible" && win[1] >= Date.now() - 10 * 60_000) setWindow([Date.now() - w, Date.now()]);
+      if (document.visibilityState === "visible" && followsNow(win)) setWindow([Date.now() - w, Date.now()]);
     }, 5 * 60_000);
     return () => clearInterval(t);
   });

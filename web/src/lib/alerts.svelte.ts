@@ -37,6 +37,8 @@ export function shortText(e: AlertEvent): string {
   switch (e.kind) {
     case "gap_above": return `> ${e.ref_place_name ?? "référence"}`;
     case "gap_below": return `< ${e.ref_place_name ?? "référence"}`;
+    case "fc_above": return `prévu > ${v(e.threshold)}`;
+    case "fc_below": return `prévu < ${v(e.threshold)}`;
     case "rise": return `↑ ${v(e.threshold)}/h`;
     case "fall": return `↓ ${v(e.threshold)}/h`;
     case "above": return `> ${v(e.threshold)}`;
@@ -69,6 +71,14 @@ export function describe(e: AlertEvent): string {
     const side = e.kind === "gap_above" ? "plus élevée qu'à" : "plus basse qu'à";
     const by = e.threshold ? ` de plus de ${v(e.threshold)}` : "";
     return `${what} ${side} ${ref}${by} ${period} (écart max ${v(e.value)})`;
+  }
+  if (e.kind === "fc_above" || e.kind === "fc_below") {
+    const side = e.kind === "fc_above" ? "au-dessus de" : "en dessous de";
+    const at = e.forecast_at ? ` à partir de ${time(e.forecast_at)}` : "";
+    const ext = `${e.kind === "fc_above" ? "max" : "min"} prévu ${v(e.value)}`;
+    return e.ended_at === null
+      ? `Prévision : ${what.toLowerCase()} ${side} ${v(e.threshold)}${at} (${ext})`
+      : `Prévision : ${what.toLowerCase()} ${side} ${v(e.threshold)} annoncée de ${time(e.started_at)} à ${time(e.ended_at)} (${ext})`;
   }
   if (e.kind === "rise" || e.kind === "fall") {
     const dir = e.kind === "rise" ? "Montée" : "Baisse";

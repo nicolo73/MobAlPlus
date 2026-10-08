@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { display, setCurve, setWeather, toggleProp, visibleProps } from "../lib/display.svelte";
+  import { display, setCurve, setForecast, setWeather, toggleProp, visibleProps } from "../lib/display.svelte";
   import { homeWeather } from "../lib/weather-state.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
@@ -44,6 +44,11 @@
               title="Comparer avec la météo publique : {homeWeather.stations[0].name}">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
         Météo
+      </button>
+      <button class:active={display.forecast} aria-pressed={display.forecast} onclick={() => setForecast(!display.forecast)}
+              title="Prévision météo : la courbe des stations se prolonge dans le futur (glisser la barre sous la courbe vers la droite)">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 12h3M10 12h3M16 12h4M17 8l4 4-4 4" /></svg>
+        Prévisions
       </button>
     </div>
   {/if}

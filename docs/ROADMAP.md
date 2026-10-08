@@ -212,6 +212,13 @@ rangées librement ; fiches, courbes, tendances et alertes comme un vrai capteur
 déjà une position reçoivent automatiquement leur station. Reste à faire : alerte comparant deux
 emplacements (« plus chaud dehors que dedans »), autres grandeurs.
 
+**Prévisions (08/10/2026)** : la station rapporte aussi 7 jours de prévision horaire (table
+`forecast`, remplacée à chaque collecte). Courbe unique par ville : mesures, puis prévision en trait
+mixte dans le futur (zone grisée, glisser la barre pour avancer) ; tableau jour par jour sur la page
+de la station ; alertes « prévu au-dessus / en dessous de » dans les 24 h. Pistes : horizon
+d'alerte réglable (12 h, 48 h), autres grandeurs prévues (pluie, vent, ensoleillement), alerte
+« écart prévu dehors / dedans », actions anticipées (voir 17).
+
 ## 9. Statistiques par groupe d'emplacements
 
 **Fait en partie (05/10/2026)** : page Courbes organisée selon l'imbrication des emplacements ;
@@ -340,6 +347,8 @@ Somfy (box TaHoma) quand le salon dépasse 26 °C l'été, ou les rouvrir quand 
 frais que l'intérieur.
 
 **Pistes** :
+- **déclencheurs** : toutes les alertes, y compris sur prévision (« chaleur prévue demain : fermer
+  les volets le matin »), comparaison dehors / dedans, pente ;
 - même moteur que les alertes (voir 7) : **règle** (condition sur une ou plusieurs séries,
   durée, plage horaire, saison) → **actions** (e-mail, notification, commande d'un appareil),
   avec journal, anti-rebond (pas plus d'une action par heure…) et mode « simulation » pour tester ;

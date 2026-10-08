@@ -163,6 +163,12 @@ affecté à un emplacement de type `weather`. Elle passe par le même chemin que
   seule requête par station et par demi-heure quel que soit le nombre d'utilisateurs.
 - Création : `add_weather_station(maison, nom, lat, lon)` (gestionnaire de la maison), depuis
   Admin › Partage › Météo publique ; l'application lance aussitôt une collecte.
+- **Prévisions** : le même appel rapporte 7 jours de prévision horaire ; les heures à venir vont
+  dans la table `forecast` (`store_forecast()`, remplacées à chaque collecte), les heures passées
+  dans `reading` comme mesures. `series_forecast()` les rend à l'application, qui prolonge la
+  courbe de la station dans le futur (trait mixte). Alertes `fc_above` / `fc_below` :
+  `evaluate_forecast_alerts()`, franchissement prévu dans les 24 heures (heure prévue dans
+  `alert_event.forecast_at`) ; destinées aussi à déclencher plus tard des actions (volets).
 
 ## Stockage en trois niveaux
 

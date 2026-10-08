@@ -2,7 +2,9 @@
 // par station toutes les 30 minutes, quel que soit le nombre d'utilisateurs ; les mesures sont
 // enregistrées comme celles des capteurs (ingest_readings).
 //  - plus de 80 jours à rattraper (création d'une station) : archives ERA5, données horaires ;
-//  - puis l'API de prévision : heures passées (past_days) et conditions actuelles (au quart d'heure).
+//  - puis l'API de prévision : heures passées (past_days) et conditions actuelles (au quart d'heure),
+//    enregistrées comme mesures, et prévision horaire des 7 prochains jours (store_forecast), qui
+//    prolonge la courbe dans le futur et sert aux alertes sur prévision.
 
 export interface Rpc {
   rpc(fn: string, args?: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
@@ -13,6 +15,7 @@ const DAY = 86_400_000;
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const VARS = "temperature_2m,relative_humidity_2m";
+const FORECAST_DAYS = 7;
 export const HEADERS = ["Température", "Humidité"];
 
 interface Row { ts: string; v: (number | null)[] }
@@ -42,7 +45,7 @@ export function rowsOf(json: unknown): Row[] {
 export async function runWeather(db: Rpc, fetchJson: FetchJson, now = Date.now()) {
   const { data, error } = await db.rpc("weather_targets");
   if (error) throw new Error(`weather_targets : ${error.message}`);
-  const results: { station: string; received: number; inserted: number; error?: string }[] = [];
+  const results: { station: string; received: number; inserted: number; forecast: number; error?: string }[] = [];
   for (const t of (data ?? []) as { ma_id: string; lat: number; lon: number; since: string }[]) {
     try {
       const since = Date.parse(t.since);
@@ -54,7 +57,9 @@ export async function runWeather(db: Rpc, fetchJson: FetchJson, now = Date.now()
           `${ARCHIVE}?${pos}&hourly=${VARS}&start_date=${day(since)}&end_date=${day(Math.min(recentFrom + DAY, now - 5 * DAY))}`)));
       }
       const past = Math.min(92, Math.max(1, Math.ceil((now - Math.max(since, recentFrom)) / DAY) + 1));
-      rows.push(...rowsOf(await fetchJson(`${FORECAST}?${pos}&hourly=${VARS}&current=${VARS}&past_days=${past}&forecast_days=1`)));
+      const recent = rowsOf(await fetchJson(
+        `${FORECAST}?${pos}&hourly=${VARS}&current=${VARS}&past_days=${past}&forecast_days=${FORECAST_DAYS}`));
+      rows.push(...recent);
       // Mesures passées seulement (pas de prévision), plus récentes que la dernière enregistrée
       const fresh = rows.filter((r) => { const ts = Date.parse(r.ts); return ts <= now && ts > since - 3_600_000; });
       const res = await db.rpc("ingest_readings", {
@@ -63,11 +68,19 @@ export async function runWeather(db: Rpc, fetchJson: FetchJson, now = Date.now()
       });
       if (res.error) throw new Error(res.error.message);
       const r = res.data as { received: number; inserted: number };
-      results.push({ station: t.ma_id, received: r.received, inserted: r.inserted });
+      // Heures à venir : prévision (remplace la précédente)
+      const future = recent.filter((x) => Date.parse(x.ts) > now);
+      let forecast = 0;
+      if (future.length) {
+        const fc = await db.rpc("store_forecast", { p_ma_id: t.ma_id, p_rows: future, p_issued_at: new Date(now).toISOString() });
+        if (fc.error) throw new Error(`prévision : ${fc.error.message}`);
+        forecast = fc.data as number;
+      }
+      results.push({ station: t.ma_id, received: r.received, inserted: r.inserted, forecast });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await db.rpc("record_sync_error", { p_ma_id: t.ma_id, p_message: message });
-      results.push({ station: t.ma_id, received: 0, inserted: 0, error: message });
+      results.push({ station: t.ma_id, received: 0, inserted: 0, forecast: 0, error: message });
     }
   }
   return results;

@@ -17,7 +17,7 @@ test("réponse Open-Meteo → lignes de mesures (heures UTC, conditions actuelle
   ]);
 });
 
-test("collecte : archives pour l'historique, prévision ensuite, sans les heures futures", async () => {
+test("collecte : archives pour l'historique, mesures récentes, puis prévision des heures futures", async () => {
   const urls: string[] = [];
   const calls: { fn: string; args?: Record<string, unknown> }[] = [];
   const db = {
@@ -26,7 +26,7 @@ test("collecte : archives pour l'historique, prévision ensuite, sans les heures
       if (fn === "weather_targets") {
         return { data: [{ ma_id: "METEO-AB", lat: 43.6, lon: 1.44, since: new Date(NOW - 365 * DAY).toISOString() }], error: null };
       }
-      return { data: { received: 3, inserted: 3 }, error: null };
+      return fn === "store_forecast" ? { data: 2, error: null } : { data: { received: 3, inserted: 3 }, error: null };
     },
   };
   const res = await runWeather(db, async (url) => {
@@ -38,11 +38,13 @@ test("collecte : archives pour l'historique, prévision ensuite, sans les heures
   }, NOW);
   assert.equal(urls.length, 2);
   assert.match(urls[0], /archive-api.*start_date=2025-10-07/);
-  assert.match(urls[1], /forecast.*past_days=81/);
+  assert.match(urls[1], /forecast.*past_days=81&forecast_days=7/);
   const ingest = calls.find((c) => c.fn === "ingest_readings")!;
   assert.deepEqual((ingest.args!.p_rows as { ts: string }[]).map((r) => r.ts),
     ["2025-10-08T00:00:00.000Z", "2026-10-07T10:00:00.000Z", "2026-10-07T10:15:00.000Z"]);  // 11:00 = prévision
-  assert.deepEqual(res, [{ station: "METEO-AB", received: 3, inserted: 3 }]);
+  const fc = calls.find((c) => c.fn === "store_forecast")!;
+  assert.deepEqual(fc.args!.p_rows, [{ ts: "2026-10-07T11:00:00.000Z", v: [13, 79] }]);   // heures à venir seulement
+  assert.deepEqual(res, [{ station: "METEO-AB", received: 3, inserted: 3, forecast: 2 }]);
 });
 
 test("collecte : une erreur est enregistrée pour la station, sans arrêter les autres", async () => {

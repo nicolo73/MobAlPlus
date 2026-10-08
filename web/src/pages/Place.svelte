@@ -3,7 +3,7 @@
   import { isDark, propertyColor, slotColor, type ColorChoice } from "../lib/colors";
   import { trendTone, zoneOf } from "../lib/zones";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
-  import { DAY, loadRange, needsReload, type Window } from "../lib/period";
+  import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
@@ -11,7 +11,7 @@
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
-  import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
@@ -142,7 +142,30 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+  });
+
+  // Station météo : prévision horaire des prochains jours (prolonge ses courbes, tableau par jour)
+  let forecast = $state(new Map<number, Point[]>());
+  const isStation = $derived(homeWeather.stations.some((st) => st.placeId === placeId));
+  $effect(() => {
+    if (isStation && series) loadForecast(series.map((x) => x.id)).then((f) => (forecast = f));
+  });
+  /** Prévision par jour : minimum et maximum de chaque grandeur */
+  const forecastDays = $derived.by(() => {
+    const days = new Map<string, { label: string; values: Map<number, { min: number; max: number }> }>();
+    for (const sr of sorted) {
+      for (const p of forecast.get(sr.id) ?? []) {
+        if (p.ts <= Date.now()) continue;
+        const d = new Date(p.ts);
+        const key = d.toDateString();
+        if (!days.has(key)) days.set(key, { label: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }), values: new Map() });
+        const v = days.get(key)!.values;
+        const cur = v.get(sr.id);
+        v.set(sr.id, cur ? { min: Math.min(cur.min, p.value), max: Math.max(cur.max, p.value) } : { min: p.value, max: p.value });
+      }
+    }
+    return [...days.values()];
   });
 
   async function init() {
@@ -225,7 +248,7 @@
   $effect(() => {
     const t = setInterval(() => {
       const w = win[1] - win[0];
-      if (document.visibilityState === "visible" && win[1] >= Date.now() - 10 * 60_000) setWindow([Date.now() - w, Date.now()]);
+      if (document.visibilityState === "visible" && followsNow(win)) setWindow([Date.now() - w, Date.now()]);
       if (document.visibilityState === "visible") {
         // valeurs actuelles et tendances suivent aussi le temps qui passe
         api.currentValues().then((cur) => (current = cur.filter((c) => c.place_id === placeId))).catch(() => {});
@@ -278,6 +301,32 @@
     </small>
   </section>
 
+  {#if forecastDays.length}
+    <section class="card">
+      <h2>Prévisions <small class="muted">(Open-Meteo, mises à jour toutes les 30 minutes)</small></h2>
+      <div class="table-wrap">
+        <table class="forecast">
+          <thead><tr><th>Jour</th>{#each sorted as sr (sr.id)}<th class="r">{sr.property_name} <small>min – max</small></th>{/each}</tr></thead>
+          <tbody>
+            {#each forecastDays as d (d.label)}
+              <tr>
+                <td>{d.label}</td>
+                {#each sorted as sr (sr.id)}
+                  {@const v = d.values.get(sr.id)}
+                  {@const rs = rules.filter((r) => r.series_id === sr.id)}
+                  <td class="r num">{#if v}<span class="zv {zoneOf(v.min, rs) ?? ''}">{fmtValue(v.min, sr.unit)}</span> –
+                    <span class="zv {zoneOf(v.max, rs) ?? ''}">{fmtValue(v.max, sr.unit)}</span>{:else}–{/if}</td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <small class="muted">Sur les courbes, la prévision prolonge la mesure en trait mixte : glisser la barre sous la
+        courbe vers la droite pour voir les jours à venir. Alertes « prévu au-dessus / en dessous » sous chaque courbe.</small>
+    </section>
+  {/if}
+
   <PeriodBar window={win} onchange={setWindow} {loading} />
   {#if sorted.length}<DisplayBar {properties} />{/if}
 
@@ -290,6 +339,8 @@
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] },
+                         ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: propertyColor(s.property, dark) },
+                                                              data.get(s.id) ?? [], forecast.get(s.id)) : []),
                          ...weatherCurve(weather, s.property, [s.place_id])]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
                  curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={silenceOf(s.id)}
@@ -302,7 +353,7 @@
           <div><dt>Mesures</dt><dd class="num">{st.n.toLocaleString("fr-FR")}</dd></div>
         </dl>
       {/if}
-      <AlertRulesEditor series={s} rules={rules.filter((r) => r.series_id === s.id)} editable={canEdit()}
+      <AlertRulesEditor series={s} rules={rules.filter((r) => r.series_id === s.id)} editable={canEdit()} forecast={forecast.has(s.id)}
                         onsaved={() => { loadAlertData(); loadAlerts(); }} />
     </section>
   {/each}

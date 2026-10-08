@@ -41,6 +41,7 @@ erDiagram
   observed_property ||--o{ device_channel : "grandeur"
   device ||--o{ device_channel : "canaux"
   device ||--o| device_sync : "état de collecte"
+  device_channel ||--o{ forecast : "prévision (station météo)"
   device_channel ||--o{ deployment : "affecté"
   series ||--o{ deployment : "alimentée par"
   device_channel ||--o{ reading : "mesures récentes"
@@ -167,7 +168,7 @@ erDiagram
   alert_rule {
     int id PK
     int series_id FK
-    text kind "above | below | peak | trough | silent | gap_above | gap_below | rise | fall"
+    text kind "above | below | peak | trough | silent | gap_above | gap_below | rise | fall | fc_above | fc_below"
     text level "info | warning"
     real threshold "seuil ; montée du pic ; heures (silent) ; écart (gap) ; par heure (rise, fall)"
     int ref_series_id FK "comparaison : autre série, même grandeur"
@@ -184,12 +185,19 @@ erDiagram
     timestamptz ended_at "NULL = en cours"
     real value "valeur extrême"
     int ref_series_id "comparaison"
+    timestamptz forecast_at "prévision : heure prévue"
     timestamptz notified_at
   }
   alert_archive {
     bigint event_id PK, FK
     uuid user_id PK "chaque compte archive pour lui"
     timestamptz archived_at
+  }
+  forecast {
+    int channel_id PK, FK
+    timestamptz ts PK "heure à venir"
+    real value
+    timestamptz issued_at "collecte qui l'a fournie"
   }
   device_sync {
     int device_id PK, FK
@@ -254,6 +262,7 @@ erDiagram
 | `alert_archive` | alertes archivées (masquées) | propre à chaque compte |
 | `push_subscription` | appareils abonnés aux notifications | supprimés quand le service les déclare expirés |
 | `device_sync` | avancement de la collecte par capteur | reprise incrémentale, dernière erreur |
+| `forecast` | prévision horaire des stations météo (7 jours), par canal | heures à venir remplacées à chaque collecte ; lue par `series_forecast()` |
 | `maintenance_log` | journal des tâches (compactage, simplification, remplacements à l'import) | consultable dans Admin › Maintenance |
 | `app_setting` | réglages (durées de conservation, fuseau, quota) | modifiables par l'administrateur |
 | `app_user` | administrateurs de la plateforme | rôle reconnu par l'e-mail du compte |
@@ -269,6 +278,7 @@ erDiagram
 | `current_values()` | dernière valeur de chaque série (page Maintenant) |
 | `collect_targets()`, `ingest_readings()`, `record_sync_error()` | collecteur |
 | `weather_targets()`, `add_weather_station()` | stations météo publiques : à collecter (Edge Function `weather`), création |
+| `store_forecast()`, `series_forecast()`, `evaluate_forecast_alerts()` | prévisions : enregistrement, lecture, alertes sur prévision |
 | `run_maintenance()`, `compact_readings()`, `simplify_old()` | maintenance nocturne |
 | `assign_channel()`, `retire_device()`, `reorder_places()` | administration |
 | `place_issues()` | emplacements parents ayant encore un capteur affecté (incohérence ancienne à corriger) |

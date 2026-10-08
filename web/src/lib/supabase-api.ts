@@ -140,6 +140,16 @@ export class SupabaseApi implements Api {
     return new Map<number, Point[]>(lists);
   }
 
+  async seriesForecast(ids: number[], from: number, to: number) {
+    const out = new Map<number, Point[]>();
+    if (!ids.length) return out;
+    const rows = check(await this.sb.rpc("series_forecast", {
+      p_series: ids, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
+    })) as { series_id: number; ts: string; value: number }[];
+    for (const r of rows) out.set(r.series_id, [...(out.get(r.series_id) ?? []), { ts: Date.parse(r.ts), value: r.value, quality: "ok" }]);
+    return out;
+  }
+
   async seriesStats(id: number, from: number, to: number) {
     const rows = check(await this.sb.rpc("series_stats", {
       p_series: id, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
@@ -322,15 +332,15 @@ export class SupabaseApi implements Api {
 
   async alertEvents({ since, seriesIds }: { since: number; seriesIds?: number[] }): Promise<AlertEvent[]> {
     let q = this.sb.from("alert_event")
-      .select("id, series_id, kind, level, threshold, started_at, ended_at, value, ref_series_id, "
+      .select("id, series_id, kind, level, threshold, started_at, ended_at, value, ref_series_id, forecast_at, "
         + "series!inner(place_id, place!inner(name, home_id), observed_property(code, unit)), alert_archive(user_id)")
       .eq("series.place.home_id", this.homeId ?? -1)
       .or(`ended_at.is.null,started_at.gte.${new Date(since).toISOString()}`)
       .order("started_at", { ascending: false })
       .limit(500);
     if (seriesIds) q = q.in("series_id", seriesIds.length ? seriesIds : [-1]);
-    const rows = check(await q) as unknown as (Omit<AlertEvent, "place_id" | "place_name" | "property" | "unit" | "archived" | "started_at" | "ended_at"> & {
-      started_at: string; ended_at: string | null;
+    const rows = check(await q) as unknown as (Omit<AlertEvent, "place_id" | "place_name" | "property" | "unit" | "archived" | "started_at" | "ended_at" | "forecast_at"> & {
+      started_at: string; ended_at: string | null; forecast_at: string | null;
       series: { place_id: number; place: { name: string }; observed_property: { code: string; unit: string } };
       alert_archive: unknown[];
     })[];
@@ -343,6 +353,7 @@ export class SupabaseApi implements Api {
     }
     return rows.map(({ series, alert_archive, ...r }) => ({
       ...r, started_at: Date.parse(r.started_at), ended_at: r.ended_at ? Date.parse(r.ended_at) : null,
+      forecast_at: r.forecast_at ? Date.parse(r.forecast_at) : null,
       place_id: series.place_id, place_name: series.place.name, property: series.observed_property.code,
       unit: series.observed_property.unit, archived: alert_archive.length > 0,
       ref_place_name: r.ref_series_id != null ? refName.get(r.ref_series_id) ?? null : null,

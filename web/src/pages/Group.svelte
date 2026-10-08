@@ -5,7 +5,7 @@
   import { isDark, placeColor, slotColor, type ColorChoice } from "../lib/colors";
   import { fmtAgo, fmtValue, isStale } from "../lib/format";
   import { canEdit } from "../lib/home.svelte";
-  import { DAY, loadRange, needsReload, type Window } from "../lib/period";
+  import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import { computeTrend } from "../lib/trend";
   import { rulesBySeries, zoneOf } from "../lib/zones";
@@ -85,7 +85,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
   });
 
   function setWindow(w: Window) {
@@ -103,7 +103,7 @@
     const t = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       const w = win[1] - win[0];
-      if (win[1] >= Date.now() - 10 * 60_000) setWindow([Date.now() - w, Date.now()]);
+      if (followsNow(win)) setWindow([Date.now() - w, Date.now()]);
       loadCurrent();
     }, 5 * 60_000);
     return () => clearInterval(t);

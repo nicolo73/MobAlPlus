@@ -6,6 +6,10 @@
 
 
 ## 8 octobre 2026
+- **Prévisions météo** : la courbe des stations météo se prolonge dans le futur (7 jours, trait
+  mixte, zone « prévision » ; glisser la barre sous la courbe pour avancer), tableau des prévisions
+  jour par jour sur la page de la station, et alertes **prévu au-dessus / en dessous de** dans les
+  24 h (chaleur, gel). Bouton **Prévisions** pour les masquer.
 - **Valeurs colorées selon les seuils d'alerte** haut / bas (rouge foncé, orange, bleu léger, bleu
   foncé), sur Maintenant, Synthèse, emplacements et groupes ; flèches de tendance en gras rouge ou
   bleu si la situation s'aggrave, vertes si un pic ou un creux ramène vers la normale. Au choix dans

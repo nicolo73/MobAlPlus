@@ -192,7 +192,8 @@ export interface ExportOptions {
 
 export type ImportRows = { s?: number; c?: number; t: string; v: number; q?: string }[];
 
-export type AlertKind = "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall";
+export type AlertKind = "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall"
+  | "fc_above" | "fc_below";
 export type AlertLevel = "info" | "warning";
 
 /** Règle d'alerte d'une série : seuil haut / bas, ou pic / creux (seuil = montée minimale) */
@@ -222,6 +223,8 @@ export interface AlertEvent {
   ref_series_id?: number | null;
   /** Comparaison : emplacement de référence */
   ref_place_name?: string | null;
+  /** Alerte sur prévision : heure prévue du franchissement (millisecondes) */
+  forecast_at?: number | null;
   archived: boolean;           // masquée par le compte connecté
 }
 
@@ -249,6 +252,8 @@ export interface Api {
   seriesList(): Promise<SeriesInfo[]>;
   /** Points d'affichage (tous, ou min / max réels par intervalle au-delà de maxPoints) */
   seriesData(ids: number[], from: number, to: number, maxPoints?: number): Promise<Map<number, Point[]>>;
+  /** Prévisions (stations météo) : heures à venir, par série ; vide pour un capteur */
+  seriesForecast(ids: number[], from: number, to: number): Promise<Map<number, Point[]>>;
   seriesStats(id: number, from: number, to: number): Promise<SeriesStats>;
   /** Mesures détaillées antérieures à « before », les plus récentes d'abord */
   observations(ids: number[], from: number, before: number, limit: number): Promise<Observation[]>;

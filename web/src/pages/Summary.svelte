@@ -4,14 +4,14 @@
   // tendance et les alertes. Le curseur est à « maintenant » par défaut : valeurs actuelles d'un coup d'œil.
   import { api } from "../lib/api";
   import { isDark } from "../lib/colors";
-  import { loadRange, needsReload, type Window } from "../lib/period";
+  import { loadRange, followsNow, needsReload, type Window } from "../lib/period";
   import { fmtAgo, fmtValue } from "../lib/format";
   import { flatten, placeTree } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
   import { curveData, valueAt } from "../lib/curve";
   import { computeTrend } from "../lib/trend";
   import { describe, RECENT } from "../lib/alerts.svelte";
-  import { homeWeather, loadWeather, primaryStation, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadWeather, primaryStation, weatherCurve } from "../lib/weather-state.svelte";
   import { rulesBySeries, trendTone, zoneOf } from "../lib/zones";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule, Place, Point, SeriesInfo } from "../lib/types";
@@ -96,9 +96,9 @@
     if (needsReload(w, loaded)) load(loadRange(w));
   }
 
-  /** Curseur tout à droite (moins de 2 % de la fenêtre avant maintenant) : « maintenant » */
+  /** Curseur à moins de 2 % de la fenêtre de maintenant : « maintenant » ; au-delà, passé ou futur (prévisions) */
   function setCursor(t: number) {
-    cursor = t >= Date.now() - 0.02 * (win[1] - win[0]) ? null : t;
+    cursor = Math.abs(t - Date.now()) <= 0.02 * (win[1] - win[0]) ? null : t;
   }
   const at = $derived(cursor ?? now);
   /** Trait du curseur : à l'instant choisi, ou au bord droit si la fenêtre se termine maintenant */
@@ -109,7 +109,7 @@
     const t = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       const w = win[1] - win[0];
-      if (win[1] >= Date.now() - 10 * 60_000) setWindow([Date.now() - w, Date.now()]);
+      if (followsNow(win)) setWindow([Date.now() - w, Date.now()]);
       else now = Date.now();
       if (!needsReload(win, loaded)) load(loadRange(win));
     }, 5 * 60_000);
@@ -145,7 +145,17 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+  });
+
+  // Stations météo choisies : leur prévision prolonge leur courbe
+  let forecast = $state(new Map<number, Point[]>());
+  const stationSeries = $derived(selected.filter((c) => !c.avg && homeWeather.stations.some((st) => st.placeId === c.node.id))
+    .flatMap((c) => (seriesByPlace.get(c.node.id) ?? []).map((x) => x.id)));
+  $effect(() => {
+    const ids = display.forecast ? stationSeries : [];
+    void data;
+    loadForecast(ids).then((f) => (forecast = f));
   });
 
   /** Une courbe par grandeur affichée */
@@ -153,7 +163,11 @@
     const curves: ChartSeries[] = [];
     for (const c of selected) {
       const points = sel.curvePoints(c, p.code, seriesByPlace, data);
-      if (points) curves.push({ id: c.key, name: c.name, color: colorOf(c.key), points, dashed: c.avg });
+      if (!points) continue;
+      const base = { id: c.key, name: c.name, color: colorOf(c.key) };
+      curves.push({ ...base, points, dashed: c.avg });
+      const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === p.code)?.id;
+      if (sid !== undefined && forecast.has(sid)) curves.push(...forecastCurve(base, points, forecast.get(sid)));
     }
     if (curves.length) curves.push(...weatherCurve(weather, p.code, selected.map((x) => x.node.id)));
     return { ...p, curves };
@@ -175,11 +189,14 @@
                                    places: number[]; values: Map<string, { v: number | null; pts: Point[] }> }>();
     for (const c of charts) {
       for (const s of c.curves) {
-        const k = String(s.id).replace(/^meteo-.*/, "meteo");
-        const sc = selected.find((x) => x.key === s.id);
-        if (!keys.has(k)) keys.set(k, { id: s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
+        // Une ligne par emplacement : sa prévision donne la valeur quand le curseur est dans le futur
+        const k = String(s.id).replace(/-prevision$/, "").replace(/^meteo-.*/, "meteo");
+        const sc = selected.find((x) => String(x.key) === k);
+        if (!keys.has(k)) keys.set(k, { id: sc?.key ?? s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
                                          places: sc?.places ?? [], values: new Map() });
-        const v = valueAt(curveData(s.points, display.curve), at, display.curve !== "step", 3 * 3_600_000);
+        if (s.forecast && at <= now) continue;
+        const v = valueAt(curveData(s.points, display.curve), at, display.curve !== "step" || !!s.forecast, 3 * 3_600_000);
+        if (s.forecast && v === null) continue;
         keys.get(k)!.values.set(c.code, { v, pts: s.points });
       }
     }
@@ -205,6 +222,11 @@
     const d = new Date(t);
     return `${d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} ${
       d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+  };
+  /** « dans 5 h », « dans 2 j » */
+  const fmtIn = (t: number) => {
+    const m = Math.max(0, (t - Date.now()) / 60_000);
+    return m < 60 ? `dans ${Math.round(m)} min` : m < 1440 ? `dans ${Math.round(m / 60)} h` : `dans ${Math.round(m / 1440)} j`;
   };
   const unitOf = (prop: string) => properties.find((p) => p.code === prop)?.unit ?? "";
 </script>
@@ -239,7 +261,7 @@
         <div class="when">
           <strong>{cursor === null ? "Maintenant" : fmtTime(at)}</strong>
           {#if cursor !== null}
-            <small class="muted">{fmtAgo(new Date(at).toISOString(), Date.now())}</small>
+            <small class="muted">{at > Date.now() ? `prévision, ${fmtIn(at)}` : fmtAgo(new Date(at).toISOString(), Date.now())}</small>
             <button class="link" onclick={() => (cursor = null)}>maintenant ›</button>
           {:else}
             <small class="muted">{new Date(now).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</small>

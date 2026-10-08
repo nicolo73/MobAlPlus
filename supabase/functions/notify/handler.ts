@@ -2,7 +2,7 @@
 
 export interface Pending {
   event_id: number;
-  kind: "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall";
+  kind: "above" | "below" | "peak" | "trough" | "silent" | "gap_above" | "gap_below" | "rise" | "fall" | "fc_above" | "fc_below";
   level: "info" | "warning";
   value: number | null;
   threshold: number | null;
@@ -16,6 +16,8 @@ export interface Pending {
   auth: string;
   /** Comparaison : emplacement de référence */
   ref_place_name?: string | null;
+  /** Alerte sur prévision : heure prévue du franchissement */
+  forecast_at?: string | null;
 }
 
 export interface Db {
@@ -32,6 +34,8 @@ const fmt = (v: number | null, unit: string) =>
 const PROP: Record<string, string> = { temperature: "température", humidity: "humidité" };
 
 /** Titre et texte d'une notification */
+const when = (iso: string) => new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", hour: "2-digit", minute: "2-digit" });
+
 export function message(p: Pending): { title: string; body: string } {
   const what = PROP[p.property] ?? p.property;
   const icon = p.level === "warning" ? "⚠️" : "ℹ️";
@@ -41,6 +45,8 @@ export function message(p: Pending): { title: string; body: string } {
     : p.kind === "silent" ? `capteur muet depuis ${new Date(p.started_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} (piles ? portée ?)`
     : p.kind === "gap_above" ? `${what} plus élevée qu'à ${p.ref_place_name ?? "la référence"} (écart ${fmt(p.value, p.unit)})`
     : p.kind === "gap_below" ? `${what} plus basse qu'à ${p.ref_place_name ?? "la référence"} (écart ${fmt(p.value, p.unit)})`
+    : p.kind === "fc_above" ? `prévision : ${what} au-dessus de ${fmt(p.threshold, p.unit)}${p.forecast_at ? ` dès ${when(p.forecast_at)}` : ""} (jusqu'à ${fmt(p.value, p.unit)})`
+    : p.kind === "fc_below" ? `prévision : ${what} en dessous de ${fmt(p.threshold, p.unit)}${p.forecast_at ? ` dès ${when(p.forecast_at)}` : ""} (jusqu'à ${fmt(p.value, p.unit)})`
     : p.kind === "rise" ? `${what} en hausse rapide : +${fmt(p.value, p.unit)} en une heure`
     : p.kind === "fall" ? `${what} en baisse rapide : −${fmt(p.value, p.unit)} en une heure`
     : p.kind === "peak" ? `pic de ${what} passé (${fmt(p.value, p.unit)}), en baisse`

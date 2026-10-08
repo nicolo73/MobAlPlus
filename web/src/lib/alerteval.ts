@@ -54,6 +54,22 @@ export function derivedPoints(pts: Point[], kind: "gap_above" | "gap_below" | "r
   return out;
 }
 
+/**
+ * Alerte sur prévision (fc_above / fc_below) : valeur prévue au-delà du seuil dans les 24 heures
+ * suivant `now` ; une alerte en cours, avec l'heure prévue du franchissement et l'extrême prévu.
+ */
+export function evaluateForecast(forecast: Point[], rule: Omit<AlertRule, "series_id">, now = Date.now()):
+    (EvalEvent & { forecast_at: number })[] {
+  if (!rule.enabled || rule.threshold == null || (rule.kind !== "fc_above" && rule.kind !== "fc_below")) return [];
+  const sign = rule.kind === "fc_above" ? 1 : -1;
+  const next = forecast.filter((p) => p.ts > now && p.ts <= now + 24 * HOUR);
+  const hit = next.find((p) => sign * (p.value - rule.threshold!) > 0);
+  if (!hit) return [];
+  const extreme = next.reduce((m, p) => (sign * (p.value - m) > 0 ? p.value : m), next[0].value);
+  return [{ kind: rule.kind, level: rule.level, threshold: rule.threshold, started_at: now, ended_at: null, value: extreme,
+            forecast_at: hit.ts }];
+}
+
 export function evaluateRule(points: Point[], rule: Omit<AlertRule, "series_id">, property: string, now = Date.now(),
                              ref: Point[] = []): EvalEvent[] {
   let pts = points.filter((p) => p.quality !== "rejected");

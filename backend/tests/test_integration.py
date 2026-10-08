@@ -833,3 +833,36 @@ def test_weather_station(conn):
                         (ts - timedelta(hours=1), ts + timedelta(hours=1), place)).fetchall()
     assert vals == [("humidity", 62.0), ("temperature", pytest.approx(18.4))]
     conn.commit()
+
+
+def test_weather_forecast_and_alerts(conn):
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    place = conn.execute("SELECT add_weather_station(%s, 'Toulouse', 43.6045, 1.4440)", (home,)).fetchone()[0]
+    ma_id = conn.execute("SELECT ma_id FROM device WHERE vendor = 'open_meteo'").fetchone()[0]
+    temp = conn.execute("""SELECT s.id FROM series s JOIN observed_property op ON op.id = s.property_id
+                           WHERE s.place_id = %s AND op.code = 'temperature'""", (place,)).fetchone()[0]
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    # Prévision horaire : 20 °C puis 31 °C dans 10 h
+    rows = [{"ts": (now + timedelta(hours=h)).isoformat(), "v": [31.0 if h >= 10 else 20.0, 50]} for h in range(1, 49)]
+    assert conn.execute("SELECT store_forecast(%s, %s, %s)", (ma_id, Jsonb(rows), now)).fetchone()[0] == 96
+    fc = conn.execute("SELECT ts, value FROM series_forecast(%s, %s, %s)",
+                      ([temp], now, now + timedelta(days=3))).fetchall()
+    assert len(fc) == 48 and fc[0][1] == 20.0
+    # Nouvelle prévision : remplace les heures à venir
+    rows2 = [{"ts": (now + timedelta(hours=h)).isoformat(), "v": [19.0, 55]} for h in range(1, 25)]
+    conn.execute("SELECT store_forecast(%s, %s, %s)", (ma_id, Jsonb(rows2), now))
+    assert conn.execute("SELECT count(*), max(value) FROM series_forecast(%s, %s, %s)",
+                        ([temp], now, now + timedelta(days=3))).fetchone() == (24, 19.0)
+    # Alerte : chaleur prévue (> 30 °C dans les 24 h)
+    conn.execute("SELECT set_alert_rules(%s, %s)", (temp, Jsonb([{"kind": "fc_above", "level": "warning", "threshold": 30}])))
+    assert conn.execute("SELECT evaluate_alerts(%s)", (now,)).fetchone()[0] == 0
+    conn.execute("SELECT store_forecast(%s, %s, %s)", (ma_id, Jsonb(rows), now))
+    assert conn.execute("SELECT evaluate_alerts(%s)", (now,)).fetchone()[0] == 1
+    assert conn.execute("SELECT evaluate_alerts(%s)", (now,)).fetchone()[0] == 0   # une seule alerte
+    kind, value, at, end = conn.execute("SELECT kind, value, forecast_at, ended_at FROM alert_event").fetchone()
+    assert (kind, value, at, end) == ("fc_above", 31.0, now + timedelta(hours=10), None)
+    # La prévision ne l'annonce plus : alerte close
+    conn.execute("SELECT store_forecast(%s, %s, %s)", (ma_id, Jsonb(rows2), now))
+    conn.execute("SELECT evaluate_alerts(%s)", (now,))
+    assert conn.execute("SELECT ended_at FROM alert_event").fetchone()[0] == now
+    conn.commit()

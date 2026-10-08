@@ -2,4 +2,9 @@
 
 import type { Point } from "./types";
 
-export interface WeatherSeries { temperature: Point[]; humidity: Point[] }
+export interface WeatherSeries {
+  temperature: Point[];
+  humidity: Point[];
+  /** Prévision des heures à venir */
+  forecast?: { temperature: Point[]; humidity: Point[] };
+}

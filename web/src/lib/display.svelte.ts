@@ -24,6 +24,8 @@ export const display = $state({
   values: "bg" as ValueStyle,
   /** Courbe de comparaison avec la station météo publique (s'il y en a une) */
   weather: true,
+  /** Prévision météo : prolongement des courbes des stations dans le futur */
+  forecast: true,
   /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement) */
   nowHidden: {} as Record<string, number[]>,
   trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
@@ -36,6 +38,7 @@ try {
   if (DENSITIES.includes(saved.density)) display.density = saved.density;
   if (VALUE_STYLES.includes(saved.values)) display.values = saved.values;
   if (typeof saved.weather === "boolean") display.weather = saved.weather;
+  if (typeof saved.forecast === "boolean") display.forecast = saved.forecast;
   if (saved.nowHidden && typeof saved.nowHidden === "object") display.nowHidden = saved.nowHidden;
   if (saved.trend && typeof saved.trend === "object") {
     const t = saved.trend;
@@ -104,6 +107,11 @@ export function setNowHidden(homeId: number | null, key: number, hidden: boolean
 
 export function setWeather(on: boolean) {
   display.weather = on;
+  save();
+}
+
+export function setForecast(on: boolean) {
+  display.forecast = on;
   save();
 }
 

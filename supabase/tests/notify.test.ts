@@ -17,6 +17,8 @@ test("texte des notifications", () => {
   assert.equal(message({ ...base, place_name: "Extérieur", kind: "gap_above", value: 1.2, threshold: 0, ref_place_name: "Salon" }).body,
     "Température plus élevée qu'à Salon (écart 1,2 °C)");
   assert.equal(message({ ...base, kind: "fall", value: 2, threshold: 1.5 }).body, "Température en baisse rapide : −2 °C en une heure");
+  assert.match(message({ ...base, kind: "fc_below", value: -2, threshold: 0, forecast_at: "2026-10-08T04:00:00Z" }).body,
+    /^Prévision : température en dessous de 0 °C dès \S+ 06:00 \(jusqu'à -2 °C\)$/);
 });
 
 test("envoi, abonnements expirés supprimés, alertes marquées notifiées", async () => {

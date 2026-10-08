@@ -17,11 +17,13 @@
     rules: AlertRule[];
     editable: boolean;
     onsaved: () => void;
+    /** Station météo avec prévision : alertes « prévu au-dessus / en dessous » */
+    forecast?: boolean;
   }
-  let { series, rules, editable, onsaved }: Props = $props();
+  let { series, rules, editable, onsaved, forecast = false }: Props = $props();
 
   const LEVELS: { v: AlertLevel; label: string }[] = [{ v: "info", label: "Info" }, { v: "warning", label: "Importante" }];
-  interface Row { kind: AlertKind; label: string; value: boolean; unit?: string; ref?: boolean; help?: string }
+  interface Row { kind: AlertKind; label: string; value: boolean; unit?: string; ref?: boolean; help?: string; fc?: boolean }
   const ROWS: Row[] = [
     { kind: "above", label: "Au-dessus de", value: true },
     { kind: "below", label: "En dessous de", value: true },
@@ -32,6 +34,8 @@
     { kind: "gap_below", label: "Plus bas que", value: true, ref: true, help: "de plus de" },
     { kind: "rise", label: "Monte de plus de", value: true, unit: "/h", help: "sur la dernière heure" },
     { kind: "fall", label: "Baisse de plus de", value: true, unit: "/h", help: "sur la dernière heure" },
+    { kind: "fc_above", label: "Prévu au-dessus de", value: true, help: "dans les 24 h", fc: true },
+    { kind: "fc_below", label: "Prévu en dessous de", value: true, help: "dans les 24 h", fc: true },
   ];
   const key = (k: AlertKind, l: AlertLevel) => `${k}:${l}`;
   const refKey = (k: AlertKind) => `${k}:ref`;
@@ -39,7 +43,7 @@
   /** Séries comparables : même grandeur, autre emplacement (chargées une fois pour toutes les courbes) */
   let candidates = $state<SeriesInfo[]>([]);
   $effect(() => { candidatesOf(series).then((c) => (candidates = c)); });
-  const rows = $derived(ROWS.filter((r) => !r.ref || candidates.length));
+  const rows = $derived(ROWS.filter((r) => (!r.ref || candidates.length) && (!r.fc || forecast || rules.some((x) => x.kind === r.kind))));
 
   /** Brouillon : seuil (texte), case cochée (pic / creux), emplacement de référence (comparaison) */
   let draft = $state<Record<string, string | boolean>>({});
@@ -117,7 +121,7 @@
     <thead><tr><th></th>{#each LEVELS as l (l.v)}<th class="lvl {l.v}">{l.label}</th>{/each}</tr></thead>
     <tbody>
       {#each rows as r (r.kind)}
-        <tr class:sep={r.kind === "gap_above" || (r.kind === "rise" && !candidates.length)}>
+        <tr class:sep={r.kind === "gap_above" || (r.kind === "rise" && !candidates.length) || r.kind === "fc_above"}>
           <th scope="row">
             {r.label}
             {#if r.ref}
@@ -160,6 +164,8 @@
       Capteur muet : un réglage sur une seule courbe suffit (température et humidité viennent du même capteur).
       Plus haut / plus bas que : comparaison avec un autre emplacement (« plus chaud dehors que dedans » :
       Extérieur plus haut que Salon de plus de 0 °C). Monte / baisse : variation sur la dernière heure.
+      {#if forecast}Prévu au-dessus / en dessous : la prévision annonce le franchissement dans les 24 heures
+        (forte chaleur, gel…), pour anticiper.{/if}
       Les alertes sont vérifiées toutes les 10 minutes.</small>
   {:else}
     <small class="muted">Réglage réservé aux comptes « gestion » de la maison.</small>

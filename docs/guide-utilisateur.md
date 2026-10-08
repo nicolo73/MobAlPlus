@@ -97,6 +97,17 @@ d'historique dès sa création.
 - **Courbes**, page d'un emplacement et page d'un groupe : la première station est ajoutée en courbe
   **grise en pointillés**, comprise dans l'infobulle. Bouton **Météo** (à côté de Température /
   Humidité) pour l'afficher ou la masquer.
+- **Prévisions** (7 jours, mises à jour toutes les 30 minutes) : la courbe d'une station se
+  **prolonge dans le futur** en **trait mixte** (– · –), sur une zone légèrement grisée « prévision »
+  après le trait « maintenant ». Par défaut on voit la prochaine heure ; **glisser la barre sous la
+  courbe vers la droite** pour voir les jours à venir (les vrais capteurs s'arrêtent à maintenant).
+  Bouton **Prévisions** pour les masquer. Dans la Synthèse, un curseur placé dans le futur donne la
+  valeur prévue (« prévision, dans 5 h »).
+- **Page de la station** : tableau **Prévisions** jour par jour (minimum – maximum, colorés selon
+  les seuils), et alertes **Prévu au-dessus de** / **Prévu en dessous de** : la prévision annonce le
+  franchissement dans les **24 heures** (forte chaleur, gel…), pour anticiper (fermer les fenêtres,
+  plus tard commander les volets). L'alerte donne l'heure prévue et se ferme quand la prévision ne
+  l'annonce plus.
 
 ## Page d'un emplacement
 
@@ -127,6 +138,8 @@ indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre 
 | **Plus bas que** *emplacement* | | ex. Extérieur, de plus de 15 °C |
 | **Monte de plus de** | ex. 2 °C/h | |
 | **Baisse de plus de** | | ex. 1,5 °C/h |
+| **Prévu au-dessus de** (station météo) | ex. 30 °C | ex. 35 °C |
+| **Prévu en dessous de** (station météo) | ex. 3 °C | ex. 0 °C |
 
 - Case vide : pas d'alerte. Les pics et creux suivent la sensibilité des flèches de tendance
   (Options).

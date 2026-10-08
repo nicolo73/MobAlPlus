@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateRule } from "../src/lib/alerteval.ts";
+import { evaluateForecast, evaluateRule } from "../src/lib/alerteval.ts";
 
 const M = 60_000;
 const pts = (vals: number[], step = 10) => vals.map((value, i) => ({ ts: i * step * M, value, quality: "ok" as const }));
@@ -69,4 +69,16 @@ test("baisse rapide : plus de 1,5 °C en une heure", () => {
   assert.equal(ev[0].started_at, t0 + 10 * 600_000);
   assert.equal(ev[0].value, 2);
   assert.equal(ev[0].ended_at, t0 + 14 * 600_000);
+});
+
+test("alerte sur prévision : franchissement annoncé dans les 24 h", () => {
+  const now = Date.UTC(2026, 9, 8, 12);
+  const fc = [2, 1, 0.5, -0.5, -2, 1].map((value, i) => ({ ts: now + (i + 1) * 3 * 3_600_000, value, quality: "ok" as const }));
+  const rule = { kind: "fc_below" as const, level: "warning" as const, threshold: 0, enabled: true };
+  const [ev] = evaluateForecast(fc, rule, now);
+  assert.equal(ev.forecast_at, now + 12 * 3_600_000);   // −0,5 °C prévu à 0 h
+  assert.equal(ev.value, -2);
+  assert.equal(ev.ended_at, null);
+  // Au-delà de 24 h : pas d'alerte
+  assert.deepEqual(evaluateForecast(fc.map((p) => ({ ...p, ts: p.ts + 86_400_000 })), rule, now), []);
 });

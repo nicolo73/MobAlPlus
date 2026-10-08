@@ -6,7 +6,7 @@ import type {
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
   AlertEvent, AlertLevel, AlertRule,
 } from "./types";
-import { evaluateRule } from "./alerteval";
+import { evaluateForecast, evaluateRule } from "./alerteval";
 
 const PROPS: Property[] = [
   { id: 1, code: "temperature", name: "Température", unit: "°C", simplify_tolerance: 0.2 },
@@ -203,6 +203,22 @@ export class DemoApi implements Api {
   }
 
   async seriesList() { return delay(series()); }
+
+  /** Prévision fictive des stations météo : valeur fictive à venir, légèrement décalée, à l'heure */
+  async seriesForecast(ids: number[], from: number, to: number) {
+    const out = new Map<number, Point[]>();
+    const meteo = new Set(devices.filter((d) => d.vendor === "open_meteo" && d.active).flatMap((d) => d.channels.map((c) => c.id)));
+    for (const id of ids.filter((x) => meteo.has(x))) {
+      const pts: Point[] = [];
+      const start = Math.max(from, Math.ceil(now / 3_600_000) * 3_600_000);
+      for (let t = start; t <= Math.min(to, now + 7 * 86_400_000); t += 3_600_000) {
+        const v = synth(id, t) + Math.sin(t / 9e6) * (id % 2 ? 0.8 : 3);
+        pts.push({ ts: t, value: Math.round(v * (id % 2 ? 10 : 1)) / (id % 2 ? 10 : 1), quality: "ok" });
+      }
+      out.set(id, pts);
+    }
+    return delay(out);
+  }
 
   async seriesData(ids: number[], from: number, to: number, maxPoints = 1000) {
     const out = new Map<number, Point[]>();
@@ -402,6 +418,7 @@ export class DemoApi implements Api {
     { series_id: 72, kind: "above", level: "info", threshold: 55, enabled: true },
     { series_id: 13, kind: "gap_above", level: "info", threshold: 3, enabled: true, ref_series_id: 211 },
     { series_id: 13, kind: "fall", level: "info", threshold: 1.1, enabled: true },
+    { series_id: 211, kind: "fc_below", level: "info", threshold: 7, enabled: true },
   ];
   private archived = new Set<number>();
   private deleted = new Set<number>();
@@ -438,6 +455,16 @@ export class DemoApi implements Api {
       const s = info.find((x) => x.id === r.series_id);
       if (!s) continue;
       // Identifiant stable : série, règle, début
+      if (r.kind === "fc_above" || r.kind === "fc_below") {
+        const fc = (await this.seriesForecast([r.series_id], now, now + 86_400_000)).get(r.series_id) ?? [];
+        evaluateForecast(fc, r, now).forEach((e) => {
+          const id = r.series_id * 1e7 + 9e6 + (r.kind === "fc_below" ? 2e5 : 0) + (r.level === "warning" ? 5e5 : 0);
+          if (this.deleted.has(id)) return;
+          out.push({ ...e, id, series_id: r.series_id, place_id: s.place_id, place_name: s.place_name,
+                     property: s.property, unit: s.unit, archived: this.archived.has(id) });
+        });
+        continue;
+      }
       const ref = r.ref_series_id ? info.find((x) => x.id === r.ref_series_id) : null;
       const pts = (id: number) => rawPoints(id, now - 15 * 86_400_000, now);
       evaluateRule(pts(r.series_id), r, s.property, now, ref ? pts(ref.id) : []).forEach((e) => {
