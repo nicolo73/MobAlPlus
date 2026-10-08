@@ -33,7 +33,8 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
 - **Couleur des valeurs** d'après les seuils d'alerte **haut / bas** de l'emplacement (pas les pics,
   creux, comparaisons ni pentes) : fond **rouge foncé** au-delà du seuil haut important, **orange**
   au-delà du seuil haut info, rien entre les seuils, **bleu léger** sous le seuil bas info, **bleu
-  foncé** sous le seuil bas important. Liseré en plus si la tendance aggrave la situation.
+  foncé** sous le seuil bas important (fond rectangulaire ; texte blanc sur les fonds foncés). Orange
+  ou bleu plus soutenu si la tendance aggrave la situation.
 - **Flèche en gras rouge** : ça monte alors qu'on est proche ou au-delà du seuil haut ; **en gras
   bleu foncé** : ça baisse encore près ou sous le seuil bas ; **verte** : un pic ou un creux passé
   ramène vers des valeurs normales.

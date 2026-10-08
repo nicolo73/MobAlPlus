@@ -262,7 +262,7 @@
                 {@const v = x && x.v !== null ? Math.round(x.v * 10) / 10 : null}
                 {@const tone = trendTone(v, tr, rs, p.code)}
                 <span class="val {p.code}">
-                  <span class="num"><span class="zv {zoneOf(v, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{v !== null ? fmtValue(v, unitOf(p.code)) : "–"}</span></span>
+                  <span class="num zv {zoneOf(v, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{v !== null ? fmtValue(v, unitOf(p.code)) : "–"}</span>
                   <span class="arrow">{#if tr}<TrendArrow trend={tr} unit={unitOf(p.code)} {tone} />{/if}</span>
                 </span>
               {/each}
@@ -291,15 +291,19 @@
   .when > * { white-space: nowrap; }
   .when .link { font-size: 0.85rem; margin-left: auto; }
   ul { list-style: none; margin: 0; padding: 0; }
-  li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+  /* Lignes sans marge verticale propre : le fond de zone d'une valeur occupe toute leur hauteur */
+  li { display: flex; align-items: stretch; gap: 0.5rem; border-bottom: 1px solid var(--border); min-width: 0; min-height: 2.3rem; }
+  li > :not(.val) { align-self: center; }
   li:last-child { border-bottom: none; }
   .key { flex: none; width: 16px; height: 0; border-top: 3px solid var(--c); }
   .key.dashed { border-top-style: dashed; }
   .key.dotted { border-top: 2px dotted var(--c); }
   .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
           text-decoration: none; font-size: 0.92rem; }
-  .val { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.1rem; flex: none; }
-  .val .num { font-weight: 700; min-width: 3.6rem; text-align: right; }
+  .val { display: inline-flex; align-items: stretch; justify-content: flex-end; gap: 0.1rem; flex: none; }
+  .val .num { display: flex; align-items: center; justify-content: flex-end; font-weight: 700; min-width: 3.6rem;
+              padding: 0 0.3rem; }
+  .val .arrow { align-self: center; }
   .val.temperature .num { color: var(--val-temp); }
   .val.humidity .num { color: var(--val-hum); min-width: 2.8rem; }
   .arrow { display: inline-flex; width: 1.2rem; justify-content: center; font-size: 0.9rem; }

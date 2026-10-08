@@ -17,8 +17,8 @@
   --hum: #1d4ed8;
   /* Zones de seuil (valeurs) : fond et texte, ou texte seul */
   --z-hot2-bg: #b42318; --z-hot2-fg: #ffffff; --z-hot2: #b42318;
-  --z-hot1-bg: #fdba74; --z-hot1-fg: #6b2410; --z-hot1: #c2410c;
-  --z-cold1-bg: #dbeafe; --z-cold1-fg: #1e40af; --z-cold1: #2563eb;
+  --z-hot1-bg: #fdba74; --z-hot1-fg: var(--text); --z-hot1: #c2410c; --z-hot1-worse: #fb923c;
+  --z-cold1-bg: #cfe0fb; --z-cold1-fg: var(--text); --z-cold1: #2563eb; --z-cold1-worse: #a5c4f7;
   --z-cold2-bg: #1e3a8a; --z-cold2-fg: #ffffff; --z-cold2: #1e3a8a;
   --radius: 12px;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px rgb(0 0 0 / 0.04);
@@ -47,8 +47,8 @@
     --temp: #fb923c;
     --hum: #60a5fa;
     --z-hot2-bg: #b91c1c; --z-hot2-fg: #ffffff; --z-hot2: #f87171;
-    --z-hot1-bg: #9a3412; --z-hot1-fg: #ffedd5; --z-hot1: #fb923c;
-    --z-cold1-bg: #1e3a5f; --z-cold1-fg: #bfdbfe; --z-cold1: #93c5fd;
+    --z-hot1-bg: #9a3412; --z-hot1-fg: var(--text); --z-hot1: #fb923c; --z-hot1-worse: #c2410c;
+    --z-cold1-bg: #1e3a5f; --z-cold1-fg: var(--text); --z-cold1: #93c5fd; --z-cold1-worse: #1e4f8f;
     --z-cold2-bg: #1d4ed8; --z-cold2-fg: #ffffff; --z-cold2: #60a5fa;
     --shadow: none;
     color-scheme: dark;
@@ -162,9 +162,7 @@ td.r, th.r { text-align: right; }
 :root { --val-temp: var(--temp); --val-hum: var(--hum); }
 :root[data-values="bg"], :root[data-values="text"] { --val-temp: var(--text); --val-hum: var(--text); }
 /* (!important : passe devant la couleur de grandeur des styles propres aux pages) */
-:root[data-values="bg"] .zv:is(.hot2, .hot1, .cold1, .cold2) {
-  border-radius: 6px; padding: 0 0.25em; margin: 0 -0.05em;
-}
+:root[data-values="bg"] .zv:is(.hot2, .hot1, .cold1, .cold2) { padding: 0 0.25em; }
 :root[data-values="bg"] .zv.hot2 { background: var(--z-hot2-bg); color: var(--z-hot2-fg) !important; }
 :root[data-values="bg"] .zv.hot1 { background: var(--z-hot1-bg); color: var(--z-hot1-fg) !important; }
 :root[data-values="bg"] .zv.cold1 { background: var(--z-cold1-bg); color: var(--z-cold1-fg) !important; }
@@ -173,9 +171,9 @@ td.r, th.r { text-align: right; }
 :root[data-values="text"] .zv.hot1 { color: var(--z-hot1) !important; }
 :root[data-values="text"] .zv.cold1 { color: var(--z-cold1) !important; }
 :root[data-values="text"] .zv.cold2 { color: var(--z-cold2) !important; }
-/* Tendance qui aggrave la situation : la zone est soulignée d'un liseré */
-:root[data-values="bg"] .zv.worse:is(.hot2, .hot1) { box-shadow: 0 0 0 2px var(--z-hot2); }
-:root[data-values="bg"] .zv.worse:is(.cold1, .cold2) { box-shadow: 0 0 0 2px var(--z-cold2); }
+/* Tendance qui aggrave la situation : fond « info » renforcé (le fond « important » est déjà le plus fort) */
+:root[data-values="bg"] .zv.worse.hot1 { background: var(--z-hot1-worse); }
+:root[data-values="bg"] .zv.worse.cold1 { background: var(--z-cold1-worse); }
 :root[data-values="text"] .zv.worse { text-decoration: underline 2px; text-underline-offset: 3px; }
 
 :root[data-text="small"] { font-size: 14.5px; }
