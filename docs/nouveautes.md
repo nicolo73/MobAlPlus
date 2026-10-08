@@ -6,6 +6,11 @@
 
 
 ## 8 octobre 2026
+- **Valeurs colorées selon les seuils d'alerte** haut / bas (rouge foncé, orange, bleu léger, bleu
+  foncé), sur Maintenant, Synthèse, emplacements et groupes ; flèches de tendance en gras rouge ou
+  bleu si la situation s'aggrave, vertes si un pic ou un creux ramène vers la normale. Au choix dans
+  Options : fond, texte ou couleur par grandeur.
+- Flèches de pic / creux sans fond coloré.
 - Nouvelle page **Synthèse** (après Maintenant ; glisser à gauche / à droite pour passer de l'une à
   l'autre sur le téléphone) : les courbes choisies et, dessous, les valeurs au curseur avec
   tendances et alertes. Curseur à « maintenant » par défaut.

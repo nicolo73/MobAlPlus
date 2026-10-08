@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api } from "../lib/api";
   import { isDark, propertyColor, slotColor, type ColorChoice } from "../lib/colors";
+  import { trendTone, zoneOf } from "../lib/zones";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, needsReload, type Window } from "../lib/period";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
@@ -254,9 +255,11 @@
     <div class="values">
       {#each sorted as s (s.id)}
         {@const c = current.find((x) => x.series_id === s.id)}
+        {@const rs = rules.filter((r) => r.series_id === s.id)}
+        {@const tone = trendTone(c?.value ?? null, trends.get(s.id) ?? null, rs, s.property)}
         <div class="value">
-          <span class="num big" style="color:{propertyColor(s.property, dark)}">{fmtValue(c?.value ?? null, s.unit)}{#if trends.get(s.id)}<span
-            class="arrow"><TrendArrow trend={trends.get(s.id)!} unit={s.unit} detail /></span>{/if}</span>
+          <span class="num big {s.property}"><span class="zv {zoneOf(c?.value ?? null, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{fmtValue(c?.value ?? null, s.unit)}</span>{#if trends.get(s.id)}<span
+            class="arrow"><TrendArrow trend={trends.get(s.id)!} unit={s.unit} {tone} detail /></span>{/if}</span>
           <small>{s.property_name.toLowerCase()}</small>
         </div>
       {/each}
@@ -365,6 +368,8 @@
   .dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--c); }
   .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+  .big.temperature { color: var(--val-temp); }
+  .big.humidity { color: var(--val-hum); }
   h2 small { font-weight: 400; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem; margin: 0.75rem 0 0; }
   .stats div { display: grid; gap: 0.1rem; }

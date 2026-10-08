@@ -30,6 +30,13 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
 - <img src="images/icones/pic.svg" alt="pic" height="16"> <img src="images/icones/creux.svg" alt="creux" height="16">
   **Pic ou creux passé** (flèche cassée orange) : la valeur vient de s'inverser. Moment de fermer ou
   d'ouvrir les fenêtres.
+- **Couleur des valeurs** d'après les seuils d'alerte **haut / bas** de l'emplacement (pas les pics,
+  creux, comparaisons ni pentes) : fond **rouge foncé** au-delà du seuil haut important, **orange**
+  au-delà du seuil haut info, rien entre les seuils, **bleu léger** sous le seuil bas info, **bleu
+  foncé** sous le seuil bas important. Liseré en plus si la tendance aggrave la situation.
+- **Flèche en gras rouge** : ça monte alors qu'on est proche ou au-delà du seuil haut ; **en gras
+  bleu foncé** : ça baisse encore près ou sous le seuil bas ; **verte** : un pic ou un creux passé
+  ramène vers des valeurs normales.
 - **Alertes** en cours : petite étiquette rouge (⚠ importante) ou bleue (ⓘ info) sous le nom.
 - Badge **ancienne** : pas de mesure récente (piles, portée de la passerelle).
 - **Emplacement parent** (ex. Jardin) : cadre en pointillé regroupant ses sous-emplacements, avec
@@ -162,6 +169,8 @@ Sur le téléphone : **Admin › Données** (menu Données sur ordinateur).
 l'écran ; réglages propres à chaque appareil ([écran](#ecran-options)).
 
 - **Taille du texte** et **présentation compacte** (2 colonnes de fiches sur téléphone).
+- **Couleur des valeurs** : *Fond* (selon les seuils, par défaut), *Texte* (chiffres colorés selon
+  les seuils) ou *Par grandeur* (température orange, humidité bleue).
 - **Grandeurs affichées** et **rendu des courbes**.
 - **Flèches de tendance** : période de calcul, sensibilité, écart pour signaler un pic ou un creux.
 - **Notifications des alertes** sur cet appareil.

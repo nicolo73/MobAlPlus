@@ -1,6 +1,6 @@
 // Préférences d'affichage, mémorisées sur l'appareil et communes à toutes les pages : rendu des
 // courbes (escalier, lissé, simplifié), grandeurs masquées (ex. l'humidité), taille du texte et
-// densité (pour voir plus de fiches à la fois).
+// densité (pour voir plus de fiches à la fois), couleur des valeurs (zones de seuil).
 
 import type { CurveMode } from "./curve";
 import { TREND_DEFAULTS, type TrendOptions } from "./trend";
@@ -10,6 +10,9 @@ const MODES: CurveMode[] = ["step", "smooth", "simple"];
 
 export type TextSize = "normal" | "small" | "smaller";
 export type Density = "comfort" | "compact";
+/** Couleur des valeurs : fond ou texte selon les seuils d'alerte, ou couleur de la grandeur */
+export type ValueStyle = "bg" | "text" | "property";
+const VALUE_STYLES: ValueStyle[] = ["bg", "text", "property"];
 const TEXTS: TextSize[] = ["normal", "small", "smaller"];
 const DENSITIES: Density[] = ["comfort", "compact"];
 
@@ -18,6 +21,7 @@ export const display = $state({
   hidden: [] as string[],
   text: "normal" as TextSize,
   density: "comfort" as Density,
+  values: "bg" as ValueStyle,
   /** Courbe de comparaison avec la station météo publique (s'il y en a une) */
   weather: true,
   /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement) */
@@ -30,6 +34,7 @@ try {
   if (MODES.includes(saved.curve)) display.curve = saved.curve;
   if (TEXTS.includes(saved.text)) display.text = saved.text;
   if (DENSITIES.includes(saved.density)) display.density = saved.density;
+  if (VALUE_STYLES.includes(saved.values)) display.values = saved.values;
   if (typeof saved.weather === "boolean") display.weather = saved.weather;
   if (saved.nowHidden && typeof saved.nowHidden === "object") display.nowHidden = saved.nowHidden;
   if (saved.trend && typeof saved.trend === "object") {
@@ -51,6 +56,13 @@ function apply() {
   const root = document.documentElement;
   root.dataset.text = display.text;
   root.dataset.density = display.density;
+  root.dataset.values = display.values;
+}
+
+export function setValueStyle(v: ValueStyle) {
+  display.values = v;
+  apply();
+  save();
 }
 
 export function setText(size: TextSize) {

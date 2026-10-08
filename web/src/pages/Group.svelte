@@ -8,8 +8,9 @@
   import { DAY, loadRange, needsReload, type Window } from "../lib/period";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import { computeTrend } from "../lib/trend";
+  import { rulesBySeries, zoneOf } from "../lib/zones";
   import { display, visibleProps } from "../lib/display.svelte";
-  import type { CurrentValue, Place, Point, SeriesInfo } from "../lib/types";
+  import type { AlertRule, CurrentValue, Place, Point, SeriesInfo } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
@@ -67,9 +68,12 @@
       if (id === reqId) loading = false;
     }
   }
+  /** Seuils d'alerte haut / bas des sous-emplacements : couleur de leurs valeurs */
+  let rules = $state(new Map<number, AlertRule[]>());
   async function loadCurrent() {
     try {
       current = (await api.currentValues()).filter((c) => node.measured.includes(c.place_id));
+      api.alertRules(current.map((c) => c.series_id)).then((r) => (rules = rulesBySeries(r))).catch(() => {});
       const to = Date.now();
       history = await api.seriesData(ids(), to - 25 * 3_600_000, to);
     } catch { /* valeurs actuelles indisponibles : la page reste utilisable */ }
@@ -205,7 +209,7 @@
           {/if}
           <span class="spacer"></span>
           {#each cur as v (v.series_id)}
-            <span class="num {v.property}" class:stale={isStale(v.ts)}>{fmtValue(v.value, v.unit)}</span>
+            <span class="num {v.property}" class:stale={isStale(v.ts)}><span class="zv {zoneOf(v.value, rules.get(v.series_id) ?? []) ?? ''}">{fmtValue(v.value, v.unit)}</span></span>
           {/each}
         </li>
       {/each}
@@ -219,8 +223,8 @@
   .values { display: flex; gap: 2rem; flex-wrap: wrap; }
   .value { display: grid; }
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
-  .temperature { color: var(--temp); }
-  .humidity { color: var(--hum); }
+  .temperature { color: var(--val-temp); }
+  .humidity { color: var(--val-hum); }
   .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
   h2 small { font-weight: 400; }
   .color { display: grid; gap: 0.4rem; justify-items: start; }

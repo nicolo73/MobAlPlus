@@ -40,7 +40,7 @@
       pushBusy = false;
     }
   }
-  import { display, resetTrend, setDensity, setText, setTrend, type Density, type TextSize } from "../lib/display.svelte";
+  import { display, resetTrend, setDensity, setText, setTrend, setValueStyle, type Density, type TextSize, type ValueStyle } from "../lib/display.svelte";
 
   const WINDOWS = [{ v: 30, label: "30 min" }, { v: 60, label: "1 h" }, { v: 120, label: "2 h" }];
   const SENSITIVITIES = [{ v: 1.6, label: "Faible" }, { v: 1, label: "Normale" }, { v: 0.6, label: "Forte" }];
@@ -61,6 +61,11 @@
   const DENSITIES: { v: Density; label: string; help: string }[] = [
     { v: "comfort", label: "Confortable", help: "fiches larges, grands chiffres" },
     { v: "compact", label: "Compacte", help: "plus de fiches à la fois (2 colonnes sur téléphone)" },
+  ];
+  const VALUE_STYLES: { v: ValueStyle; label: string; help: string }[] = [
+    { v: "bg", label: "Fond", help: "fond coloré selon les seuils d'alerte haut / bas de l'emplacement" },
+    { v: "text", label: "Texte", help: "chiffres colorés selon les seuils d'alerte haut / bas" },
+    { v: "property", label: "Par grandeur", help: "température en orange, humidité en bleu (sans tenir compte des seuils)" },
   ];
 
   // Grandeurs connues de la maison, pour le choix des grandeurs affichées
@@ -97,6 +102,24 @@
         {/each}
       </div>
       <small class="muted">{DENSITIES.find((d) => d.v === display.density)?.help}</small>
+    </div>
+    <div class="opt">
+      <h2>Couleur des valeurs</h2>
+      <div class="seg" role="group" aria-label="Couleur des valeurs">
+        {#each VALUE_STYLES as v (v.v)}
+          <button class:active={display.values === v.v} aria-pressed={display.values === v.v} onclick={() => setValueStyle(v.v)}
+                  title={v.help}>{v.label}</button>
+        {/each}
+      </div>
+      <small class="muted">{VALUE_STYLES.find((v) => v.v === display.values)?.help}.
+        {#if display.values !== "property"}
+          <span class="legend-z">
+            <span class="zv hot2">au-delà important</span> <span class="zv hot1">au-delà info</span>
+            <span class="zv cold1">sous info</span> <span class="zv cold2">sous important</span>
+          </span>
+          Flèche en gras rouge ou bleu foncé : la tendance aggrave la situation ; verte : un pic ou un
+          creux ramène vers la normale.
+        {/if}</small>
     </div>
     <div class="opt">
       <h2>Grandeurs et rendu des courbes</h2>
@@ -213,6 +236,7 @@
 </div>
 
 <style>
+  .legend-z { display: inline-flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; margin: 0.25rem 0; font-weight: 600; }
   .now-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
   .now-list label { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2rem; }
   .now-list input { min-height: 0; width: 1.1rem; height: 1.1rem; }

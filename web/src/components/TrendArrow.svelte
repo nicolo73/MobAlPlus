@@ -1,9 +1,12 @@
 <script lang="ts">
   // Flèche de tendance : inclinée selon la pente ; « cassée » (pic ou creux) en cas d'inversion.
+  // Ton (seuils d'alerte de la série) : rouge ou bleu foncé en gras si la tendance aggrave la
+  // situation, vert si un pic ou un creux ramène vers des valeurs normales.
   import { fmtValue } from "../lib/format";
   import type { Trend } from "../lib/trend";
+  import type { Tone } from "../lib/zones";
 
-  let { trend, unit, detail = false }: { trend: Trend; unit: string; detail?: boolean } = $props();
+  let { trend, unit, detail = false, tone = null }: { trend: Trend; unit: string; detail?: boolean; tone?: Tone | null } = $props();
 
   // Une décimale de plus pour les pentes faibles (0,05 °C/h plutôt que 0,0)
   const decimals = $derived((unit === "%" ? 0 : 1) + (Math.abs(trend.slope) > 0 && Math.abs(trend.slope) < (unit === "%" ? 1 : 0.1) ? 1 : 0));
@@ -11,13 +14,15 @@
     .toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ${unit}/h`);
   const at = (ts: number) => new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const words = ["stable", "légère", "nette", "forte"];
-  const title = $derived(trend.reversal
+  const title = $derived((trend.reversal
     ? `Inversion : ${trend.reversal.kind === "peak" ? "maximum" : "minimum"} de ${fmtValue(trend.reversal.value, unit)} à ${at(trend.reversal.ts)}, ${trend.reversal.kind === "peak" ? "en baisse" : "en hausse"} depuis (${slopeText})`
     : trend.level === 0 ? `Stable (${slopeText})`
-    : `${trend.level > 0 ? "Hausse" : "Baisse"} ${words[Math.abs(trend.level)]} (${slopeText})`);
+    : `${trend.level > 0 ? "Hausse" : "Baisse"} ${words[Math.abs(trend.level)]} (${slopeText})`)
+    + (tone === "worse-hot" ? " – vers ou au-delà du seuil haut" : tone === "worse-cold" ? " – vers ou en deçà du seuil bas"
+       : tone === "better" ? " – retour vers des valeurs normales" : ""));
 </script>
 
-<span class="trend" class:rev={trend.reversal} class:flat={!trend.reversal && trend.level === 0} {title}
+<span class="trend {tone ?? ''}" class:rev={trend.reversal} class:flat={!trend.reversal && trend.level === 0 && !tone} {title}
       role="img" aria-label={title}>
   {#if trend.reversal}
     <!-- Flèche « cassée » : montée puis descente (pic) ou l'inverse (creux) -->
@@ -40,8 +45,13 @@
   .trend { display: inline-flex; align-items: center; gap: 0.2rem; color: var(--muted); vertical-align: middle; }
   .trend svg { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   .trend.flat { opacity: 0.6; }
-  .trend.rev { color: var(--warn); background: var(--warn-soft); border-radius: 6px; padding: 0 0.2rem; }
+  .trend.rev { color: var(--warn); }
   .trend.rev svg { stroke-width: 2.6; }
   .trend.rev small { font-weight: 700; }
   small { font-size: 0.75rem; white-space: nowrap; }
+  .trend.worse-hot { color: var(--z-hot2); }
+  .trend.worse-cold { color: var(--z-cold2); }
+  .trend.better { color: var(--ok); }
+  .trend:is(.worse-hot, .worse-cold, .better) svg { stroke-width: 3.2; }
+  .trend:is(.worse-hot, .worse-cold, .better) small { font-weight: 700; }
 </style>

@@ -11,9 +11,10 @@
   import { curveData, valueAt } from "../lib/curve";
   import { computeTrend } from "../lib/trend";
   import { describe, RECENT } from "../lib/alerts.svelte";
-  import { homeWeather, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { homeWeather, loadWeather, primaryStation, weatherCurve } from "../lib/weather-state.svelte";
+  import { rulesBySeries, trendTone, zoneOf } from "../lib/zones";
   import type { WeatherSeries } from "../lib/weather-parse";
-  import type { AlertEvent, Place, Point, SeriesInfo } from "../lib/types";
+  import type { AlertEvent, AlertRule, Place, Point, SeriesInfo } from "../lib/types";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
   import { display, visibleProps } from "../lib/display.svelte";
@@ -28,6 +29,8 @@
   let loaded = $state<Window>(loadRange(initial));
   let data = $state(new Map<number, Point[]>());
   let events = $state<AlertEvent[]>([]);
+  /** Seuils d'alerte haut / bas des séries affichées : couleur des valeurs et des flèches */
+  let rules = $state(new Map<number, AlertRule[]>());
   let loading = $state(false);
   let error = $state("");
   let dark = $state(isDark());
@@ -77,6 +80,9 @@
       now = Date.now();
       error = "";
       api.alertEvents({ since: range[0] }).then((e) => (events = e)).catch(() => (events = []));
+      const st = primaryStation();
+      api.alertRules([...res.keys(), ...[st?.temperature, st?.humidity].filter((x): x is number => x != null)])
+        .then((r) => (rules = rulesBySeries(r))).catch(() => {});
     } catch (e) {
       if (id === reqId) error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -152,6 +158,16 @@
     if (curves.length) curves.push(...weatherCurve(weather, p.code, selected.map((x) => x.node.id)));
     return { ...p, curves };
   }).filter((c) => c.curves.length));
+
+  /** Série d'une ligne de légende pour une grandeur (emplacement ou station météo ; pas les moyennes) */
+  function seriesOf(id: string | number, prop: string): number | null {
+    if (typeof id === "string") {
+      const st = primaryStation();
+      return (prop === "temperature" ? st?.temperature : prop === "humidity" ? st?.humidity : null) ?? null;
+    }
+    if (id < 0) return null;
+    return seriesByPlace.get(id)?.find((s) => s.property === prop)?.id ?? null;
+  }
 
   /** Légende : une ligne par courbe, valeurs à l'instant choisi, tendance et alerte */
   const rows = $derived.by(() => {
@@ -240,10 +256,14 @@
               {/if}
               {#each shownProps as p (p.code)}
                 {@const x = r.values.get(p.code)}
-                {@const tr = r.trends.get(p.code)}
+                {@const tr = r.trends.get(p.code) ?? null}
+                {@const sid = seriesOf(r.id, p.code)}
+                {@const rs = sid !== null ? rules.get(sid) ?? [] : []}
+                {@const v = x && x.v !== null ? Math.round(x.v * 10) / 10 : null}
+                {@const tone = trendTone(v, tr, rs, p.code)}
                 <span class="val {p.code}">
-                  <span class="num">{x && x.v !== null ? fmtValue(Math.round(x.v * 10) / 10, unitOf(p.code)) : "–"}</span>
-                  <span class="arrow">{#if tr}<TrendArrow trend={tr} unit={unitOf(p.code)} />{/if}</span>
+                  <span class="num"><span class="zv {zoneOf(v, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{v !== null ? fmtValue(v, unitOf(p.code)) : "–"}</span></span>
+                  <span class="arrow">{#if tr}<TrendArrow trend={tr} unit={unitOf(p.code)} {tone} />{/if}</span>
                 </span>
               {/each}
               <span class="alert" title={r.alert ? describe(r.alert) : ""}>
@@ -280,8 +300,8 @@
           text-decoration: none; font-size: 0.92rem; }
   .val { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.1rem; flex: none; }
   .val .num { font-weight: 700; min-width: 3.6rem; text-align: right; }
-  .val.temperature .num { color: var(--temp); }
-  .val.humidity .num { color: var(--hum); min-width: 2.8rem; }
+  .val.temperature .num { color: var(--val-temp); }
+  .val.humidity .num { color: var(--val-hum); min-width: 2.8rem; }
   .arrow { display: inline-flex; width: 1.2rem; justify-content: center; font-size: 0.9rem; }
   .alert { flex: none; width: 1rem; text-align: center; font-weight: 700; }
   .alert .warning { color: var(--err); }

@@ -11,6 +11,8 @@
   import DisplayBar from "../components/DisplayBar.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
   import { computeTrend } from "../lib/trend";
+  import { rulesBySeries, trendTone, zoneOf } from "../lib/zones";
+  import type { AlertRule } from "../lib/types";
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { averagePoints, placeTree, type PlaceNode } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
@@ -47,9 +49,16 @@
   // Grandeur réaffichée : ses tendances sont chargées à leur tour
   $effect(() => { void visible; if (values) setTimeout(() => loadTrends(), 0); });
 
+  // Seuils d'alerte haut / bas : couleur des valeurs et des flèches
+  let rules = $state(new Map<number, AlertRule[]>());
+  async function loadRules(ids: number[]) {
+    try { rules = rulesBySeries(await api.alertRules(ids)); } catch { /* sans seuils : pas de mise en évidence */ }
+  }
+
   async function load() {
     try {
       const [cur, pl] = await Promise.all([api.currentValues(), api.places().catch(() => places)]);
+      loadRules(cur.map((v) => v.series_id));
       places = pl;
       values = cur;
       memo.set(ctx.homeId, { values: cur, places: pl });
@@ -163,9 +172,11 @@
       {/if}
       <div class="values">
         {#each items as v (v.series_id)}
+          {@const rs = rules.get(v.series_id) ?? []}
+          {@const tone = trendTone(v.value, trends.get(v.series_id) ?? null, rs, v.property)}
           <div class="value {v.property}">
-            <span class="num big">{fmtValue(v.value, v.unit)}{#if trends.get(v.series_id)}<span class="arrow"><TrendArrow
-              trend={trends.get(v.series_id)!} unit={v.unit} detail={display.density !== "compact"} /></span>{/if}</span>
+            <span class="num big"><span class="zv {zoneOf(v.value, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{fmtValue(v.value, v.unit)}</span>{#if trends.get(v.series_id)}<span
+              class="arrow"><TrendArrow trend={trends.get(v.series_id)!} unit={v.unit} {tone} detail={display.density !== "compact"} /></span>{/if}</span>
             <small class:hide={visible.length === 1 && display.density === "compact"}>{v.property === "temperature" ? "température" : v.property === "humidity" ? "humidité" : v.property}{n.weather ? " publique" : ""}</small>
           </div>
         {/each}
@@ -236,8 +247,8 @@
   .big { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
   .arrow { font-size: 1rem; margin-left: 0.3rem; font-weight: 400; }
   .compact .arrow { font-size: 0.95rem; margin-left: 0.2rem; }
-  .temperature .big { color: var(--temp); }
-  .humidity .big { color: var(--hum); }
+  .temperature .big { color: var(--val-temp); }
+  .humidity .big { color: var(--val-hum); }
   .stale .big { opacity: 0.6; }
   .meteo { border-style: dotted; background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
   .meteo h2 svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; vertical-align: -0.15em; margin-right: 0.3rem; }
@@ -257,7 +268,7 @@
   .group-head h2 { margin: 0; font-size: 1rem; }
   .group-head .chev { margin-left: auto; }
   .avg { display: inline-flex; align-items: center; font-weight: 700; }
-  .avg.temperature { color: var(--temp); }
-  .avg.humidity { color: var(--hum); }
+  .avg.temperature { color: var(--val-temp); }
+  .avg.humidity { color: var(--val-hum); }
   .compact.now, .group .now { gap: 0.5rem; }
 </style>
