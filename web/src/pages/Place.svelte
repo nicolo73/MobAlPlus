@@ -182,7 +182,7 @@
         if (p.ts <= Date.now()) continue;
         const d = new Date(p.ts);
         const key = d.toDateString();
-        if (!days.has(key)) days.set(key, { label: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }), values: new Map() });
+        if (!days.has(key)) days.set(key, { label: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }), values: new Map() });
         const v = days.get(key)!.values;
         const cur = v.get(sr.id);
         v.set(sr.id, cur ? { min: Math.min(cur.min, p.value), max: Math.max(cur.max, p.value) } : { min: p.value, max: p.value });
@@ -340,7 +340,10 @@
       <h2>Prévisions <small class="muted">(Open-Meteo, mises à jour toutes les 30 minutes)</small></h2>
       <div class="table-wrap">
         <table class="forecast">
-          <thead><tr><th>Jour</th>{#each sorted as sr (sr.id)}<th class="r">{sr.property_name} <small>min – max</small></th>{/each}</tr></thead>
+          <thead>
+            <tr><th rowspan="2">Jour</th>{#each sorted as sr (sr.id)}<th class="r" colspan="2">{sr.property_name}</th>{/each}</tr>
+            <tr>{#each sorted as sr (sr.id)}<th class="r sub">min</th><th class="r sub">max</th>{/each}</tr>
+          </thead>
           <tbody>
             {#each forecastDays as d (d.label)}
               <tr>
@@ -348,8 +351,8 @@
                 {#each sorted as sr (sr.id)}
                   {@const v = d.values.get(sr.id)}
                   {@const rs = rules.filter((r) => r.series_id === sr.id)}
-                  <td class="r num">{#if v}<span class="zv {zoneOf(v.min, rs) ?? ''}">{fmtValue(v.min, sr.unit)}</span> –
-                    <span class="zv {zoneOf(v.max, rs) ?? ''}">{fmtValue(v.max, sr.unit)}</span>{:else}–{/if}</td>
+                  <td class="r num zv {v ? zoneOf(v.min, rs) ?? '' : ''}">{v ? fmtValue(v.min, sr.unit) : "–"}</td>
+                  <td class="r num zv {v ? zoneOf(v.max, rs) ?? '' : ''}">{v ? fmtValue(v.max, sr.unit) : "–"}</td>
                 {/each}
               </tr>
             {/each}
@@ -406,7 +409,9 @@
                 <td class="num">{fmtDate(new Date(ts).toISOString())}</td>
                 {#each sorted as s (s.id)}
                   {@const o = cells.get(s.id)}
-                  <td class="r num" class:rejected={o?.quality === "rejected"}
+                  <!-- Couleur des seuils d'alerte haut / bas, comme les valeurs actuelles -->
+                  <td class="r num zv {o && o.quality !== 'rejected' ? zoneOf(o.value, rules.filter((r) => r.series_id === s.id)) ?? '' : ''}"
+                      class:rejected={o?.quality === "rejected"}
                       title={o?.quality === "rejected" ? "valeur rejetée" : o?.quality === "corrected" ? "valeur corrigée" : ""}>
                     {o ? fmtValue(o.value, s.unit) : ""}{#if o?.quality === "corrected"}*{/if}
                   </td>
@@ -464,4 +469,6 @@
   .values-table { max-height: 26rem; overflow-y: auto; }
   .values-table thead th { position: sticky; top: 0; background: var(--surface); }
   .rejected { text-decoration: line-through; color: var(--muted); }
+  .forecast th.sub { font-size: 0.75rem; font-weight: 500; padding-top: 0; }
+  .forecast td { white-space: nowrap; }
 </style>

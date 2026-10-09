@@ -3,7 +3,8 @@
 //  - zone : au-delà du seuil « important » haut (hot2), entre info et important haut (hot1), normale,
 //    sous le seuil info bas (cold1), sous le seuil important bas (cold2) ;
 //  - ton de la flèche de tendance : aggravation (on monte près ou au-delà du seuil haut, on baisse
-//    près ou en deçà du seuil bas), ou retour vers la normale (pic ou creux passé dans la zone à risque).
+//    près ou en deçà du seuil bas), ou retour vers la normale (on redescend alors qu'on est au-delà du
+//    seuil haut, on remonte sous le seuil bas, ou pic / creux passé dans la zone à risque).
 
 import type { AlertRule } from "./types";
 import type { Trend } from "./trend";
@@ -50,6 +51,10 @@ export function trendTone(value: number | null, trend: Trend | null, rules: Aler
   }
   if (trend.level > 0 && nearHigh) return "worse-hot";
   if (trend.level < 0 && nearLow) return "worse-cold";
+  // En alerte (au-delà d'un seuil info ou important) et la tendance ramène vers la normale
+  const zone = zoneOf(value, rules);
+  if ((zone === "hot1" || zone === "hot2") && trend.level < 0) return "better";
+  if ((zone === "cold1" || zone === "cold2") && trend.level > 0) return "better";
   return null;
 }
 

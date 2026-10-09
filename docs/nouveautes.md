@@ -7,6 +7,9 @@
 
 ## 9 octobre 2026
 - Courbes et Synthèse : jusqu'à **12 courbes** en même temps (au lieu de 8).
+- Flèche de tendance **verte** dès qu'une valeur en alerte (seuil haut ou bas) revient vers la normale.
+- Couleurs des seuils aussi dans les tableaux de **mesures** (page d'un emplacement) et de
+  **prévisions** (minimum et maximum en colonnes séparées).
 - Synthèse : survoler une ligne de la légende (ou toucher ses valeurs) **met sa courbe en évidence**.
 - Page d'un emplacement : ses courbes prennent **la couleur choisie** pour l'emplacement, comme dans
   les courbes superposées.

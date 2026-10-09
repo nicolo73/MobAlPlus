@@ -162,7 +162,8 @@ td.r, th.r { text-align: right; }
 :root { --val-temp: var(--temp); --val-hum: var(--hum); }
 :root[data-values="bg"], :root[data-values="text"] { --val-temp: var(--text); --val-hum: var(--text); }
 /* (!important : passe devant la couleur de grandeur des styles propres aux pages) */
-:root[data-values="bg"] .zv:is(.hot2, .hot1, .cold1, .cold2) { padding: 0 0.45em; }
+/* (cellule de tableau : le fond occupe toute la cellule, avec son espacement habituel) */
+:root[data-values="bg"] .zv:is(.hot2, .hot1, .cold1, .cold2):not(td) { padding: 0 0.45em; }
 :root[data-values="bg"] .zv.hot2 { background: var(--z-hot2-bg); color: var(--z-hot2-fg) !important; }
 :root[data-values="bg"] .zv.hot1 { background: var(--z-hot1-bg); color: var(--z-hot1-fg) !important; }
 :root[data-values="bg"] .zv.cold1 { background: var(--z-cold1-bg); color: var(--z-cold1-fg) !important; }

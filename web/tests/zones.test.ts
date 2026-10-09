@@ -30,4 +30,8 @@ test("ton de la flèche : aggravation ou retour vers la normale", () => {
   assert.equal(trendTone(14.5, trough, rules, "temperature"), "better");  // creux passé en zone froide
   assert.equal(trendTone(19, peak, rules, "temperature"), null);
   assert.equal(trendTone(21.5, up, [], "temperature"), null);             // pas de seuil
+  // En alerte, la tendance ramène vers la normale : verte
+  assert.equal(trendTone(15, up, rules, "temperature"), "better");        // trop froid, remonte
+  assert.equal(trendTone(23, down, rules, "temperature"), "better");      // trop chaud, redescend
+  assert.equal(trendTone(16.5, up, rules, "temperature"), null);          // proche du seuil bas, sans alerte
 });

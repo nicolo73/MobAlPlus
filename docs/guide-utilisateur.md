@@ -36,8 +36,11 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
   foncé** sous le seuil bas important (fond rectangulaire ; texte blanc sur les fonds foncés). Orange
   ou bleu plus soutenu si la tendance aggrave la situation.
 - **Flèche en gras rouge** : ça monte alors qu'on est proche ou au-delà du seuil haut ; **en gras
-  bleu foncé** : ça baisse encore près ou sous le seuil bas ; **verte** : un pic ou un creux passé
-  ramène vers des valeurs normales.
+  bleu foncé** : ça baisse encore près ou sous le seuil bas ; **verte** : on est en alerte (au-delà
+  d'un seuil haut ou bas) et la tendance ramène vers des valeurs normales (ça redescend, ça remonte,
+  ou un pic / creux vient de passer).
+- Mêmes couleurs dans les tableaux : **mesures** de la page d'un emplacement et **prévisions** jour
+  par jour d'une station (minimum et maximum).
 - **Alertes** en cours : petite étiquette rouge (⚠ importante) ou bleue (ⓘ info) sous le nom.
 - Badge **ancienne** : pas de mesure récente (piles, portée de la passerelle).
 - **Emplacement parent** (ex. Jardin) : cadre en pointillé regroupant ses sous-emplacements, avec
