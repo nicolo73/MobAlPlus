@@ -228,6 +228,9 @@ export interface AlertEvent {
   archived: boolean;           // masquée par le compte connecté
 }
 
+/** Résultat de la collecte météo d'une station */
+export interface WeatherResult { station: string; received: number; inserted: number; forecast?: number; error?: string }
+
 export interface Api {
   readonly demo: boolean;
   session(): Promise<{ email: string } | null>;
@@ -288,7 +291,7 @@ export interface Api {
   /** Crée une station météo publique (capteur virtuel + emplacement) ; renvoie l'emplacement */
   addWeatherStation(label: string, lat: number, lon: number): Promise<number>;
   /** Lance la collecte météo (après création d'une station) */
-  collectWeather(): Promise<void>;
+  collectWeather(): Promise<WeatherResult[]>;
   /** Emplacements parents qui ont encore un capteur affecté (incohérence à corriger) */
   placeIssues(): Promise<{ place_id: number; place_name: string; channels: number }[]>;
   alertRules(seriesIds: number[]): Promise<AlertRule[]>;

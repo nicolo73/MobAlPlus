@@ -183,6 +183,14 @@
     return seriesByPlace.get(id)?.find((s) => s.property === prop)?.id ?? null;
   }
 
+  /** Ligne de légende d'une courbe : l'emplacement (sa prévision comprise), ou « meteo » pour la comparaison */
+  const curveKey = (id: string | number) => String(id).replace(/-prevision$/, "").replace(/^meteo-.*/, "meteo");
+  /** Ligne survolée (souris) ou touchée (valeurs, sur téléphone) : sa courbe est mise en évidence */
+  let hovered = $state<string | null>(null);
+  /** Dernier type de pointeur (souris : le survol suffit ; toucher : bascule) */
+  let pointer = "";
+  const highlightOf = (curves: ChartSeries[]) => hovered === null ? [] : curves.filter((x) => curveKey(x.id) === hovered).map((x) => String(x.id));
+
   /** Légende : une ligne par courbe, valeurs à l'instant choisi, tendance et alerte */
   const rows = $derived.by(() => {
     const keys = new Map<string, { id: string | number; name: string; color: string; dashed?: boolean; dotted?: boolean;
@@ -190,7 +198,7 @@
     for (const c of charts) {
       for (const s of c.curves) {
         // Une ligne par emplacement : sa prévision donne la valeur quand le curseur est dans le futur
-        const k = String(s.id).replace(/-prevision$/, "").replace(/^meteo-.*/, "meteo");
+        const k = curveKey(s.id);
         const sc = selected.find((x) => String(x.key) === k);
         if (!keys.has(k)) keys.set(k, { id: sc?.key ?? s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
                                          places: sc?.places ?? [], values: new Map() });
@@ -252,7 +260,7 @@
             {#if charts.length > 1}<h2>{c.name} <small class="muted">({c.unit})</small></h2>{/if}
             <TimeChart series={c.curves} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
                        curve={display.curve} group="synthese" label="{c.name} : {c.curves.map((s) => s.name).join(', ')}"
-                       height={chartHeight} fullscreen={false} cursor={mark} oncursor={setCursor} />
+                       height={chartHeight} fullscreen={false} cursor={mark} oncursor={setCursor} highlight={highlightOf(c.curves)} />
           </section>
         {/each}
       </div>
@@ -269,13 +277,22 @@
         </div>
         <ul>
           {#each rows as r (r.id)}
-            <li>
+            {@const key = curveKey(r.id)}
+            <li class:hl={hovered === key}
+                onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = key; }}
+                onpointerleave={(e) => { if (e.pointerType === "mouse" && hovered === key) hovered = null; }}>
               <span class="key" class:dashed={r.dashed} class:dotted={r.dotted} style="--c:{r.color}"></span>
               {#if typeof r.id === "number"}
                 <a class="name" href="#/lieu/{Math.abs(r.id)}">{r.name}</a>
               {:else}
                 <span class="name">{r.name}</span>
               {/if}
+              <!-- Valeurs : toucher met la courbe en évidence (le nom, lui, ouvre la page de l'emplacement) -->
+              <span class="vals" role="button" tabindex="0" aria-pressed={hovered === key}
+                    title="Mettre en évidence la courbe de {r.name}"
+                    onpointerdown={(e) => (pointer = e.pointerType)}
+                    onclick={() => (hovered = pointer === "mouse" || hovered !== key ? key : null)}
+                    onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hovered = hovered === key ? null : key; } }}>
               {#each shownProps as p (p.code)}
                 {@const x = r.values.get(p.code)}
                 {@const tr = r.trends.get(p.code) ?? null}
@@ -290,6 +307,7 @@
               {/each}
               <span class="alert" title={r.alert ? describe(r.alert) : ""}>
                 {#if r.alert}<span class={r.alert.level}>{r.alert.level === "warning" ? "⚠" : "ⓘ"}</span>{/if}
+              </span>
               </span>
             </li>
           {/each}
@@ -315,7 +333,10 @@
   ul { list-style: none; margin: 0; padding: 0; }
   /* Lignes sans marge verticale propre : le fond de zone d'une valeur occupe toute leur hauteur */
   li { display: flex; align-items: stretch; gap: 0.5rem; border-bottom: 1px solid var(--border); min-width: 0; min-height: 2.3rem; }
-  li > :not(.val) { align-self: center; }
+  li > :not(.vals) { align-self: center; }
+  li.hl { background: var(--surface-2); }
+  .vals { display: flex; align-items: stretch; gap: 0.5rem; flex: none; cursor: pointer; }
+  .vals > .alert { align-self: center; }
   li:last-child { border-bottom: none; }
   .key { flex: none; width: 16px; height: 0; border-top: 3px solid var(--c); }
   .key.dashed { border-top-style: dashed; }
@@ -324,7 +345,7 @@
           text-decoration: none; font-size: 0.92rem; }
   .val { display: inline-flex; align-items: stretch; justify-content: flex-end; gap: 0.1rem; flex: none; }
   .val .num { display: flex; align-items: center; justify-content: flex-end; font-weight: 700; min-width: 3.6rem;
-              padding: 0 0.3rem; }
+              padding: 0 0.5rem; }
   .val .arrow { align-self: center; }
   .val.temperature .num { color: var(--val-temp); }
   .val.humidity .num { color: var(--val-hum); min-width: 2.8rem; }

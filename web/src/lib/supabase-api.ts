@@ -3,7 +3,7 @@ import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
-  AlertEvent, AlertLevel, AlertRule,
+  AlertEvent, AlertLevel, AlertRule, WeatherResult,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -309,8 +309,13 @@ export class SupabaseApi implements Api {
   }
 
   async collectWeather() {
-    const { error } = await this.sb.functions.invoke("weather", { body: {} });
-    if (error) throw new Error(error.message);
+    const { data, error } = await this.sb.functions.invoke("weather", { body: {} });
+    if (error) {
+      // Message de la fonction (ex. erreur SQL) plutôt que le code HTTP seul
+      const detail = await (error as { context?: Response }).context?.json?.().catch(() => null);
+      throw new Error(detail?.error ?? error.message);
+    }
+    return ((data as { results?: WeatherResult[] })?.results ?? []);
   }
 
   async placeIssues() {

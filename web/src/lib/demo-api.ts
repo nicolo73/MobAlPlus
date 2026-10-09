@@ -432,7 +432,10 @@ export class DemoApi implements Api {
     devices.push(weatherDevice(Math.max(...devices.map((d) => d.id)) + 1, placeId, label));
     return delay(placeId);
   }
-  async collectWeather() { await delay(null); }
+  async collectWeather() {
+    return delay(devices.filter((d) => d.vendor === "open_meteo" && d.active)
+      .map((d) => ({ station: d.ma_id, received: 2, inserted: 0, forecast: 336 })));
+  }
   async placeIssues() {
     const out: { place_id: number; place_name: string; channels: number }[] = [];
     for (const p of places) {

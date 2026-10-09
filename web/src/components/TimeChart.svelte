@@ -59,11 +59,13 @@
     oncursor?: (t: number) => void;
     /** Bouton plein écran */
     fullscreen?: boolean;
+    /** Courbes mises en évidence (identifiants) : les autres s'estompent */
+    highlight?: string[];
   }
 
   let { series, unit, loaded, window, onwindow, loading = false, height = 280, group, label, curve = "step",
         thresholds = [], alertPoints = [], alertsWideOnly = false, gaps = [], cutAfter = GAP,
-        cursor = null, oncursor, fullscreen = true }: Props = $props();
+        cursor = null, oncursor, fullscreen = true, highlight = [] }: Props = $props();
 
   let el: HTMLDivElement;
   let box: HTMLDivElement;
@@ -191,7 +193,8 @@
         lineStyle: { width: s.dotted ? 1.5 : 2, color: s.color, opacity: s.forecast ? 0.75 : 1,
                      type: s.forecast ? [7, 3, 1.5, 3] : s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" },
         itemStyle: { color: s.color, borderColor: surface, borderWidth: 2 },
-        emphasis: { focus: "series", lineStyle: { width: 2 } },
+        emphasis: { focus: "series", lineStyle: { width: 3.5 } },
+        blur: { lineStyle: { opacity: 0.18 } },
         endLabel: endLabels && !s.forecast ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
         data,
@@ -253,6 +256,8 @@
       markLine: {
         silent: true, symbol: ["none", "circle"], symbolSize: 7, animation: false, label: { show: false },
         lineStyle: { color: cssVar("--primary"), type: "solid", width: 1.5 },
+        // reste net quand une courbe est mise en évidence
+        blur: { lineStyle: { opacity: 1 }, itemStyle: { opacity: 1 } },
         data: cursor == null ? [] : [{ xAxis: cursor }],
       },
     };
@@ -271,7 +276,16 @@
     if (!chart) return;
     chart.setOption(option(), { replaceMerge: ["series"] });
     applied = [window[0], window[1]];
+    applyHighlight();
   }
+
+  /** Mise en évidence demandée par la page (ligne de légende survolée ou touchée) */
+  function applyHighlight() {
+    if (!chart) return;
+    chart.dispatchAction({ type: "downplay", seriesIndex: series.map((_, i) => i) });
+    if (highlight.length) chart.dispatchAction({ type: "highlight", seriesId: highlight });
+  }
+  $effect(() => { void highlight; applyHighlight(); });
 
   type Orientation = ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
 

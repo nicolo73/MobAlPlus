@@ -62,6 +62,9 @@ dans la page Courbes, sans réglage, et dessous (à côté en paysage) la **lég
 - **Toucher ou glisser sur la courbe** pour lire un autre instant : la date s'affiche avec
   « il y a… » ; **maintenant ›** revient au présent.
 - Groupe : son nom suivi du nombre d'emplacements moyennés, ex. « Jardin (3) ».
+- **Mettre une courbe en évidence** : survoler sa ligne à la souris, ou toucher ses **valeurs** sur le
+  téléphone (toucher de nouveau pour revenir) ; les autres courbes s'estompent. Le **nom** ouvre
+  toujours la page de l'emplacement.
 - **Détails / options** : page Courbes, où se choisissent emplacements, période, grandeurs, rendu
   et météo ; la Synthèse reprend ces choix.
 

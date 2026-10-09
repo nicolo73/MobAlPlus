@@ -7,6 +7,12 @@
 
 ## 9 octobre 2026
 - Courbes et Synthèse : jusqu'à **12 courbes** en même temps (au lieu de 8).
+- Synthèse : survoler une ligne de la légende (ou toucher ses valeurs) **met sa courbe en évidence**.
+- Page d'un emplacement : ses courbes prennent **la couleur choisie** pour l'emplacement, comme dans
+  les courbes superposées.
+- Valeurs sur fond coloré (seuils) : fond un peu plus large autour du chiffre.
+- Station météo sans prévision encore : bouton **Mettre à jour maintenant**, avec le compte rendu de
+  la collecte (ou l'erreur).
 
 ## 8 octobre 2026
 - **Prévisions météo** : la courbe des stations météo se prolonge dans le futur (7 jours, trait

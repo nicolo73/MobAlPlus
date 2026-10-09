@@ -145,12 +145,35 @@
     loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
   });
 
+  /** Couleur des courbes : celle choisie pour l'emplacement (comme dans les courbes superposées), sinon celle de la grandeur */
+  const curveColor = (prop: string) =>
+    color != null ? (typeof color === "string" ? color : slotColor(color, dark)) : propertyColor(prop, dark);
+
   // Station météo : prévision horaire des prochains jours (prolonge ses courbes, tableau par jour)
   let forecast = $state(new Map<number, Point[]>());
+  let forecastLoaded = $state(false);
   const isStation = $derived(homeWeather.stations.some((st) => st.placeId === placeId));
-  $effect(() => {
-    if (isStation && series) loadForecast(series.map((x) => x.id)).then((f) => (forecast = f));
-  });
+  const refreshForecast = () => series && loadForecast(series.map((x) => x.id)).then((f) => { forecast = f; forecastLoaded = true; });
+  $effect(() => { if (isStation && series) refreshForecast(); });
+  // Pas encore de prévision : collecte à la demande, avec son compte rendu (ou l'erreur)
+  let collecting = $state(false);
+  let collectInfo = $state("");
+  async function collectNow() {
+    collecting = true;
+    collectInfo = "";
+    try {
+      const res = await api.collectWeather();
+      const errs = res.filter((r) => r.error);
+      collectInfo = errs.length ? `Erreur : ${errs.map((r) => r.error).join(" ; ")}`
+        : `Collecte faite : ${res.reduce((t, r) => t + (r.forecast ?? 0), 0)} valeurs de prévision reçues.`;
+      await refreshForecast();
+      load();
+    } catch (e) {
+      collectInfo = `Erreur : ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      collecting = false;
+    }
+  }
   /** Prévision par jour : minimum et maximum de chaque grandeur */
   const forecastDays = $derived.by(() => {
     const days = new Map<string, { label: string; values: Map<number, { min: number; max: number }> }>();
@@ -301,6 +324,17 @@
     </small>
   </section>
 
+  {#if isStation && forecastLoaded && !forecastDays.length}
+    <section class="card stack">
+      <h2 style="margin:0">Prévisions</h2>
+      <p class="muted" style="margin:0">Pas encore de prévision pour cette station : elles arrivent avec la collecte météo
+        (toutes les 30 minutes) une fois la base à jour (workflow « Déploiement Supabase »).</p>
+      <div class="row">
+        <button onclick={collectNow} disabled={collecting}>{collecting ? "Collecte…" : "Mettre à jour maintenant"}</button>
+        {#if collectInfo}<small class:err-text={collectInfo.startsWith("Erreur")}>{collectInfo}</small>{/if}
+      </div>
+    </section>
+  {/if}
   {#if forecastDays.length}
     <section class="card">
       <h2>Prévisions <small class="muted">(Open-Meteo, mises à jour toutes les 30 minutes)</small></h2>
@@ -338,8 +372,8 @@
     {@const st = stats.get(s.id)}
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
-      <TimeChart series={[{ id: s.id, name: s.property_name, color: propertyColor(s.property, dark), points: data.get(s.id) ?? [] },
-                         ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: propertyColor(s.property, dark) },
+      <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [] },
+                         ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: curveColor(s.property) },
                                                               data.get(s.id) ?? [], forecast.get(s.id)) : []),
                          ...weatherCurve(weather, s.property, [s.place_id])]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
@@ -418,6 +452,7 @@
   .color .link { font-size: 0.85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
   .dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--c); }
   .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
+  .err-text { color: var(--err); }
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
   .big.temperature { color: var(--val-temp); }
   .big.humidity { color: var(--val-hum); }
