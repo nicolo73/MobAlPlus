@@ -5,6 +5,9 @@
 -->
 
 
+## 9 octobre 2026
+- Courbes et Synthèse : jusqu'à **12 courbes** en même temps (au lieu de 8).
+
 ## 8 octobre 2026
 - **Prévisions météo** : la courbe des stations météo se prolonge dans le futur (7 jours, trait
   mixte, zone « prévision » ; glisser la barre sous la courbe pour avancer), tableau des prévisions

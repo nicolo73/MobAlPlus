@@ -1,15 +1,23 @@
 // Couleurs des séries : palette catégorielle validée (8 teintes, ordre fixe, variante claire / sombre).
 // Une couleur suit l'emplacement : attribuée à la sélection, conservée tant qu'il reste sélectionné.
 
-export const MAX_SERIES = 8;
+/** Teintes de la palette (couleur choisie pour un emplacement : numéro 0 à 7, voir place.color_slot) */
+export const PALETTE_SIZE = 8;
+/** Courbes au plus en même temps (Courbes, Synthèse) ; au-delà de la palette, couleurs d'appoint */
+export const MAX_SERIES = 12;
 
 const LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 const DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+/** Couleurs d'appoint (9e à 12e courbe automatique) : turquoise, marron, olive, bordeaux */
+const EXTRA_LIGHT = ["#0fa3b1", "#8b5a2b", "#8a8f2a", "#8e1b3a"];
+const EXTRA_DARK = ["#22b8c6", "#b07a45", "#a9ae3c", "#c2476a"];
 
 export const isDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
 
 export function slotColor(slot: number, dark = isDark()): string {
-  return (dark ? DARK : LIGHT)[slot % MAX_SERIES];
+  const n = PALETTE_SIZE + EXTRA_LIGHT.length;
+  const i = ((slot % n) + n) % n;
+  return i < PALETTE_SIZE ? (dark ? DARK : LIGHT)[i] : (dark ? EXTRA_DARK : EXTRA_LIGHT)[i - PALETTE_SIZE];
 }
 
 /** Couleurs fixes de la page d'un emplacement : température orange, humidité bleue */

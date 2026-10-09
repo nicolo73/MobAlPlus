@@ -1,7 +1,7 @@
 <script lang="ts">
   // Choix d'une couleur : palette de l'application (adaptée au thème clair / sombre), couleurs
   // supplémentaires (gris, marron…), couleur personnalisée, ou automatique.
-  import { EXTRA_COLORS, MAX_SERIES, slotColor, type ColorChoice } from "../lib/colors";
+  import { EXTRA_COLORS, PALETTE_SIZE, slotColor, type ColorChoice } from "../lib/colors";
 
   interface Props {
     value: ColorChoice;
@@ -19,7 +19,7 @@
 <div class="picker" role="radiogroup" aria-label={label}>
   <button type="button" class="auto" class:on={value === null} role="radio" aria-checked={value === null} {disabled}
           title="Automatique : couleur attribuée selon l'ordre de sélection" onclick={() => onchange(null)}>auto</button>
-  {#each Array.from({ length: MAX_SERIES }, (_, i) => i) as i (i)}
+  {#each Array.from({ length: PALETTE_SIZE }, (_, i) => i) as i (i)}
     <button type="button" class="swatch" class:on={value === i} role="radio" aria-checked={value === i} {disabled}
             style="--c:{slotColor(i, dark)}" title={NAMES[i]} aria-label={NAMES[i]} onclick={() => onchange(i)}></button>
   {/each}

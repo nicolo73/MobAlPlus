@@ -69,7 +69,7 @@ dans la page Courbes, sans réglage, et dessous (à côté en paysage) la **lég
 
 Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-courbes)).
 
-- **Choisir les emplacements** en touchant leurs noms (8 courbes au plus).
+- **Choisir les emplacements** en touchant leurs noms (12 courbes au plus).
 - **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
 - **Période** : 24 h à 1 an ; **‹ ›** pour reculer ou avancer ; **Maintenant** pour revenir au présent.
 - **Lire les valeurs** : toucher la courbe et glisser le doigt ; l'infobulle donne la valeur de

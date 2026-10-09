@@ -227,7 +227,8 @@
       ...(futureEnd > now ? [{
         id: "futur", type: "line", data: [], silent: true,
         markArea: { silent: true, animation: false, itemStyle: { color: muted, opacity: 0.07 },
-                    label: { show: true, position: "insideTopLeft", color: muted, fontSize: 10, formatter: "prévision" },
+                    // étiquette seulement si la partie future visible est assez large pour l'écrire
+                    label: { show: we - Math.max(now, ws) > 0.2 * (we - ws), position: "insideTopLeft", color: muted, fontSize: 10, formatter: "prévision" },
                     data: [[{ xAxis: now }, { xAxis: axisMax }]] },
         markLine: { silent: true, symbol: "none", animation: false, lineStyle: { color: muted, type: [3, 3], width: 1 },
                     label: { show: false }, data: [{ xAxis: now }] },
