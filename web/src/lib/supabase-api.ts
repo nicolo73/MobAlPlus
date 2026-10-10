@@ -141,6 +141,14 @@ export class SupabaseApi implements Api {
     return new Map<number, Point[]>(lists);
   }
 
+  async userOptions() {
+    return check(await this.sb.rpc("my_options")) as Record<string, unknown> | null;
+  }
+
+  async saveUserOptions(options: Record<string, unknown>) {
+    check(await this.sb.rpc("save_my_options", { p_options: options }));
+  }
+
   async seriesDaily(ids: number[], from: number, to: number) {
     // Un appel par série (comme seriesData) : chacun reste court
     const lists = await Promise.all(ids.map(async (id) => {

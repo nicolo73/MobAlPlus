@@ -1,13 +1,28 @@
 // Pages de synthèse (tableaux de bord) d'une maison : chacune a son nom, ses courbes choisies
-// (emplacements, moyennes de groupes, couleurs) et la durée affichée. La page « Courbes » sert à les
-// régler. Mémorisées sur l'appareil ; il en reste toujours au moins une.
+// (emplacements, moyennes de groupes, couleurs), la durée affichée, ses grandeurs (température,
+// humidité…) et la courbe météo ou non. La page « Courbes » sert à les régler. Gardées sur l'appareil
+// et enregistrées dans le compte (account.svelte.ts) ; il en reste toujours au moins une.
 
 import type { Slots } from "./chartsel.ts";
 
 const DAY = 86_400_000;
-export interface Dashboard { id: string; name: string; slots: Slots; width: number }
+export interface Dashboard {
+  id: string;
+  name: string;
+  slots: Slots;
+  width: number;
+  /** Grandeurs masquées sur cette synthèse (ex. ["humidity"] : synthèse des températures) */
+  hidden?: string[];
+  /** Courbe de comparaison avec la météo publique */
+  weather?: boolean;
+}
 
-const KEY = (homeId: number | null) => `mobalplus.dashboards.${homeId}`;
+const PREFIX = "mobalplus.dashboards.";
+let onSaved: (() => void) | null = null;
+/** Appelé après chaque modification (enregistrement dans le compte) */
+export function setDashboardsSaveHook(fn: () => void) { onSaved = fn; }
+
+const KEY = (homeId: number | null) => `${PREFIX}${homeId}`;
 /** Ancien réglage unique de la page Courbes : repris comme première synthèse */
 const OLD_KEY = (homeId: number | null) => `mobalplus.charts.${homeId}`;
 
@@ -30,8 +45,31 @@ export function listDashboards(homeId: number | null): Dashboard[] {
   return [{ id: "principale", name: "Synthèse", slots: old?.slots ?? {}, width: old?.width && old.width > 0 ? old.width : DAY }];
 }
 
-export function saveDashboards(homeId: number | null, list: Dashboard[]) {
+export function saveDashboards(homeId: number | null, list: Dashboard[], notify = true) {
   try { localStorage.setItem(KEY(homeId), JSON.stringify(list)); } catch { /* stockage indisponible */ }
+  if (notify) onSaved?.();
+}
+
+/** Synthèses de toutes les maisons connues de l'appareil (pour le compte) */
+export function allDashboards(): Record<string, Dashboard[]> {
+  const out: Record<string, Dashboard[]> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(PREFIX)) continue;
+      const list = read(k);
+      if (Array.isArray(list)) out[k.slice(PREFIX.length)] = list.filter(valid);
+    }
+  } catch { /* stockage indisponible */ }
+  return out;
+}
+
+/** Synthèses reçues du compte : remplacent celles de l'appareil */
+export function replaceDashboards(all: unknown) {
+  if (!all || typeof all !== "object") return;
+  for (const [home, list] of Object.entries(all as Record<string, unknown>)) {
+    if (Array.isArray(list) && list.some(valid)) saveDashboards(Number(home), list.filter(valid), false);
+  }
 }
 
 /** Synthèse demandée, sinon la première */

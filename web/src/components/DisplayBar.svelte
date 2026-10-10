@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { display, setCurve, setForecast, setWeather, toggleProp, visibleProps } from "../lib/display.svelte";
+  import { display, setCurve, setForecast, setWeather, toggleProp, visibleOf, visibleProps } from "../lib/display.svelte";
   import { homeWeather } from "../lib/weather-state.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
@@ -11,11 +11,26 @@
     small?: boolean;
     /** Bouton « Météo » (si la position de la maison est connue) */
     weatherToggle?: boolean;
+    /**
+     * Réglages propres à une synthèse (sinon les préférences générales) : grandeurs masquées et
+     * courbe météo, avec leurs fonctions de modification
+     */
+    hidden?: string[];
+    onhidden?: (hidden: string[]) => void;
+    weather?: boolean;
+    onweather?: (on: boolean) => void;
   }
-  let { properties, curves = true, small = false, weatherToggle = true }: Props = $props();
+  let { properties, curves = true, small = false, weatherToggle = true, hidden, onhidden, weather, onweather }: Props = $props();
 
   const codes = $derived(properties.map((p) => p.code));
-  const visible = $derived(visibleProps(codes));
+  const visible = $derived(hidden ? visibleOf(codes, hidden) : visibleProps(codes));
+  const weatherOn = $derived(weather ?? display.weather);
+  function toggle(code: string) {
+    if (!hidden || !onhidden) return toggleProp(code, codes);
+    if (hidden.includes(code)) onhidden(hidden.filter((p) => p !== code));
+    else if (visible.length > 1) onhidden([...hidden, code]);
+  }
+  const switchWeather = () => (onweather ? onweather(!weatherOn) : setWeather(!weatherOn));
   const CURVES = [
     { mode: "step", label: "Escalier", help: "Rendu fidèle : chaque valeur reste constante jusqu'à la mesure suivante" },
     { mode: "smooth", label: "Lissé", help: "Courbe adoucie passant par toutes les mesures" },
@@ -28,7 +43,7 @@
     <div class="seg" role="group" aria-label="Grandeurs affichées">
       {#each properties as p (p.code)}
         {@const on = visible.includes(p.code)}
-        <button class:active={on} aria-pressed={on} onclick={() => toggleProp(p.code, codes)}
+        <button class:active={on} aria-pressed={on} onclick={() => toggle(p.code)}
                 title={on && visible.length === 1 ? "Au moins une grandeur reste affichée" : on ? `Masquer : ${p.name}` : `Afficher : ${p.name}`}>
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
             {#if on}<path d="M5 12l5 5 9-10" />{:else}<path d="M7 7l10 10M17 7L7 17" />{/if}
@@ -40,7 +55,7 @@
   {/if}
   {#if weatherToggle && homeWeather.stations.length}
     <div class="seg" role="group" aria-label="Météo publique">
-      <button class:active={display.weather} aria-pressed={display.weather} onclick={() => setWeather(!display.weather)}
+      <button class:active={weatherOn} aria-pressed={weatherOn} onclick={switchWeather}
               title="Comparer avec la météo publique : {homeWeather.stations[0].name}">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z" /></svg>
         Météo

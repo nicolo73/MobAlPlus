@@ -6,6 +6,10 @@
 
 
 ## 10 octobre 2026
+- **Synthèses et préférences enregistrées dans le compte** : les mêmes sur le téléphone et
+  l'ordinateur (sauf taille du texte et présentation compacte, propres à chaque appareil).
+- Chaque synthèse a ses **grandeurs** (ex. une synthèse des températures, une de l'humidité) et sa
+  courbe **météo** ou non.
 - **Plusieurs synthèses** : chacune avec son nom, ses emplacements et sa durée ; boutons ⚙ (réglages),
   + (nouvelle), corbeille ; onglets, et glisser d'une synthèse à l'autre sur le téléphone. La page
   Courbes devient la page de réglages de la synthèse (menu « Courbes » retiré).

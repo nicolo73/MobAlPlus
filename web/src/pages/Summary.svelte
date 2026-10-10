@@ -20,7 +20,7 @@
   import type { AlertEvent, AlertRule, Place, Point, SeriesInfo } from "../lib/types";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import TrendArrow from "../components/TrendArrow.svelte";
-  import { display, visibleProps } from "../lib/display.svelte";
+  import { display, visibleOf } from "../lib/display.svelte";
   import { ctx } from "../lib/home.svelte";
 
   let { dashboardId = null }: { dashboardId?: string | null } = $props();
@@ -66,7 +66,8 @@
     for (const s of all ?? []) m.set(s.property, { name: s.property_name, unit: s.unit });
     return [...m].map(([code, p]) => ({ code, ...p })).sort((a, b) => rank(a.code) - rank(b.code));
   });
-  const visible = $derived(visibleProps(properties.map((p) => p.code)));
+  // Grandeurs et courbe météo propres à cette synthèse (réglées dans ses réglages)
+  const visible = $derived(visibleOf(properties.map((p) => p.code), dash.hidden ?? display.hidden));
   const shownProps = $derived(properties.filter((p) => visible.includes(p.code)));
 
   async function init() {
@@ -175,7 +176,7 @@
   // Météo publique (courbe de comparaison, si activée dans les options)
   let weather = $state<WeatherSeries | null>(null);
   $effect(() => {
-    const [a, b] = loaded, on = display.weather;
+    const [a, b] = loaded, on = dash.weather ?? display.weather;
     void homeWeather.stations;
     loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });

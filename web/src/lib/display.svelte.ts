@@ -34,8 +34,10 @@ export const display = $state({
   longview: { ...LONGVIEW_DEFAULTS } as LongView,
 });
 
-try {
-  const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}");
+/** Applique des préférences enregistrées (appareil ou compte), en ignorant les valeurs invalides */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applySaved(saved: any) {
+  if (!saved || typeof saved !== "object") return;
   if (MODES.includes(saved.curve)) display.curve = saved.curve;
   if (TEXTS.includes(saved.text)) display.text = saved.text;
   if (DENSITIES.includes(saved.density)) display.density = saved.density;
@@ -55,8 +57,31 @@ try {
     };
   }
   if (Array.isArray(saved.hidden)) display.hidden = saved.hidden.filter((h: unknown) => typeof h === "string");
-} catch { /* stockage indisponible : valeurs par défaut */ }
+}
+
+try { applySaved(JSON.parse(localStorage.getItem(STORE) ?? "{}")); } catch { /* stockage indisponible : valeurs par défaut */ }
 apply();
+
+/**
+ * Préférences enregistrées dans le compte (retrouvées sur tous ses appareils) ; la taille du texte
+ * et la présentation compacte restent propres à chaque appareil (téléphone, ordinateur)
+ */
+export function accountDisplay(): Record<string, unknown> {
+  const { text: _t, density: _d, ...rest } = $state.snapshot(display);
+  return rest;
+}
+
+/** Préférences reçues du compte */
+export function applyAccountDisplay(saved: unknown) {
+  if (!saved || typeof saved !== "object") return;
+  const { text: _t, density: _d, ...rest } = saved as Record<string, unknown>;
+  applySaved(rest);
+  try { localStorage.setItem(STORE, JSON.stringify(display)); } catch { /* ignoré */ }
+}
+
+let onSaved: (() => void) | null = null;
+/** Appelé après chaque modification (enregistrement dans le compte) */
+export function setDisplaySaveHook(fn: () => void) { onSaved = fn; }
 
 /** Taille du texte et densité : attributs de <html>, exploités par app.css */
 function apply() {
@@ -86,6 +111,7 @@ export function setDensity(density: Density) {
 
 function save() {
   try { localStorage.setItem(STORE, JSON.stringify(display)); } catch { /* ignoré */ }
+  onSaved?.();
 }
 
 export function setTrend(patch: Partial<TrendOptions>) {
@@ -130,9 +156,14 @@ export function setCurve(mode: CurveMode) {
 }
 
 /** Grandeurs affichées parmi celles disponibles ; jamais aucune (on les montre alors toutes) */
-export function visibleProps(available: string[]): string[] {
-  const v = available.filter((p) => !display.hidden.includes(p));
+/** Grandeurs affichées parmi celles disponibles, selon une liste de grandeurs masquées (jamais aucune) */
+export function visibleOf(available: string[], hidden: string[]): string[] {
+  const v = available.filter((p) => !hidden.includes(p));
   return v.length ? v : available;
+}
+
+export function visibleProps(available: string[]): string[] {
+  return visibleOf(available, display.hidden);
 }
 
 export function toggleProp(prop: string, available: string[]) {

@@ -16,7 +16,7 @@
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
-  import { display, visibleProps } from "../lib/display.svelte";
+  import { display, visibleOf } from "../lib/display.svelte";
 
   import { ctx } from "../lib/home.svelte";
 
@@ -50,7 +50,12 @@
   let dark = $state(isDark());
   let reqId = 0;
 
-  $effect(() => updateDashboard(ctx.homeId, dash.id, { slots: $state.snapshot(slots), width: win[1] - win[0] }));
+  // Grandeurs et courbe météo propres à cette synthèse (au départ : les préférences générales)
+  let hidden = $state<string[]>(dash.hidden ?? [...display.hidden]);
+  let showWeather = $state(dash.weather ?? display.weather);
+  $effect(() => updateDashboard(ctx.homeId, dash.id, {
+    slots: $state.snapshot(slots), width: win[1] - win[0], hidden: $state.snapshot(hidden), weather: showWeather,
+  }));
 
   $effect(() => {
     const m = matchMedia("(prefers-color-scheme: dark)");
@@ -88,7 +93,7 @@
     for (const s of all ?? []) m.set(s.property, s.property_name);
     return [...m].map(([code, name]) => ({ code, name })).sort((a, b) => rank(a.code) - rank(b.code));
   });
-  const visible = $derived(visibleProps(properties.map((p) => p.code)));
+  const visible = $derived(visibleOf(properties.map((p) => p.code), hidden));
 
   async function init() {
     try {
@@ -122,7 +127,7 @@
   // Météo publique de la période chargée (si activée et position connue)
   let weather = $state<WeatherSeries | null>(null);
   $effect(() => {
-    const [a, b] = loaded, on = display.weather;
+    const [a, b] = loaded, on = showWeather;
     void homeWeather.stations;
     loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });
@@ -297,7 +302,7 @@
         <small class="muted"><span class="legend-avg"></span> emplacement parent : moyenne de ses sous-emplacements</small>
       {/if}
     </div>
-    <DisplayBar {properties} />
+    <DisplayBar {properties} {hidden} onhidden={(h) => (hidden = h)} weather={showWeather} onweather={(on) => (showWeather = on)} />
     {#if clashes.length}
       <small class="muted">Même couleur pour {clashes.map((n) => n.join(" et ")).join(", ")} : la couleur d'un emplacement
         se choisit sur sa page (ou dans Admin › Emplacements).</small>

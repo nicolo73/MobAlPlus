@@ -225,6 +225,11 @@ erDiagram
     text email
     text role "admin | viewer"
   }
+  user_options {
+    uuid user_id PK
+    jsonb options "synthèses par maison, préférences d'affichage"
+    timestamptz updated_at
+  }
   push_subscription {
     int id PK
     uuid user_id
@@ -261,6 +266,7 @@ erDiagram
 | `alert_event` | alertes déclenchées | en cours tant que `ended_at` est vide ; effacement réservé à « gestion » |
 | `alert_archive` | alertes archivées (masquées) | propre à chaque compte |
 | `push_subscription` | appareils abonnés aux notifications | supprimés quand le service les déclare expirés |
+| `user_options` | options de chaque compte : un document JSON (synthèses de chaque maison, préférences d'affichage) | une ligne par compte, visible de lui seul ; évolutif sans changer la structure |
 | `device_sync` | avancement de la collecte par capteur | reprise incrémentale, dernière erreur |
 | `forecast` | prévision horaire des stations météo (7 jours), par canal | heures à venir remplacées à chaque collecte ; lue par `series_forecast()` |
 | `maintenance_log` | journal des tâches (compactage, simplification, remplacements à l'import) | consultable dans Admin › Maintenance |
@@ -285,6 +291,7 @@ erDiagram
 | `place_issues()` | emplacements parents ayant encore un capteur affecté (incohérence ancienne à corriger) |
 | `export_csv()`, `import_preview()`, `import_values()` | export et import de fichiers |
 | `my_context()`, `my_home_ids()`, `my_place_ids()`… | droits du compte connecté (règles d'accès) |
+| `my_options()`, `save_my_options()` | options du compte connecté (lecture, enregistrement du document) |
 | `evaluate_alerts()`, `set_alert_rules()`, `alert_derived()` | alertes : évaluation toutes les 10 minutes, réglage des seuils, courbe d'écart ou de pente |
 | `pending_notifications()`, `mark_notified()` | notifications à envoyer (Edge Function `notify`) |
 | `admin_stats()`, `stats()` | statistiques d'occupation |

@@ -205,6 +205,11 @@ export class DemoApi implements Api {
 
   async seriesList() { return delay(series()); }
 
+  /** Options du « compte » de démonstration : gardées le temps de la session */
+  private options: Record<string, unknown> | null = null;
+  async userOptions() { return delay(this.options ? structuredClone(this.options) : null); }
+  async saveUserOptions(options: Record<string, unknown>) { this.options = structuredClone(options); await delay(null); }
+
   async seriesDaily(ids: number[], from: number, to: number) {
     const out = new Map<number, DayBand[]>();
     for (const id of ids) {

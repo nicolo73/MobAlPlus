@@ -7,6 +7,7 @@
   import Charts from "./pages/Charts.svelte";
   import Summary from "./pages/Summary.svelte";
   import { listDashboards } from "./lib/dashboards";
+  import { loadAccountOptions } from "./lib/account.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
@@ -42,6 +43,8 @@
     } catch (e) {
       ctxError = e instanceof Error ? e.message : String(e);
     }
+    // Synthèses et préférences du compte (avant d'afficher les pages qui les utilisent)
+    await loadAccountOptions();
     session = next;
   }
   refreshSession();

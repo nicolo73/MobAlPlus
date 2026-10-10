@@ -57,8 +57,9 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
 Le résumé d'un coup d'œil, pensé pour le téléphone ([écran](#ecran-synthese)) : des courbes, sans
 réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
 
-- **Plusieurs synthèses** possibles (ex. « Chambres », « Extérieur », « Congélateurs ») : chacune a
-  son nom, ses emplacements et sa durée. Boutons en haut à droite : **⚙ réglages** de la synthèse
+- **Plusieurs synthèses** possibles (ex. « Chambres », « Températures », « Humidité ») : chacune a
+  son nom, ses emplacements, sa durée, ses grandeurs (température, humidité) et la courbe météo ou
+  non. Elles sont enregistrées dans votre compte : les mêmes sur le téléphone et l'ordinateur. Boutons en haut à droite : **⚙ réglages** de la synthèse
   affichée, **+** nouvelle synthèse, **corbeille** pour la supprimer (il en reste toujours une).
   Onglets sous le titre pour passer de l'une à l'autre.
 - Sur le téléphone, **glisser vers la gauche** sur Maintenant ouvre la première synthèse, puis la
@@ -76,9 +77,10 @@ réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
 
 ## Réglages d'une synthèse
 
-Ouverts par **⚙** sur une synthèse : son **nom**, ses emplacements, sa durée, avec l'aperçu des
-courbes ([écran](#ecran-courbes)). **Terminé** revient à la synthèse. Les grandeurs affichées, le
-rendu et la météo de comparaison sont des préférences de l'appareil, communes à toutes les pages.
+Ouverts par **⚙** sur une synthèse : son **nom**, ses emplacements, sa durée, ses **grandeurs**
+(Temp. / Hum.) et la courbe **Météo**, avec l'aperçu des courbes ([écran](#ecran-courbes)).
+**Terminé** revient à la synthèse. Le rendu des courbes (escalier, lissé, simplifié) est commun à
+toutes les pages.
 
 - **Choisir les emplacements** en touchant leurs noms (12 courbes au plus).
 - **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
@@ -205,7 +207,8 @@ Sur le téléphone : **Admin › Données** (menu Données sur ordinateur).
 ## Options d'affichage
 
 <img src="images/icones/options.svg" alt="réglages" height="16"> Icône à réglettes en haut de
-l'écran ; réglages propres à chaque appareil ([écran](#ecran-options)).
+l'écran ([écran](#ecran-options)). Enregistrées dans votre **compte** (retrouvées sur tous vos appareils),
+sauf la taille du texte et la présentation compacte, propres à chaque appareil.
 
 - **Taille du texte** et **présentation compacte** (2 colonnes de fiches sur téléphone).
 - **Couleur des valeurs** : *Fond* (selon les seuils, par défaut), *Texte* (chiffres colorés selon

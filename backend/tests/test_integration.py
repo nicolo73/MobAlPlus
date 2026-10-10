@@ -883,3 +883,29 @@ def test_series_daily(conn):
                         (sid, datetime(2026, 10, 5, tzinfo=UTC), datetime(2026, 10, 7, tzinfo=UTC))).fetchall()
     assert [(d.day, mn, mx, n) for d, mn, mx, _, n in days] == [(5, 30.0, 30.0, 1), (6, 18.0, 24.0, 2)]
     assert days[1][3] == pytest.approx(21.0)
+
+
+def test_user_options_per_account(conn):
+    a, b = uuid.uuid4(), uuid.uuid4()
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, a, "a@ex.fr")
+        assert conn.execute("SELECT my_options()").fetchone()[0] is None          # rien encore
+        conn.execute("SELECT save_my_options(%s)", (Jsonb({"dashboards": {"1": [{"id": "x", "name": "Chambres"}]}}),))
+        conn.execute("SELECT save_my_options(%s)", (Jsonb({"dashboards": {"1": []}, "curve": "step"}),))  # remplace
+        assert conn.execute("SELECT my_options()").fetchone()[0] == {"dashboards": {"1": []}, "curve": "step"}
+        conn.commit()
+        # Un autre compte ne voit ni ne modifie ces options
+        as_user(conn, b, "b@ex.fr")
+        assert conn.execute("SELECT my_options()").fetchone()[0] is None
+        assert conn.execute("SELECT count(*) FROM user_options").fetchone()[0] == 0
+        assert conn.execute("UPDATE user_options SET options = '{}' WHERE true").rowcount == 0
+        conn.rollback()
+        # Sans compte : refusé
+        as_user(conn, None)
+        with pytest.raises(psycopg.errors.RaiseException, match="Connexion requise"):
+            conn.execute("SELECT save_my_options('{}')")
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")
