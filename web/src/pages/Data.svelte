@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
-  import { buildPlan, readFile, type ImportPlan, type ImportTz } from "../lib/dataio";
+  import { buildPlan, mergePlans, readSheets, type ImportPlan, type ImportTz } from "../lib/dataio";
   import { fmtDate, fmtInt, toLocalInput } from "../lib/format";
   import { canEdit, currentHome } from "../lib/home.svelte";
   import { DAY } from "../lib/period";
@@ -122,6 +122,8 @@
   let importProgress = $state(0);
   let result = $state<ImportResult | null>(null);
   let cancel = false;
+  /** Capteurs et emplacements au moment de l'analyse (réutilisés pour l'import) */
+  let ctxImport: Parameters<typeof buildPlan>[2] | null = null;
   const BATCH = 2000;
 
   const tolerance = $derived(Math.round(Math.max(0, Math.min(6, Number(toleranceMin) || 0)) * 60));
@@ -147,23 +149,29 @@
     analysing = true;
     analyseProgress = 0;
     try {
-      const [sheets, places, devices] = await Promise.all([readFile(file), api.places(), api.devices()]);
-      const p = buildPlan(sheets, importTz, { series: series ?? [], places, devices });
-      if (!p.groups.length) throw new Error("Aucune donnée reconnue : vérifiez l'en-tête (date;emplacement;grandeur;valeur).");
-      // Comparaison avec l'existant, par lots, sans rien écrire
+      const [places, devices] = await Promise.all([api.places(), api.devices()]);
+      ctxImport = { series: series ?? [], places, devices };
+      // Onglet par onglet (un seul en mémoire) : comparaison avec l'existant, par lots, sans rien écrire
+      let p: ImportPlan | null = null;
       const byKey = new Map<number, GroupCheck>();
       let shifted = 0, sampled = 0;
-      for (let i = 0; i < p.rows.length; i += BATCH) {
-        const r = await api.importPreview(p.kind, p.rows.slice(i, i + BATCH), tolerance);
-        for (const g of r.groups) {
-          const c = byKey.get(g.key) ?? { new: 0, identical: 0, conflict: 0, samples: [] };
-          c.new += g.new; c.identical += g.identical; c.conflict += g.conflict;
-          c.samples = [...c.samples, ...g.samples].slice(0, 5);
-          byKey.set(g.key, c);
+      for await (const { sheet, index, count } of readSheets(file)) {
+        const sp = buildPlan([sheet], importTz, ctxImport);
+        p = mergePlans(p, sp);
+        for (let i = 0; i < sp.rows.length; i += BATCH) {
+          const r = await api.importPreview(sp.kind, sp.rows.slice(i, i + BATCH), tolerance);
+          for (const g of r.groups) {
+            const c = byKey.get(g.key) ?? { new: 0, identical: 0, conflict: 0, samples: [] };
+            c.new += g.new; c.identical += g.identical; c.conflict += g.conflict;
+            c.samples = [...c.samples, ...g.samples].slice(0, 5);
+            byKey.set(g.key, c);
+          }
+          shifted += r.tz_shifted; sampled += r.tz_sampled;
+          analyseProgress = Math.min(1, (index + Math.min(1, (i + BATCH) / sp.rows.length)) / count);
         }
-        shifted += r.tz_shifted; sampled += r.tz_sampled;
-        analyseProgress = Math.min(1, (i + BATCH) / p.rows.length);
+        analyseProgress = (index + 1) / count;
       }
+      if (!p || !p.groups.length) throw new Error("Aucune donnée reconnue : vérifiez l'en-tête (date;emplacement;grandeur;valeur).");
       const byGroup = new Map<string, GroupCheck>();
       for (const g of p.groups) {
         const c: GroupCheck = { new: 0, identical: 0, conflict: 0, samples: [] };
@@ -198,11 +206,18 @@
     importProgress = 0;
     const total: ImportResult = { received: 0, inserted: 0, identical: 0, conflicts: 0, replaced: 0, skipped: 0, extended: 0, rejected: 0 };
     try {
-      for (let i = 0; i < plan.rows.length && !cancel; i += BATCH) {
-        const r = await api.importValues(plan.kind, plan.rows.slice(i, i + BATCH), tolerance, mode);
-        for (const k of Object.keys(total) as (keyof ImportResult)[]) total[k] += r[k] ?? 0;
-        result = { ...total };
-        importProgress = Math.min(1, (i + BATCH) / plan.rows.length);
+      // Onglet par onglet, relu dans le fichier (rien n'est gardé en mémoire depuis l'analyse)
+      let sent = 0;
+      for await (const { sheet } of readSheets(file!)) {
+        if (cancel) break;
+        const sp = buildPlan([sheet], importTz, ctxImport!);
+        for (let i = 0; i < sp.rows.length && !cancel; i += BATCH) {
+          const r = await api.importValues(sp.kind, sp.rows.slice(i, i + BATCH), tolerance, mode);
+          for (const k of Object.keys(total) as (keyof ImportResult)[]) total[k] += r[k] ?? 0;
+          result = { ...total };
+          sent += Math.min(BATCH, sp.rows.length - i);
+          importProgress = Math.min(1, sent / Math.max(1, plan.values));
+        }
       }
     } catch (e) {
       error = `Import interrompu : ${e instanceof Error ? e.message : String(e)}. Les lots déjà envoyés sont enregistrés ; ` +
@@ -311,7 +326,7 @@
 
       {#if plan && checks}
         <div class="notice">
-          Format reconnu : <strong>{plan.format}</strong> · {fmtInt(plan.rows.length)} valeurs lues :
+          Format reconnu : <strong>{plan.format}</strong> · {fmtInt(plan.values)} valeurs lues :
           <strong>{fmtInt(totals.new)}</strong> nouvelles, {fmtInt(totals.identical)} déjà présentes,
           <strong>{fmtInt(totals.conflict)}</strong> en conflit
           {#if plan.ignored} · {fmtInt(plan.ignored)} ignorées{/if}

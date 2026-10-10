@@ -5,6 +5,11 @@
 -->
 
 
+## 10 octobre 2026
+- Import : les gros classeurs (anciens tableurs Mobile Alerts de plusieurs dizaines de Mo) sont lus
+  **onglet par onglet**, sans saturer la mémoire du navigateur ; heures des dates Excel arrondies à
+  la seconde (les mesures déjà collectées sont reconnues à l'identique).
+
 ## 9 octobre 2026
 - Courbes et Synthèse : jusqu'à **12 courbes** en même temps (au lieu de 8).
 - Flèche de tendance **verte** dès qu'une valeur en alerte (seuil haut ou bas) revient vers la normale.

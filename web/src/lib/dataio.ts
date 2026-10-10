@@ -1,7 +1,7 @@
 // Lecture des fichiers à importer (CSV MobAlPlus, Excel, ancien tableur Mobile Alerts) et préparation
 // des lignes envoyées à la base.
 
-import { localizeAscending, parseLocalTimestamp } from "./timeutil";
+import { localizeAscending, parseLocalTimestamp } from "./timeutil.ts";
 import type { Device, Place, SeriesInfo } from "./types";
 
 export type Cell = string | number | boolean | Date | null;
@@ -26,6 +26,8 @@ export interface ImportPlan {
   format: "mobalplus" | "ancien tableur";
   kind: "series" | "channel";
   rows: ImportRow[];
+  /** Nombre de valeurs (rows peut être vide dans un bilan de plusieurs onglets) */
+  values: number;
   groups: ImportGroup[];
   ignored: number;             // lignes illisibles ou non rattachées
   ignoredSheets: string[];
@@ -64,13 +66,45 @@ export function parseCsv(text: string): Cell[][] {
   return rows;
 }
 
-export async function readFile(file: File): Promise<Sheet[]> {
-  if (/\.xlsx?$/i.test(file.name)) {
-    const { default: readXlsxFile } = await import("read-excel-file/browser");
-    const sheets = await readXlsxFile(file);
-    return sheets.map((s) => ({ name: s.sheet, rows: s.data as Cell[][] }));
+/**
+ * Onglets d'un fichier, lus un par un : un seul onglet en mémoire à la fois (un classeur de 40 Mo
+ * lu d'un bloc occuperait plusieurs Go dans le navigateur).
+ */
+export async function* readSheets(file: File): AsyncGenerator<{ sheet: Sheet; index: number; count: number }> {
+  if (!/\.xlsx?$/i.test(file.name)) {
+    yield { sheet: { name: file.name, rows: parseCsv(await file.text()) }, index: 0, count: 1 };
+    return;
   }
-  return [{ name: file.name, rows: parseCsv(await file.text()) }];
+  const { readSheet } = await import("read-excel-file/browser");
+  // Noms des onglets : donnés par l'erreur « onglet introuvable » (la bibliothèque n'a pas d'autre moyen)
+  let names: string[] = [];
+  try { await readSheet(file, "\u0000"); } catch (e) { names = (e as { sheets?: string[] }).sheets ?? []; }
+  if (!names.length) throw new Error("Classeur illisible (aucun onglet trouvé).");
+  for (let i = 0; i < names.length; i++) {
+    yield { sheet: { name: names[i], rows: (await readSheet(file, names[i])) as Cell[][] }, index: i, count: names.length };
+  }
+}
+
+/** Bilan de plusieurs onglets analysés séparément (sans les lignes) */
+export function mergePlans(acc: ImportPlan | null, p: ImportPlan): ImportPlan {
+  if (!acc) return { ...p, rows: [] };
+  const groups = [...acc.groups];
+  for (const g of p.groups) {
+    const same = groups.findIndex((x) => x.label === g.label);
+    if (same < 0) { groups.push(g); continue; }
+    const x = groups[same];
+    const lo = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
+    const hi = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.max(a, b));
+    groups[same] = { ...x, keys: [...new Set([...x.keys, ...g.keys])], rows: x.rows + g.rows,
+                     first: lo(x.first, g.first), last: hi(x.last, g.last), ok: x.ok && g.ok, problem: x.problem ?? g.problem };
+  }
+  const old = acc.format === "ancien tableur" || p.format === "ancien tableur";
+  return {
+    format: old ? "ancien tableur" : "mobalplus", kind: acc.groups.length ? acc.kind : p.kind, rows: [],
+    values: acc.values + p.values, groups, ignored: acc.ignored + p.ignored,
+    // un onglet est « ignoré » s'il ne contient rien de reconnu (Config…)
+    ignoredSheets: [...acc.ignoredSheets, ...p.ignoredSheets],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,8 +137,10 @@ function toNumber(v: Cell): number | null {
  */
 type When = { exact: number } | { wall: number };
 function toWhen(v: Cell): When | null {
-  if (v instanceof Date) return { wall: v.getTime() };          // Excel : date sans fuseau
-  if (typeof v === "number") return { wall: Math.round((v - 25569) * 86_400_000) };  // numéro de série Excel
+  // Excel : date sans fuseau, stockée en fraction de jour, arrondie à la seconde (sinon 18,999 s au lieu
+  // de 19 s : la mesure ne serait pas reconnue identique à celle déjà collectée)
+  if (v instanceof Date) return { wall: Math.round(v.getTime() / 1000) * 1000 };
+  if (typeof v === "number") return { wall: Math.round((v - 25569) * 86_400) * 1000 };  // numéro de série Excel
   if (typeof v !== "string" || !v.trim()) return null;
   const s = v.trim();
   if (/(Z|[+-]\d\d:?\d\d)$/.test(s) && /^\d{4}-\d\d-\d\d/.test(s)) {
@@ -188,7 +224,7 @@ function planStandard(sheets: Sheet[], tz: ImportTz, series: SeriesInfo[]): Impo
     times.forEach((t, i) => rows.push({ s: g.serie!.id, t: new Date(t).toISOString(), v: g.values[i],
                                         ...(g.q[i] === "rejected" ? { q: "rejected" } : {}) }));
   }
-  return { format: "mobalplus", kind: "series", rows, groups: out, ignored, ignoredSheets };
+  return { format: "mobalplus", kind: "series", rows, values: rows.length, groups: out, ignored, ignoredSheets };
 }
 
 /** Ancien tableur : un onglet par capteur, « Device ID » en A1, colonnes Mobile Alerts dans « columns » */
@@ -230,5 +266,5 @@ function planOld(sheets: Sheet[], tz: ImportTz, devices: Device[]): ImportPlan {
       if (v !== null) rows.push({ c: channels[j]!.id, t: new Date(t).toISOString(), v });
     }));
   }
-  return { format: "ancien tableur", kind: "channel", rows, groups: out, ignored, ignoredSheets };
+  return { format: "ancien tableur", kind: "channel", rows, values: rows.length, groups: out, ignored, ignoredSheets };
 }

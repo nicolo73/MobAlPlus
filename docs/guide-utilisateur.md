@@ -182,6 +182,11 @@ Sur le téléphone : **Admin › Données** (menu Données sur ordinateur).
   Alerts. L'analyse montre les mesures nouvelles, identiques ou en conflit **avant** toute écriture ;
   en cas de conflit, conserver l'existant ou le remplacer.
 - Préciser le **fuseau horaire** des dates du fichier ([écran](#ecran-donnees)).
+- **Gros classeurs** (archives de plusieurs dizaines de Mo) : à faire sur un **ordinateur** ; le
+  fichier est lu onglet par onglet, puis envoyé par lots (compter plusieurs minutes, laisser l'onglet
+  du navigateur ouvert). Les capteurs du fichier doivent exister dans la maison (Admin › Capteurs,
+  avec au moins une collecte pour que leurs canaux soient connus). Archives qui se recouvrent : les
+  mesures déjà présentes sont reconnues et ignorées ; un import interrompu peut être relancé.
 
 ## Options d'affichage
 
