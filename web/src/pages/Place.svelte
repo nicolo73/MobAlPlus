@@ -4,7 +4,8 @@
   import { trendTone, zoneOf } from "../lib/zones";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
-  import { gapThreshold, isBand, type DayBand } from "../lib/longview";
+  import { gapThreshold, bandMain, type DayBand } from "../lib/longview";
+  import { loadCurves, otherView } from "../lib/curveload";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
@@ -34,7 +35,9 @@
   let data = $state(new Map<number, Point[]>());
   /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
   let bands = $state(new Map<number, DayBand[]>());
-  let bandMode = $state(false);
+  let loadedKey = $state("");
+  /** Bande min – max au premier plan (fenêtre large) ; la courbe détaillée passe en fond */
+  const bandMode = $derived(bandMain(win, display.longview));
   let stats = $state(new Map<number, SeriesStats>());
   let rows = $state<Observation[]>([]);
   let moreAvailable = $state(true);
@@ -152,7 +155,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });
 
   /** Couleur des courbes : celle choisie pour l'emplacement (comme dans les courbes superposées), sinon celle de la grandeur */
@@ -224,13 +227,12 @@
     const id = ++reqId;
     loading = true;
     try {
-      const band = isBand(win);
       const ids = shownSeries.map((s) => s.id);
-      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
+      const r = await loadCurves(ids, range, win);
       if (id !== reqId) return;
-      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
-      else { data = res as Map<number, Point[]>; bands = new Map(); }
-      bandMode = band;
+      data = r.data;
+      bands = r.bands;
+      loadedKey = r.key;
       if (range[0] < loaded[0]) setTimeout(loadAlertData, 0);  // période élargie : alertes plus anciennes
       loaded = range;
     } catch (e) {
@@ -254,9 +256,12 @@
     moreAvailable = res.length >= PAGE;
   }
 
+  // Seuils du temps long modifiés : données d'une autre nature à charger
+  $effect(() => { void display.longview; if (loadedKey && otherView(win, loadedKey)) load(loadRange(win)); });
+
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
+    if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
     clearTimeout(statsTimer);
     statsTimer = setTimeout(() => { loadStats(); loadRows(true); }, 400);
   }
@@ -390,7 +395,7 @@
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [],
-                            ...(bandMode ? { band: bands.get(s.id) ?? [] } : {}) },
+                            ...(bands.has(s.id) ? { band: bands.get(s.id) } : {}) },
                          ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: curveColor(s.property) },
                                                               data.get(s.id) ?? [], forecast.get(s.id)) : []),
                          ...weatherCurve(weather, s.property, [s.place_id])]}

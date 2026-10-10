@@ -11,9 +11,57 @@ const DAY = 24 * HOUR;
 /** Minimum, maximum et moyenne d'un jour ; `ts` : midi (heure locale) du jour */
 export interface DayBand { ts: number; min: number; max: number; avg: number }
 
-/** Au-delà de cette largeur de fenêtre : bandes min – max journalières */
-export const BAND_FROM = 8 * DAY;
-export const isBand = ([s, e]: Window) => e - s > BAND_FROM;
+/**
+ * Passage progressif de la courbe détaillée à la bande min – max, selon la largeur visible (en jours,
+ * réglable dans Options) :
+ * - jusqu'à `bandFrom` : courbe seule ;
+ * - de `bandFrom` à `bandFull` : courbe (interactive), bande en fond de plus en plus visible ;
+ * - de `bandFull` à `rawUntil` : bande (interactive), courbe en fond de plus en plus effacée ;
+ * - au-delà de `rawUntil` : bande seule.
+ * Ce qui est en fond n'est pas interactif (ni infobulle ni mise en évidence).
+ */
+export interface LongView { bandFrom: number; bandFull: number; rawUntil: number }
+export const LONGVIEW_DEFAULTS: LongView = { bandFrom: 3, bandFull: 7, rawUntil: 30 };
+
+/** Seuils cohérents (croissants, positifs) */
+export function normLongView(o: Partial<LongView> | undefined): LongView {
+  const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : d);
+  const bandFrom = n(o?.bandFrom, LONGVIEW_DEFAULTS.bandFrom);
+  const bandFull = Math.max(bandFrom, n(o?.bandFull, LONGVIEW_DEFAULTS.bandFull));
+  const rawUntil = Math.max(bandFull, n(o?.rawUntil, LONGVIEW_DEFAULTS.rawUntil));
+  return { bandFrom, bandFull, rawUntil };
+}
+
+const widthDays = ([s, e]: Window) => (e - s) / DAY;
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+/** Données utiles pour une fenêtre : mesures détaillées et / ou bandes journalières */
+export function needs(w: Window, o: LongView): { raw: boolean; band: boolean } {
+  const d = widthDays(w);
+  return { raw: d <= o.rawUntil, band: d > o.bandFrom };
+}
+
+/** La bande est la représentation principale (interactive) */
+export const bandMain = (w: Window, o: LongView) => widthDays(w) > o.bandFull;
+
+/** Clé des données à charger : un changement impose un rechargement */
+export function viewKey(w: Window, o: LongView): string {
+  const n = needs(w, o);
+  return `${n.raw ? "r" : ""}${n.band ? "b" : ""}`;
+}
+
+/**
+ * Présence de la représentation de fond, de 0 (absente) à 1 : la bande avant `bandFull`,
+ * la courbe détaillée après
+ */
+export function ghostLevel(w: Window, o: LongView): number {
+  const d = widthDays(w);
+  if (d <= o.bandFull) return o.bandFull > o.bandFrom ? clamp01((d - o.bandFrom) / (o.bandFull - o.bandFrom)) : 0;
+  return o.rawUntil > o.bandFull ? clamp01(1 - (d - o.bandFull) / (o.rawUntil - o.bandFull)) : 0;
+}
+
+/** Repères à la journée jusqu'à cette largeur */
+const DAY_SCALE_UNTIL = 8 * DAY;
 
 /** Midi (heure locale) d'un jour « AAAA-MM-JJ » */
 export function dayNoon(day: string): number {
@@ -71,7 +119,7 @@ export type Scale = "day" | "week" | "month" | "year";
 /** Repères verticaux adaptés à la fenêtre visible */
 export function scaleOf([s, e]: Window): Scale {
   const w = e - s;
-  return w <= BAND_FROM ? "day" : w <= 62 * DAY ? "week" : w <= 730 * DAY ? "month" : "year";
+  return w <= DAY_SCALE_UNTIL ? "day" : w <= 62 * DAY ? "week" : w <= 730 * DAY ? "month" : "year";
 }
 
 /** Instants des repères (minuit local) : chaque jour, chaque lundi, chaque 1er du mois ou chaque 1er janvier */

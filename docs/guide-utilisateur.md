@@ -54,11 +54,15 @@ Une fiche par emplacement : dernière valeur, tendance et ancienneté de la mesu
 
 ## Synthèse
 
-Le résumé d'un coup d'œil, pensé pour le téléphone ([écran](#ecran-synthese)) : les courbes choisies
-dans la page Courbes, sans réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
+Le résumé d'un coup d'œil, pensé pour le téléphone ([écran](#ecran-synthese)) : des courbes, sans
+réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
 
-- Sur le téléphone, **glisser vers la gauche** sur Maintenant ouvre la Synthèse, **vers la droite**
-  revient à Maintenant.
+- **Plusieurs synthèses** possibles (ex. « Chambres », « Extérieur », « Congélateurs ») : chacune a
+  son nom, ses emplacements et sa durée. Boutons en haut à droite : **⚙ réglages** de la synthèse
+  affichée, **+** nouvelle synthèse, **corbeille** pour la supprimer (il en reste toujours une).
+  Onglets sous le titre pour passer de l'une à l'autre.
+- Sur le téléphone, **glisser vers la gauche** sur Maintenant ouvre la première synthèse, puis la
+  suivante ; **vers la droite** revient en arrière jusqu'à Maintenant.
 - Le **curseur** (trait vertical) est à **maintenant** : la légende donne les valeurs actuelles,
   classées de la plus haute à la plus basse, avec leur **tendance** et une icône
   <img src="images/icones/alerte.svg" alt="⚠" height="16"> en cas d'alerte.
@@ -68,12 +72,13 @@ dans la page Courbes, sans réglage, et dessous (à côté en paysage) la **lég
 - **Mettre une courbe en évidence** : survoler sa ligne à la souris, ou toucher ses **valeurs** sur le
   téléphone (toucher de nouveau pour revenir) ; les autres courbes s'estompent. Le **nom** ouvre
   toujours la page de l'emplacement.
-- **Détails / options** : page Courbes, où se choisissent emplacements, période, grandeurs, rendu
-  et météo ; la Synthèse reprend ces choix.
+- **⚙ Réglages** : page « Réglages de la synthèse » (ci-dessous), propre à chaque synthèse.
 
-## Courbes
+## Réglages d'une synthèse
 
-Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-courbes)).
+Ouverts par **⚙** sur une synthèse : son **nom**, ses emplacements, sa durée, avec l'aperçu des
+courbes ([écran](#ecran-courbes)). **Terminé** revient à la synthèse. Les grandeurs affichées, le
+rendu et la météo de comparaison sont des préférences de l'appareil, communes à toutes les pages.
 
 - **Choisir les emplacements** en touchant leurs noms (12 courbes au plus).
 - **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
@@ -86,9 +91,12 @@ Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-cou
 - **Rendu** : *Escalier* (fidèle aux mesures), *Lissé*, *Simplifié* (sans les marches dues à
   l'arrondi du capteur).
 - Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran), jusqu'à 7 jours affichés.
-- **Temps long** (plus de 8 jours affichés) : au lieu des oscillations jour / nuit, chaque courbe devient
-  une **bande** entre le **minimum et le maximum de chaque jour**, remplie de sa couleur en plus léger ;
-  au-delà de 3 mois, une bande par **semaine** (moyennes des minimums et des maximums, comme les
+- **Temps long** : au lieu des oscillations jour / nuit, chaque courbe devient une **bande** entre le
+  **minimum et le maximum de chaque jour**, remplie de sa couleur en plus léger, avec un passage
+  progressif : à partir de 3 jours affichés la bande apparaît en fond, très légère ; au-delà de
+  7 jours elle passe au premier plan et la courbe détaillée s'estompe, jusqu'à disparaître au-delà
+  d'un mois (seuils réglables : **Options › Courbes sur le temps long**). Ce qui est en fond n'est
+  pas interactif. Au-delà de 3 mois, une bande par **semaine** (moyennes des minimums et des maximums, comme les
   normales des sites météo). L'infobulle donne « min – max ». Repères verticaux à la semaine, au mois
   ou à l'année ; seules les interruptions de mesure assez longues pour la période affichée sont
   grisées (sur un mois, quelques heures sans mesure ne coupent plus la courbe).
@@ -106,7 +114,7 @@ d'historique dès sa création.
   icône nuage), page avec courbes, tendances et **alertes** ; elle se range librement dans
   Admin › Emplacements (par exemple dans un groupe « Sites météo »). Elle ne compte pas dans la
   moyenne d'un groupe qui contient de vrais capteurs.
-- **Courbes**, page d'un emplacement et page d'un groupe : la première station est ajoutée en courbe
+- **Synthèses**, page d'un emplacement et page d'un groupe : la première station est ajoutée en courbe
   **grise en pointillés**, comprise dans l'infobulle. Bouton **Météo** (à côté de Température /
   Humidité) pour l'afficher ou la masquer.
 - **Prévisions** (7 jours, mises à jour toutes les 30 minutes) : la courbe d'une station se
@@ -252,7 +260,7 @@ l'agrandir.
 <a id="ecran-groupe" href="images/maintenant-groupe.jpg"><img src="images/maintenant-groupe.jpg" alt="Emplacement parent et moyenne" title="Emplacement parent et moyenne" width="150"></a>
 <a id="ecran-compact" href="images/maintenant-compact.jpg"><img src="images/maintenant-compact.jpg" alt="Présentation compacte" title="Présentation compacte" width="150"></a>
 <a id="ecran-synthese" href="images/synthese.jpg"><img src="images/synthese.jpg" alt="Synthèse" title="Synthèse : courbes et valeurs au curseur" width="150"></a>
-<a id="ecran-courbes" href="images/courbes.jpg"><img src="images/courbes.jpg" alt="Courbes : choix des emplacements" title="Courbes : choix des emplacements" width="150"></a>
+<a id="ecran-courbes" href="images/courbes.jpg"><img src="images/courbes.jpg" alt="Réglages d'une synthèse" title="Réglages d'une synthèse : choix des emplacements" width="150"></a>
 <a id="ecran-courbes-graphique" href="images/courbes-graphique.jpg"><img src="images/courbes-graphique.jpg" alt="Courbes superposées" title="Courbes superposées" width="150"></a>
 <a id="ecran-emplacement" href="images/emplacement.jpg"><img src="images/emplacement.jpg" alt="Page d'un emplacement" title="Page d'un emplacement" width="150"></a>
 <a id="ecran-emplacement-alertes" href="images/emplacement-alertes.jpg"><img src="images/emplacement-alertes.jpg" alt="Seuils d'alerte sur la courbe" title="Seuils d'alerte sur la courbe" width="150"></a>

@@ -40,7 +40,7 @@
       pushBusy = false;
     }
   }
-  import { display, resetTrend, setDensity, setText, setTrend, setValueStyle, type Density, type TextSize, type ValueStyle } from "../lib/display.svelte";
+  import { display, resetTrend, setDensity, setLongView, setText, setTrend, setValueStyle, type Density, type TextSize, type ValueStyle } from "../lib/display.svelte";
 
   const WINDOWS = [{ v: 30, label: "30 min" }, { v: 60, label: "1 h" }, { v: 120, label: "2 h" }];
   const SENSITIVITIES = [{ v: 1.6, label: "Faible" }, { v: 1, label: "Normale" }, { v: 0.6, label: "Forte" }];
@@ -185,6 +185,25 @@
     <div><button onclick={resetTrend}>Valeurs par défaut</button></div>
   </section>
 
+  <section class="card stack" id="temps-long">
+    <h2 style="margin:0">Courbes sur le temps long</h2>
+    <p class="muted" style="margin:0">Selon la durée affichée, la courbe détaillée laisse progressivement la place à une
+      bande entre le minimum et le maximum de chaque jour (par semaine au-delà de 3 mois). Ce qui passe en fond
+      s'estompe et n'est plus interactif.</p>
+    <div class="lv">
+      <label>Bande en fond à partir de
+        <span><input type="number" min="1" max="365" step="1" value={display.longview.bandFrom}
+                     onchange={(e) => setLongView({ bandFrom: Number((e.currentTarget as HTMLInputElement).value) })} /> jours</span></label>
+      <label>Bande au premier plan au-delà de
+        <span><input type="number" min="1" max="365" step="1" value={display.longview.bandFull}
+                     onchange={(e) => setLongView({ bandFull: Number((e.currentTarget as HTMLInputElement).value) })} /> jours</span></label>
+      <label>Courbe détaillée en fond jusqu'à
+        <span><input type="number" min="1" max="730" step="1" value={display.longview.rawUntil}
+                     onchange={(e) => setLongView({ rawUntil: Number((e.currentTarget as HTMLInputElement).value) })} /> jours</span></label>
+    </div>
+    <div><button onclick={() => setLongView(null)}>Valeurs par défaut</button></div>
+  </section>
+
   <section class="card stack" id="maintenant">
     <h2 style="margin:0">Page Maintenant</h2>
     <p class="muted" style="margin:0">Fiches affichées sur cet appareil, pour la maison « {ctx.homes.find((h) => h.id === ctx.homeId)?.name} ».
@@ -236,6 +255,9 @@
 </div>
 
 <style>
+  .lv { display: grid; gap: 0.5rem; }
+  .lv label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 0.75rem; }
+  .lv input { width: 5rem; }
   .legend-z { display: inline-flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; margin: 0.25rem 0; font-weight: 600; }
   .now-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
   .now-list label { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2rem; }

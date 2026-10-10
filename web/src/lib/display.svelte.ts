@@ -4,6 +4,7 @@
 
 import type { CurveMode } from "./curve";
 import { TREND_DEFAULTS, type TrendOptions } from "./trend";
+import { LONGVIEW_DEFAULTS, normLongView, type LongView } from "./longview";
 
 const STORE = "mobalplus.display";
 const MODES: CurveMode[] = ["step", "smooth", "simple"];
@@ -29,6 +30,8 @@ export const display = $state({
   /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement) */
   nowHidden: {} as Record<string, number[]>,
   trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
+  /** Temps long : seuils (en jours) du passage de la courbe détaillée à la bande min – max */
+  longview: { ...LONGVIEW_DEFAULTS } as LongView,
 });
 
 try {
@@ -39,6 +42,7 @@ try {
   if (VALUE_STYLES.includes(saved.values)) display.values = saved.values;
   if (typeof saved.weather === "boolean") display.weather = saved.weather;
   if (typeof saved.forecast === "boolean") display.forecast = saved.forecast;
+  if (saved.longview && typeof saved.longview === "object") display.longview = normLongView(saved.longview);
   if (saved.nowHidden && typeof saved.nowHidden === "object") display.nowHidden = saved.nowHidden;
   if (saved.trend && typeof saved.trend === "object") {
     const t = saved.trend;
@@ -107,6 +111,11 @@ export function setNowHidden(homeId: number | null, key: number, hidden: boolean
 
 export function setWeather(on: boolean) {
   display.weather = on;
+  save();
+}
+
+export function setLongView(patch: Partial<LongView> | null) {
+  display.longview = patch ? normLongView({ ...display.longview, ...patch }) : { ...LONGVIEW_DEFAULTS };
   save();
 }
 

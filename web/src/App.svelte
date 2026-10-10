@@ -6,6 +6,7 @@
   import Now from "./pages/Now.svelte";
   import Charts from "./pages/Charts.svelte";
   import Summary from "./pages/Summary.svelte";
+  import { listDashboards } from "./lib/dashboards";
   import Dashboard from "./pages/Dashboard.svelte";
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
@@ -68,7 +69,6 @@
   const main: { href: Route; label: string; icon: string; wide?: boolean }[] = [
     { href: "/", label: "Maintenant", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 8v4l3 2" },
     { href: "/synthese", label: "Synthèse", icon: "M4 4h16v9H4zM4 13l4-4 3 2 4-4 5 4M4 17h7M4 20h5M15 17h5M15 20h3" },
-    { href: "/courbes", label: "Courbes", icon: "M3 17l5-6 4 3 5-7 4 4" },
     { href: "/donnees", label: "Données", icon: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14", wide: true },
     { href: "/admin", label: "Admin", icon: "M4 6h16M4 12h16M4 18h10" },
     { href: "/aide", label: "Aide", icon: "M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" },
@@ -87,13 +87,20 @@
   const showAdmin = $derived(adminTabs.length > 0 || narrow);
   const adminActive = $derived(isAdminRoute || (narrow && router.route === "/donnees"));
 
-  // Téléphone : glisser horizontalement passe de Maintenant à Synthèse et inversement
-  const SWIPE: Partial<Record<Route, { left?: Route; right?: Route }>> = { "/": { left: "/synthese" }, "/synthese": { right: "/" } };
+  // Téléphone : glisser horizontalement passe de Maintenant aux synthèses, puis d'une synthèse à la suivante
+  function swipeTarget(dir: "left" | "right"): string | null {
+    const ids = listDashboards(ctx.homeId).map((d) => d.id);
+    if (router.route === "/") return dir === "left" ? `/synthese/${encodeURIComponent(ids[0])}` : null;
+    if (router.route !== "/synthese") return null;
+    const i = Math.max(0, ids.indexOf(router.param ?? ids[0]));
+    const j = dir === "left" ? i + 1 : i - 1;
+    return j < 0 ? "/" : j < ids.length ? `/synthese/${encodeURIComponent(ids[j])}` : null;
+  }
   let touch: { x: number; y: number; t: number } | null = null;
   function onTouchStart(e: TouchEvent) {
     const target = e.target as HTMLElement;
     // Pas depuis une courbe (curseur), un champ ou une zone qui défile horizontalement
-    touch = !narrow || e.touches.length !== 1 || !SWIPE[router.route]
+    touch = !narrow || e.touches.length !== 1 || (router.route !== "/" && router.route !== "/synthese")
       || target.closest(".box, input, select, textarea, .table-wrap, .tabs, [data-noswipe]")
       ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
   }
@@ -103,7 +110,7 @@
     const fast = Date.now() - touch.t < 700;
     touch = null;
     if (!fast || Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy)) return;
-    const to = SWIPE[router.route]?.[dx < 0 ? "left" : "right"];
+    const to = swipeTarget(dx < 0 ? "left" : "right");
     if (to) location.hash = "#" + to;
   }
 </script>
@@ -150,7 +157,8 @@
     <nav class="main-nav" aria-label="Navigation principale">
       {#each main.filter((m) => (m.href !== "/admin" || showAdmin) && !(m.wide && narrow)) as item (item.href)}
         {@const active = item.href === "/admin" ? adminActive
-          : item.href === "/" ? router.route === "/" || router.route === "/lieu" : router.route === item.href}
+          : item.href === "/" ? router.route === "/" || router.route === "/lieu"
+          : item.href === "/synthese" ? router.route === "/synthese" || router.route === "/courbes" : router.route === item.href}
         <a href={"#" + item.href} class:active aria-current={active ? "page" : undefined}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d={item.icon} /></svg>
           <span>{item.label}</span>
@@ -185,9 +193,9 @@
               {:else}<Maintenance />{/if}
             {/if}
           {:else if router.route === "/courbes"}
-            <Charts />
+            {#key router.query.get("d")}<Charts />{/key}
           {:else if router.route === "/synthese"}
-            <Summary />
+            {#key router.param}<Summary dashboardId={router.param} />{/key}
           {:else if router.route === "/alertes"}
             <Alerts />
           {:else if router.route === "/aide"}

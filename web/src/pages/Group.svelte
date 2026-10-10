@@ -6,7 +6,8 @@
   import { fmtAgo, fmtValue, isStale } from "../lib/format";
   import { canEdit } from "../lib/home.svelte";
   import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
-  import { averageBands, isBand, type DayBand } from "../lib/longview";
+  import { averageBands, bandMain, type DayBand } from "../lib/longview";
+  import { loadCurves, otherView } from "../lib/curveload";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import { computeTrend } from "../lib/trend";
   import { rulesBySeries, zoneOf } from "../lib/zones";
@@ -48,7 +49,9 @@
   let data = $state(new Map<number, Point[]>());
   /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
   let bands = $state(new Map<number, DayBand[]>());
-  let bandMode = $state(false);
+  let loadedKey = $state("");
+  /** Bande min – max au premier plan (fenêtre large) ; la courbe détaillée passe en fond */
+  const bandMode = $derived(bandMain(win, display.longview));
   let history = $state(new Map<number, Point[]>());
   let loading = $state(false);
   let error = $state("");
@@ -62,12 +65,11 @@
     const id = ++reqId;
     loading = true;
     try {
-      const band = isBand(win);
-      const res = band ? await api.seriesDaily(ids(), range[0], range[1]) : await api.seriesData(ids(), range[0], range[1]);
+      const r = await loadCurves(ids(), range, win);
       if (id !== reqId) return;
-      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
-      else { data = res as Map<number, Point[]>; bands = new Map(); }
-      bandMode = band;
+      data = r.data;
+      bands = r.bands;
+      loadedKey = r.key;
       loaded = range;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -92,12 +94,15 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });
+
+  // Seuils du temps long modifiés : données d'une autre nature à charger
+  $effect(() => { void display.longview; if (loadedKey && otherView(win, loadedKey)) load(loadRange(win)); });
 
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
+    if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
   }
   // Grandeur réaffichée : ses mesures n'ont pas été chargées
   let shown = "";
@@ -134,15 +139,15 @@
     for (const m of members) {
       const s = seriesOf(m.node.id, prop);
       if (s) curves.push({ id: s.id, name: m.node.id === placeId ? `${m.node.name} (capteur propre)` : m.node.name, color: m.color,
-                           points: data.get(s.id) ?? [], ...(bandMode ? { band: bands.get(s.id) ?? [] } : {}) });
+                           points: data.get(s.id) ?? [], ...(bands.has(s.id) ? { band: bands.get(s.id) } : {}) });
     }
     if (!curves.length) return [];
     const p = properties.find((x) => x.code === prop)!;
     const unit = series.find((s) => s.property === prop)?.unit ?? "";
     if (curves.length > 1)
-      curves.unshift(bandMode
-        ? { id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: [], band: averageBands(curves.map((c) => c.band ?? [])) }
-        : { id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: averagePoints(curves.map((c) => c.points)) });
+      curves.unshift({ id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true,
+                       points: data.size ? averagePoints(curves.map((c) => c.points)) : [],
+                       ...(bands.size ? { band: averageBands(curves.map((c) => c.band ?? [])) } : {}) });
     curves.push(...weatherCurve(weather, prop, members.map((m) => m.node.id)));
     return [{ prop, title: p.name, unit, curves }];
   }));

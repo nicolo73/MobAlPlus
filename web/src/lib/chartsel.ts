@@ -1,29 +1,13 @@
-// Courbes choisies dans la page Courbes (emplacements, moyennes de groupes, couleurs, largeur de la
-// période), mémorisées par maison et reprises telles quelles par la page Synthèse.
+// Courbes choisies pour une page de synthèse (emplacements, moyennes de groupes, couleurs) et calcul
+// de leurs points ; les synthèses elles-mêmes sont dans dashboards.ts.
 
 import { slotColor } from "./colors";
 import { averagePoints, type PlaceNode } from "./placetree";
 import { averageBands, type DayBand } from "./longview";
 import type { Point, SeriesInfo } from "./types";
 
-const DAY = 86_400_000;
-const store = (homeId: number | null) => `mobalplus.charts.${homeId}`;
-
 /** Clé d'une courbe : identifiant de l'emplacement (ses mesures), ou son opposé (moyenne de sa branche) */
 export type Slots = Record<number, number>;
-
-export function readSelection(homeId: number | null): { slots: Slots; width: number } {
-  try {
-    const saved = JSON.parse(localStorage.getItem(store(homeId)) ?? "{}");
-    return { slots: saved.slots ?? {}, width: saved.width > 0 ? saved.width : DAY };
-  } catch {
-    return { slots: {}, width: DAY };
-  }
-}
-
-export function saveSelection(homeId: number | null, slots: Slots, width: number) {
-  try { localStorage.setItem(store(homeId), JSON.stringify({ slots, width })); } catch { /* stockage indisponible */ }
-}
 
 export const isParent = (n: PlaceNode) => n.children.length > 0;
 export const hasAvg = (n: PlaceNode) => isParent(n) && n.measured.length > 0;

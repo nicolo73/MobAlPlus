@@ -1,13 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { averageBands, gapThreshold, gridLines, isBand, scaleOf, weeklyBands } from "../src/lib/longview.ts";
+import { LONGVIEW_DEFAULTS as O, averageBands, bandMain, gapThreshold, ghostLevel, gridLines, needs, normLongView, scaleOf, weeklyBands } from "../src/lib/longview.ts";
 
 const H = 3_600_000, D = 24 * H;
 const NOW = Date.UTC(2026, 9, 10, 12);
 
-test("bandes min – max au-delà de 8 jours", () => {
-  assert.ok(!isBand([NOW - 7 * D, NOW]));
-  assert.ok(isBand([NOW - 30 * D, NOW]));
+test("passage progressif courbe → bande (3, 7, 30 jours par défaut)", () => {
+  const w = (days: number) => [NOW - days * D, NOW] as [number, number];
+  assert.deepEqual(needs(w(2), O), { raw: true, band: false });
+  assert.deepEqual(needs(w(5), O), { raw: true, band: true });
+  assert.deepEqual(needs(w(60), O), { raw: false, band: true });
+  assert.ok(!bandMain(w(5), O) && bandMain(w(10), O));
+  assert.equal(ghostLevel(w(3), O), 0);            // bande à peine visible
+  assert.equal(ghostLevel(w(5), O), 0.5);
+  assert.equal(ghostLevel(w(7), O), 1);            // bande pleinement là, courbe encore nette
+  assert.equal(ghostLevel(w(18.5), O), 0.5);       // courbe à moitié effacée
+  assert.equal(ghostLevel(w(30), O), 0);
+  // Seuils incohérents : remis dans l'ordre
+  assert.deepEqual(normLongView({ bandFrom: 10, bandFull: 5, rawUntil: -1 }), { bandFrom: 10, bandFull: 10, rawUntil: 30 });
 });
 
 test("seuil d'interruption : tient compte de la réduction des points et de la fenêtre", () => {

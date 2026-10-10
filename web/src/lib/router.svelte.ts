@@ -1,4 +1,4 @@
-// Routage par fragment d'URL (#/admin..., #/lieu/12, #/donnees?lieu=3) : aucune configuration côté hébergeur.
+// Routage par fragment d'URL (#/admin..., #/lieu/12, #/synthese/abc, #/courbes?d=abc, #/donnees?lieu=3) : aucune configuration côté hébergeur.
 
 export const routes = {
   "/": "Maintenant",
@@ -24,6 +24,8 @@ const read = (): { route: Route; param: string | null; query: URLSearchParams } 
   const query = new URLSearchParams(qs ?? "");
   const m = path.match(/^\/lieu\/([^/]+)$/);
   if (m) return { route: "/lieu", param: decodeURIComponent(m[1]), query };
+  const d = path.match(/^\/synthese\/([^/]+)$/);
+  if (d) return { route: "/synthese", param: decodeURIComponent(d[1]), query };
   return { route: (path in routes ? path : "/") as Route, param: null, query };
 };
 

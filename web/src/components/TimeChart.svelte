@@ -11,7 +11,8 @@
   import type { Window } from "../lib/period";
   import type { Point } from "../lib/types";
   import { GAP, curveData, valueAt, type CurveMode } from "../lib/curve";
-  import { WEEKLY_FROM, gridLines, scaleOf, weeklyBands, type DayBand } from "../lib/longview";
+  import { WEEKLY_FROM, bandMain, ghostLevel, gridLines, scaleOf, weeklyBands, type DayBand } from "../lib/longview";
+  import { display } from "../lib/display.svelte";
 
   export interface ChartSeries {
     id: number | string;
@@ -89,7 +90,8 @@
 
   const HOUR = 3_600_000;
   /** Échelle des repères et affichage des points : nouveau rendu quand elle change (zoom) */
-  const scaleKey = $derived(`${scaleOf(window)}-${window[1] - window[0] > 7.5 * 86_400_000}-${window[1] - window[0] > WEEKLY_FROM}`);
+  const scaleKey = $derived(`${scaleOf(window)}-${window[1] - window[0] > 7.5 * 86_400_000}-${window[1] - window[0] > WEEKLY_FROM}`
+    + `-${bandMain(window, display.longview)}-${Math.round(ghostLevel(window, display.longview) * 10)}`);
   /** Fin de la prévision la plus lointaine (0 sans prévision) */
   const futureEnd = $derived(Math.max(0, ...series.filter((s) => s.forecast).map((s) => s.points.at(-1)?.ts ?? 0)));
   /**
@@ -109,6 +111,12 @@
     // Repères verticaux selon la largeur visible ; au-delà d'une semaine, pas de points d'alerte
     // (trop nombreux) ni de quadrillage horaire
     const scale = scaleOf([ws, we]);
+    // Temps long : bande ou courbe détaillée au premier plan (interactive), l'autre en fond, estompée
+    const lv = display.longview;
+    // (fenêtre de la page, sans l'heure de prévision ajoutée : même choix que la légende de la page)
+    const bandFirst = bandMain(window, lv);
+    const ghost = ghostLevel(window, lv);
+    const asBand = (s: ChartSeries) => !!s.band?.length && (bandFirst || !s.points.length);
     const long = we - ws > 7.5 * 86_400_000;   // « 7 j » (plus l'heure de prévision) garde ses points
     // Étiquettes en bout de courbe de 2 à 4 séries ; une seule série est nommée par le titre
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
@@ -173,10 +181,10 @@
         formatter: (params: { axisValue: number }[]) => {
           const t = params[0]?.axisValue;
           if (t == null) return "";
-          const banded = series.some((s) => s.band);
+          const banded = series.some(asBand);
           const rows = prepared
             .map(({ s, data }) => {
-              if (s.band) { const b = bandAt(bandsOf(s), t); return { s, v: b?.max ?? null, text: b ? `${fmt(b.min)} – ${fmt(b.max)}` : "" }; }
+              if (asBand(s)) { const b = bandAt(bandsOf(s), t); return { s, v: b?.max ?? null, text: b ? `${fmt(b.min)} – ${fmt(b.max)}` : "" }; }
               const v = valueAt(data, t, curve !== "step");
               return { s, v, text: v === null ? "" : fmt(v) };
             })
@@ -207,7 +215,11 @@
             new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
           brushSelect: false },
       ],
-      series: [...withMarks(prepared.flatMap<object>(({ s, data }) => s.band ? bandSeries({ ...s, band: bandsOf(s) }, endLabels, muted, weekly) : [{
+      series: [...withMarks(prepared.flatMap<object>(({ s, data }) => asBand(s)
+        ? [...bandSeries({ ...s, band: bandsOf(s) }, endLabels, muted, weekly),
+           // courbe détaillée en fond, de plus en plus effacée
+           ...(s.points.length && ghost > 0 ? [ghostLine(s, data, ghost)] : [])]
+        : [...(s.band?.length && ghost > 0 ? bandSeries({ ...s, band: bandsOf(s) }, false, muted, weekly, ghost) : []), {
         id: String(s.id), name: s.name, type: "line",
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
@@ -287,6 +299,17 @@
     };
   }
 
+  /** Courbe détaillée en fond derrière la bande (temps long) : fine, estompée, sans interaction */
+  function ghostLine(s: ChartSeries, data: ReturnType<typeof curveData>, ghost: number) {
+    return {
+      id: `${s.id}-fond`, name: s.name, type: "line", silent: true, z: 1, showSymbol: false,
+      ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
+      emphasis: { disabled: true },
+      lineStyle: { width: 1, color: s.color, opacity: 0.08 + 0.5 * ghost, type: s.dotted ? [2, 3] : "solid" },
+      data,
+    };
+  }
+
   /** Seuils et périodes sans mesure, portés par la première courbe */
   function withMarks<T extends object>(list: T[], marks: object): T[] {
     return list.map((x, i) => (i === 0 ? { ...x, ...marks } : x));
@@ -296,22 +319,28 @@
    * Bande min – max d'une courbe (temps long) : minimum (trait fin), puis l'écart jusqu'au maximum
    * empilé dessus, rempli de la couleur de la courbe en plus léger ; le haut de l'empilement est le maximum.
    */
-  function bandSeries(s: ChartSeries, endLabels: boolean, muted: string, weekly: boolean) {
+  function bandSeries(s: ChartSeries, endLabels: boolean, muted: string, weekly: boolean, ghost?: number) {
     const band = s.band ?? [];
     const stack = `bande-${s.id}`;
     // Jour manquant : la bande s'interrompt
     const withBreaks = <V,>(f: (b: DayBand) => V) => band.flatMap((b, i) =>
       i > 0 && b.ts - band[i - 1].ts > (weekly ? 10 : 1.5) * 86_400_000 ? [[b.ts - 86_400_000, null], [b.ts, f(b)]] : [[b.ts, f(b)]]);
+    // En fond (avant le seuil « bande au premier plan ») : très léger, sans interaction
+    const bg = ghost !== undefined;
     const common = {
-      type: "line", stack, stackStrategy: "all", showSymbol: false, smooth: curve === "step" ? false : 0.3,
-      emphasis: { focus: "series", lineStyle: { width: 2.5 } }, blur: { lineStyle: { opacity: 0.18 }, areaStyle: { opacity: 0.05 } },
-      lineStyle: { width: 1.2, color: s.color, type: s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" },
+      type: "line", stack: bg ? `${stack}-fond` : stack, stackStrategy: "all", showSymbol: false, smooth: curve === "step" ? false : 0.3,
+      ...(bg ? { silent: true, z: 1, emphasis: { disabled: true } }
+             : { emphasis: { focus: "series", lineStyle: { width: 2.5 } } }),
+      blur: { lineStyle: { opacity: 0.18 }, areaStyle: { opacity: 0.05 } },
+      lineStyle: { width: bg ? 0.8 : 1.2, color: s.color, opacity: bg ? 0.08 + 0.22 * ghost! : 1,
+                   type: s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" },
       itemStyle: { color: s.color },
     };
+    const fill = (s.dotted ? 0.08 : 0.2) * (bg ? 0.15 + 0.45 * ghost! : 1);
     return [
-      { ...common, id: `${s.id}-min`, name: s.name, data: withBreaks((b) => b.min) },
-      { ...common, id: `${s.id}-range`, name: s.name, data: withBreaks((b) => b.max - b.min),
-        areaStyle: { color: s.color, opacity: s.dotted ? 0.08 : 0.2 },
+      { ...common, id: `${s.id}-${bg ? "fond-" : ""}min`, name: s.name, data: withBreaks((b) => b.min) },
+      { ...common, id: `${s.id}-${bg ? "fond-" : ""}range`, name: s.name, data: withBreaks((b) => b.max - b.min),
+        areaStyle: { color: s.color, opacity: fill },
         endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false } },
     ];
   }

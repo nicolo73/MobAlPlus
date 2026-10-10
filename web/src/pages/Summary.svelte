@@ -8,7 +8,9 @@
   import { fmtAgo, fmtValue } from "../lib/format";
   import { flatten, placeTree } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
-  import { isBand, type DayBand } from "../lib/longview";
+  import { addDashboard, getDashboard, listDashboards, removeDashboard, updateDashboard } from "../lib/dashboards";
+  import { bandMain, type DayBand } from "../lib/longview";
+  import { loadCurves, otherView } from "../lib/curveload";
   import { curveData, valueAt } from "../lib/curve";
   import { computeTrend } from "../lib/trend";
   import { describe, RECENT } from "../lib/alerts.svelte";
@@ -21,8 +23,14 @@
   import { display, visibleProps } from "../lib/display.svelte";
   import { ctx } from "../lib/home.svelte";
 
-  const saved = sel.readSelection(ctx.homeId);
-  let slots = $state<sel.Slots>(saved.slots);
+  let { dashboardId = null }: { dashboardId?: string | null } = $props();
+
+  // Synthèse affichée (il peut y en avoir plusieurs, chacune avec ses courbes) et la liste, pour en changer
+  // svelte-ignore state_referenced_locally
+  const dash = getDashboard(ctx.homeId, dashboardId);
+  const dashboards = listDashboards(ctx.homeId);
+  const saved = dash;
+  let slots = $state<sel.Slots>(dash.slots);
   let all = $state<SeriesInfo[] | null>(null);
   let placeList = $state<Place[]>([]);
   const initial: Window = [Date.now() - saved.width, Date.now()];
@@ -31,7 +39,9 @@
   let data = $state(new Map<number, Point[]>());
   /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
   let bands = $state(new Map<number, DayBand[]>());
-  let bandMode = $state(false);
+  let loadedKey = $state("");
+  /** Bande min – max au premier plan (fenêtre large) ; la courbe détaillée passe en fond */
+  const bandMode = $derived(bandMain(win, display.longview));
   let events = $state<AlertEvent[]>([]);
   /** Seuils d'alerte haut / bas des séries affichées : couleur des valeurs et des flèches */
   let rules = $state(new Map<number, AlertRule[]>());
@@ -65,7 +75,11 @@
       placeList = pl;
       all = series;
       slots = Object.fromEntries(Object.entries(slots).filter(([k]) => sel.validKey(byId, Number(k))));
-      if (!Object.keys(slots).length) slots = sel.defaultSlots(nodes);
+      // Première synthèse jamais réglée : les premiers emplacements ; une synthèse ajoutée reste à régler
+      if (!Object.keys(slots).length && dash.id === "principale" && dashboards.length === 1) {
+        slots = sel.defaultSlots(nodes);
+        updateDashboard(ctx.homeId, dash.id, { slots });
+      }
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -77,19 +91,18 @@
     const id = ++reqId;
     loading = true;
     try {
-      const band = isBand(win);
       const ids = sel.seriesIds(selected, seriesByPlace, visible);
-      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
+      const r = await loadCurves(ids, range, win);
       if (id !== reqId) return;
-      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
-      else { data = res as Map<number, Point[]>; bands = new Map(); }
-      bandMode = band;
+      data = r.data;
+      bands = r.bands;
+      loadedKey = r.key;
       loaded = range;
       now = Date.now();
       error = "";
       api.alertEvents({ since: range[0] }).then((e) => (events = e)).catch(() => (events = []));
       const st = primaryStation();
-      api.alertRules([...res.keys(), ...[st?.temperature, st?.humidity].filter((x): x is number => x != null)])
+      api.alertRules([...ids, ...[st?.temperature, st?.humidity].filter((x): x is number => x != null)])
         .then((r) => (rules = rulesBySeries(r))).catch(() => {});
     } catch (e) {
       if (id === reqId) error = e instanceof Error ? e.message : String(e);
@@ -98,10 +111,21 @@
     }
   }
 
+  // Seuils du temps long modifiés : données d'une autre nature à charger
+  $effect(() => { void display.longview; if (loadedKey && otherView(win, loadedKey)) load(loadRange(win)); });
+
   function setWindow(w: Window) {
     win = w;
-    sel.saveSelection(ctx.homeId, slots, w[1] - w[0]);
-    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
+    updateDashboard(ctx.homeId, dash.id, { width: w[1] - w[0] });
+    if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
+  }
+
+  function addNew() {
+    location.hash = `#/courbes?d=${encodeURIComponent(addDashboard(ctx.homeId))}`;
+  }
+  function remove() {
+    if (!confirm(`Supprimer la synthèse « ${dash.name} » ? Les mesures ne sont pas touchées.`)) return;
+    location.hash = `#/synthese/${encodeURIComponent(removeDashboard(ctx.homeId, dash.id))}`;
   }
 
   /** Curseur à moins de 2 % de la fenêtre de maintenant : « maintenant » ; au-delà, passé ou futur (prévisions) */
@@ -153,7 +177,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });
 
   // Stations météo choisies : leur prévision prolonge leur courbe
@@ -171,14 +195,11 @@
     const curves: ChartSeries[] = [];
     for (const c of selected) {
       const base = { id: c.key, name: c.name, color: colorOf(c.key) };
-      if (bandMode) {
-        const band = sel.curveBand(c, p.code, seriesByPlace, bands);
-        if (band) curves.push({ ...base, points: [], band, dashed: c.avg });
-        continue;
-      }
+      const band = bands.size ? sel.curveBand(c, p.code, seriesByPlace, bands) : null;
       const points = sel.curvePoints(c, p.code, seriesByPlace, data);
-      if (!points) continue;
-      curves.push({ ...base, points, dashed: c.avg });
+      if (!points && !band) continue;
+      curves.push({ ...base, points: points ?? [], ...(band ? { band } : {}), dashed: c.avg });
+      if (!points?.length) continue;
       const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === p.code)?.id;
       if (sid !== undefined && forecast.has(sid)) curves.push(...forecastCurve(base, points, forecast.get(sid)));
     }
@@ -216,7 +237,7 @@
         if (!keys.has(k)) keys.set(k, { id: sc?.key ?? s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
                                          places: sc?.places ?? [], values: new Map() });
         if (s.forecast && at <= now) continue;
-        if (s.band) {
+        if (s.band && bandMode) {
           // Temps long : minimum et maximum du jour sous le curseur
           const day = s.band.find((b) => Math.abs(b.ts - at) <= 12 * 3_600_000);
           keys.get(k)!.values.set(c.code, { v: day?.max ?? null, pts: [], day });
@@ -266,17 +287,39 @@
 
 <div class="stack summary">
   <div class="row head">
-    <h1 style="margin:0">Synthèse</h1>
+    <h1 style="margin:0">{dash.name}</h1>
     <span class="spacer"></span>
-    <a href="#/courbes" class="btn" title="Choix des emplacements, période, rendu et autres options">Détails / options</a>
+    <div class="tools">
+      <a href="#/courbes?d={encodeURIComponent(dash.id)}" class="icon-btn" title="Réglages de cette synthèse : emplacements, période, rendu…"
+         aria-label="Réglages de cette synthèse">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path
+          d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+      </a>
+      <button class="icon-btn" title="Nouvelle synthèse" aria-label="Nouvelle synthèse" onclick={addNew}>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      </button>
+      {#if dashboards.length > 1}
+        <button class="icon-btn" title="Supprimer cette synthèse" aria-label="Supprimer cette synthèse" onclick={remove}>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+        </button>
+      {/if}
+    </div>
   </div>
+  {#if dashboards.length > 1}
+    <!-- Autres synthèses (glisser à gauche / à droite pour passer de l'une à l'autre sur téléphone) -->
+    <nav class="dash-tabs" aria-label="Synthèses" data-noswipe>
+      {#each dashboards as d (d.id)}
+        <a href="#/synthese/{encodeURIComponent(d.id)}" class:active={d.id === dash.id} aria-current={d.id === dash.id ? "page" : undefined}>{d.name}</a>
+      {/each}
+    </nav>
+  {/if}
 
   {#if error}<div class="notice err" role="alert">{error}</div>{/if}
 
   {#if all === null}
     <p class="muted">Chargement…</p>
   {:else if !selected.length || !charts.length}
-    <div class="card">Aucune courbe choisie : <a href="#/courbes">choisir des emplacements</a>.</div>
+    <div class="card">Aucune courbe choisie : <a href="#/courbes?d={encodeURIComponent(dash.id)}">choisir des emplacements</a>.</div>
   {:else}
     <div class="panels" class:landscape>
       <div class="charts">
@@ -351,6 +394,16 @@
 
 <style>
   .head { flex-wrap: nowrap; }
+  .head h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tools { display: flex; gap: 0.25rem; flex: none; }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.25rem; min-width: 2.25rem;
+              padding: 0.3rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); }
+  .icon-btn:hover { color: var(--text); }
+  .icon-btn svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .dash-tabs { display: flex; gap: 0.35rem; overflow-x: auto; margin-top: -0.25rem; }
+  .dash-tabs a { flex: none; padding: 0.3rem 0.75rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+                 text-decoration: none; font-size: 0.9rem; white-space: nowrap; }
+  .dash-tabs a.active { color: var(--primary); border-color: var(--primary); font-weight: 600; background: var(--primary-soft); }
   .panels { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
   .panels.landscape { grid-template-columns: minmax(0, 1fr) minmax(15rem, 24rem); align-items: start; }
   .charts { display: grid; gap: 0.75rem; min-width: 0; }

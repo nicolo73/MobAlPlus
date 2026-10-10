@@ -6,7 +6,10 @@
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
-  import { isBand, type DayBand } from "../lib/longview";
+  import { getDashboard, updateDashboard } from "../lib/dashboards";
+  import { router } from "../lib/router.svelte";
+  import { bandMain, type DayBand } from "../lib/longview";
+  import { loadCurves, otherView } from "../lib/curveload";
   import type { AlertEvent } from "../lib/types";
   import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
@@ -17,8 +20,16 @@
 
   import { ctx } from "../lib/home.svelte";
 
-  // Sélection mémorisée par maison (reprise par la page Synthèse)
-  const saved = sel.readSelection(ctx.homeId);
+  // Réglages d'une synthèse (#/courbes?d=…) : ses courbes, sa durée et son nom
+  const dash = getDashboard(ctx.homeId, router.query.get("d"));
+  const saved = dash;
+  let dashName = $state(dash.name);
+  const backHref = `#/synthese/${encodeURIComponent(dash.id)}`;
+  function rename() {
+    const name = dashName.trim() || dash.name;
+    dashName = name;
+    updateDashboard(ctx.homeId, dash.id, { name });
+  }
 
   let all = $state<SeriesInfo[] | null>(null);
   let placeList = $state<Place[]>([]);
@@ -32,12 +43,14 @@
   let data = $state(new Map<number, Point[]>());
   /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
   let bands = $state(new Map<number, DayBand[]>());
-  let bandMode = $state(false);
+  let loadedKey = $state("");
+  /** Bande min – max au premier plan (fenêtre large) ; la courbe détaillée passe en fond */
+  const bandMode = $derived(bandMain(win, display.longview));
   let loading = $state(false);
   let dark = $state(isDark());
   let reqId = 0;
 
-  $effect(() => sel.saveSelection(ctx.homeId, slots, win[1] - win[0]));
+  $effect(() => updateDashboard(ctx.homeId, dash.id, { slots: $state.snapshot(slots), width: win[1] - win[0] }));
 
   $effect(() => {
     const m = matchMedia("(prefers-color-scheme: dark)");
@@ -84,7 +97,7 @@
       all = series;
       // Première visite : les premiers emplacements mesurés (4 au plus, pour garder des courbes lisibles)
       slots = Object.fromEntries(Object.entries(slots).filter(([k]) => validKey(Number(k))));
-      if (!Object.keys(slots).length) slots = sel.defaultSlots(nodes);
+      if (!Object.keys(slots).length && dash.id === "principale") slots = sel.defaultSlots(nodes);
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -111,7 +124,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, { raw: loadedKey.includes("r"), band: loadedKey.includes("b") }).then((w) => (weather = w));
   });
 
   // Prévision des stations météo choisies
@@ -141,12 +154,11 @@
     const id = ++reqId;
     loading = true;
     try {
-      const band = isBand(win);
-      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
+      const r = await loadCurves(ids, range, win);
       if (id !== reqId) return;
-      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
-      else { data = res as Map<number, Point[]>; bands = new Map(); }
-      bandMode = band;
+      data = r.data;
+      bands = r.bands;
+      loadedKey = r.key;
       loaded = range;
       loadEvents(range[0]);
       error = "";
@@ -157,9 +169,12 @@
     }
   }
 
+  // Seuils du temps long modifiés : données d'une autre nature à charger
+  $effect(() => { void display.longview; if (loadedKey && otherView(win, loadedKey)) load(loadRange(win)); });
+
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
+    if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
   }
 
   // Grandeur réaffichée : ses mesures n'ont pas été chargées
@@ -182,14 +197,12 @@
     for (const c of selected) {
       for (const [prop, chart] of byProp) {
         const base = { id: c.key, name: c.name, color: colorOf(c.key) };
-        if (bandMode) {
-          const band = sel.curveBand(c, prop, seriesByPlace, bands);
-          if (band) chart.series.push({ ...base, points: [], band, dashed: c.avg });
-          continue;
-        }
+        // Mesures détaillées et / ou bande min – max (le graphique choisit ce qui est au premier plan)
+        const band = bands.size ? sel.curveBand(c, prop, seriesByPlace, bands) : null;
         const points = curvePoints(c, prop);
-        if (!points) continue;
-        chart.series.push({ ...base, points, dashed: c.avg });
+        if (!points && !band) continue;
+        chart.series.push({ ...base, points: points ?? [], ...(band ? { band } : {}), dashed: c.avg });
+        if (!points?.length) continue;
         // Station météo : sa prévision prolonge sa courbe
         const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === prop)?.id;
         if (sid !== undefined && forecast.has(sid)) chart.series.push(...forecastCurve(base, points, forecast.get(sid)));
@@ -226,7 +239,19 @@
 </script>
 
 <div class="stack">
-  <div class="row"><h1 style="margin:0">Courbes</h1><span class="spacer"></span><a href="#/synthese" class="btn">Synthèse</a></div>
+  <div class="row">
+    <a href={backHref} class="back">‹ Synthèse</a>
+    <span class="spacer"></span>
+    <a href={backHref} class="btn primary">Terminé</a>
+  </div>
+  <div class="row name">
+    <h1 style="margin:0">Réglages de la synthèse</h1>
+    <label class="name-field">Nom
+      <input bind:value={dashName} onchange={rename} onblur={rename} maxlength="40" />
+    </label>
+  </div>
+  <small class="muted">Emplacements, durée, grandeurs et rendu de cette page de synthèse. Une autre synthèse se crée avec
+    le bouton + de la page Synthèse.</small>
 
   <PeriodBar window={win} onchange={setWindow} {loading} />
 
@@ -325,6 +350,10 @@
 </div>
 
 <style>
+  .back { text-decoration: none; font-weight: 600; }
+  .name { align-items: end; }
+  .name-field { display: flex; align-items: center; gap: 0.5rem; }
+  .name-field input { width: 14rem; max-width: 60vw; }
   td.num { white-space: nowrap; }
   .places { display: grid; gap: 0.5rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }

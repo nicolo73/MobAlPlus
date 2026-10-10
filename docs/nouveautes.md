@@ -6,6 +6,11 @@
 
 
 ## 10 octobre 2026
+- **Plusieurs synthèses** : chacune avec son nom, ses emplacements et sa durée ; boutons ⚙ (réglages),
+  + (nouvelle), corbeille ; onglets, et glisser d'une synthèse à l'autre sur le téléphone. La page
+  Courbes devient la page de réglages de la synthèse (menu « Courbes » retiré).
+- Temps long : **passage progressif** de la courbe à la bande min – max (bande en fond dès 3 jours,
+  au premier plan au-delà de 7 jours, courbe détaillée estompée jusqu'à 1 mois) ; seuils dans Options.
 - **Courbes sur le temps long** (plus de 8 jours) : une **bande min – max par jour** (par semaine
   au-delà de 3 mois) au lieu des oscillations jour / nuit ; repères à la semaine, au mois ou à
   l'année ; points d'alerte masqués au-delà de 7 jours ; fausses interruptions corrigées (elles
