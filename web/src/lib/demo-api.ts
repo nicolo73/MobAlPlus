@@ -7,6 +7,7 @@ import type {
   AlertEvent, AlertLevel, AlertRule,
 } from "./types";
 import { evaluateForecast, evaluateRule } from "./alerteval";
+import { dayNoon, type DayBand } from "./longview";
 
 const PROPS: Property[] = [
   { id: 1, code: "temperature", name: "Température", unit: "°C", simplify_tolerance: 0.2 },
@@ -203,6 +204,22 @@ export class DemoApi implements Api {
   }
 
   async seriesList() { return delay(series()); }
+
+  async seriesDaily(ids: number[], from: number, to: number) {
+    const out = new Map<number, DayBand[]>();
+    for (const id of ids) {
+      const days = new Map<string, number[]>();
+      for (const p of rawPoints(id, from, to)) {
+        const d = new Date(p.ts);
+        const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+        days.set(key, [...(days.get(key) ?? []), p.value]);
+      }
+      out.set(id, [...days].map(([day, vs]) => ({
+        ts: dayNoon(day), min: Math.min(...vs), max: Math.max(...vs), avg: vs.reduce((t, v) => t + v, 0) / vs.length,
+      })).sort((a, b) => a.ts - b.ts));
+    }
+    return delay(out);
+  }
 
   /** Prévision fictive des stations météo : valeur fictive à venir, légèrement décalée, à l'heure */
   async seriesForecast(ids: number[], from: number, to: number) {

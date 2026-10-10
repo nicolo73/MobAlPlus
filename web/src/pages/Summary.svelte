@@ -8,6 +8,7 @@
   import { fmtAgo, fmtValue } from "../lib/format";
   import { flatten, placeTree } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
+  import { isBand, type DayBand } from "../lib/longview";
   import { curveData, valueAt } from "../lib/curve";
   import { computeTrend } from "../lib/trend";
   import { describe, RECENT } from "../lib/alerts.svelte";
@@ -28,6 +29,9 @@
   let win = $state<Window>(initial);
   let loaded = $state<Window>(loadRange(initial));
   let data = $state(new Map<number, Point[]>());
+  /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
+  let bands = $state(new Map<number, DayBand[]>());
+  let bandMode = $state(false);
   let events = $state<AlertEvent[]>([]);
   /** Seuils d'alerte haut / bas des séries affichées : couleur des valeurs et des flèches */
   let rules = $state(new Map<number, AlertRule[]>());
@@ -73,9 +77,13 @@
     const id = ++reqId;
     loading = true;
     try {
-      const res = await api.seriesData(sel.seriesIds(selected, seriesByPlace, visible), range[0], range[1]);
+      const band = isBand(win);
+      const ids = sel.seriesIds(selected, seriesByPlace, visible);
+      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
       if (id !== reqId) return;
-      data = res;
+      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
+      else { data = res as Map<number, Point[]>; bands = new Map(); }
+      bandMode = band;
       loaded = range;
       now = Date.now();
       error = "";
@@ -93,7 +101,7 @@
   function setWindow(w: Window) {
     win = w;
     sel.saveSelection(ctx.homeId, slots, w[1] - w[0]);
-    if (needsReload(w, loaded)) load(loadRange(w));
+    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
   }
 
   /** Curseur à moins de 2 % de la fenêtre de maintenant : « maintenant » ; au-delà, passé ou futur (prévisions) */
@@ -145,7 +153,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
   });
 
   // Stations météo choisies : leur prévision prolonge leur courbe
@@ -162,9 +170,14 @@
   const charts = $derived(shownProps.map((p) => {
     const curves: ChartSeries[] = [];
     for (const c of selected) {
+      const base = { id: c.key, name: c.name, color: colorOf(c.key) };
+      if (bandMode) {
+        const band = sel.curveBand(c, p.code, seriesByPlace, bands);
+        if (band) curves.push({ ...base, points: [], band, dashed: c.avg });
+        continue;
+      }
       const points = sel.curvePoints(c, p.code, seriesByPlace, data);
       if (!points) continue;
-      const base = { id: c.key, name: c.name, color: colorOf(c.key) };
       curves.push({ ...base, points, dashed: c.avg });
       const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === p.code)?.id;
       if (sid !== undefined && forecast.has(sid)) curves.push(...forecastCurve(base, points, forecast.get(sid)));
@@ -194,7 +207,7 @@
   /** Légende : une ligne par courbe, valeurs à l'instant choisi, tendance et alerte */
   const rows = $derived.by(() => {
     const keys = new Map<string, { id: string | number; name: string; color: string; dashed?: boolean; dotted?: boolean;
-                                   places: number[]; values: Map<string, { v: number | null; pts: Point[] }> }>();
+                                   places: number[]; values: Map<string, { v: number | null; pts: Point[]; day?: DayBand }> }>();
     for (const c of charts) {
       for (const s of c.curves) {
         // Une ligne par emplacement : sa prévision donne la valeur quand le curseur est dans le futur
@@ -203,6 +216,12 @@
         if (!keys.has(k)) keys.set(k, { id: sc?.key ?? s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
                                          places: sc?.places ?? [], values: new Map() });
         if (s.forecast && at <= now) continue;
+        if (s.band) {
+          // Temps long : minimum et maximum du jour sous le curseur
+          const day = s.band.find((b) => Math.abs(b.ts - at) <= 12 * 3_600_000);
+          keys.get(k)!.values.set(c.code, { v: day?.max ?? null, pts: [], day });
+          continue;
+        }
         const v = valueAt(curveData(s.points, display.curve), at, display.curve !== "step" || !!s.forecast, 3 * 3_600_000);
         if (s.forecast && v === null) continue;
         keys.get(k)!.values.set(c.code, { v, pts: s.points });
@@ -236,6 +255,12 @@
     const m = Math.max(0, (t - Date.now()) / 60_000);
     return m < 60 ? `dans ${Math.round(m)} min` : m < 1440 ? `dans ${Math.round(m / 60)} h` : `dans ${Math.round(m / 1440)} j`;
   };
+  const fmtDay = (t: number) => new Date(t).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  /** Nombre seul (sans unité), à la précision de la grandeur */
+  const numOnly = (v: number, unit: string) => {
+    const d = unit === "%" ? 0 : 1;
+    return v.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
   const unitOf = (prop: string) => properties.find((p) => p.code === prop)?.unit ?? "";
 </script>
 
@@ -267,11 +292,12 @@
 
       <section class="card legend" aria-live="polite">
         <div class="when">
-          <strong>{cursor === null ? "Maintenant" : fmtTime(at)}</strong>
+          <strong>{cursor === null ? (bandMode ? "Aujourd'hui" : "Maintenant") : bandMode ? fmtDay(at) : fmtTime(at)}</strong>
+          {#if bandMode}<small class="muted">min – max du jour ({shownProps.map((p) => p.unit).join(", ")})</small>{/if}
           {#if cursor !== null}
             <small class="muted">{at > Date.now() ? `prévision, ${fmtIn(at)}` : fmtAgo(new Date(at).toISOString(), Date.now())}</small>
             <button class="link" onclick={() => (cursor = null)}>maintenant ›</button>
-          {:else}
+          {:else if !bandMode}
             <small class="muted">{new Date(now).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</small>
           {/if}
         </div>
@@ -301,7 +327,12 @@
                 {@const v = x && x.v !== null ? Math.round(x.v * 10) / 10 : null}
                 {@const tone = trendTone(v, tr, rs, p.code)}
                 <span class="val {p.code}">
+                  {#if x?.day}
+                    <!-- Temps long : minimum – maximum du jour (fond selon la valeur la plus à risque) -->
+                    <span class="num range zv {zoneOf(x.day.max, rs) ?? zoneOf(x.day.min, rs) ?? ''}" title="minimum – maximum du jour">{numOnly(x.day.min, unitOf(p.code))}–{numOnly(x.day.max, unitOf(p.code))}</span>
+                  {:else}
                   <span class="num zv {zoneOf(v, rs) ?? ''}" class:worse={tone?.startsWith("worse")}>{v !== null ? fmtValue(v, unitOf(p.code)) : "–"}</span>
+                  {/if}
                   <span class="arrow">{#if tr}<TrendArrow trend={tr} unit={unitOf(p.code)} {tone} />{/if}</span>
                 </span>
               {/each}
@@ -347,6 +378,7 @@
   .val .num { display: flex; align-items: center; justify-content: flex-end; font-weight: 700; min-width: 3.6rem;
               padding: 0 0.5rem; }
   .val .arrow { align-self: center; }
+  .val .num.range { font-size: 0.85rem; white-space: nowrap; }
   .val.temperature .num { color: var(--val-temp); }
   .val.humidity .num { color: var(--val-hum); min-width: 2.8rem; }
   .arrow { display: inline-flex; width: 1.2rem; justify-content: center; font-size: 0.9rem; }

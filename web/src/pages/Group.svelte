@@ -6,6 +6,7 @@
   import { fmtAgo, fmtValue, isStale } from "../lib/format";
   import { canEdit } from "../lib/home.svelte";
   import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
+  import { averageBands, isBand, type DayBand } from "../lib/longview";
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import { computeTrend } from "../lib/trend";
   import { rulesBySeries, zoneOf } from "../lib/zones";
@@ -45,6 +46,9 @@
   let win = $state<Window>([Date.now() - DAY, Date.now()]);
   let loaded = $state<Window>(loadRange([Date.now() - DAY, Date.now()]));
   let data = $state(new Map<number, Point[]>());
+  /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
+  let bands = $state(new Map<number, DayBand[]>());
+  let bandMode = $state(false);
   let history = $state(new Map<number, Point[]>());
   let loading = $state(false);
   let error = $state("");
@@ -58,9 +62,12 @@
     const id = ++reqId;
     loading = true;
     try {
-      const res = await api.seriesData(ids(), range[0], range[1]);
+      const band = isBand(win);
+      const res = band ? await api.seriesDaily(ids(), range[0], range[1]) : await api.seriesData(ids(), range[0], range[1]);
       if (id !== reqId) return;
-      data = res;
+      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
+      else { data = res as Map<number, Point[]>; bands = new Map(); }
+      bandMode = band;
       loaded = range;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -85,12 +92,12 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
   });
 
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded)) load(loadRange(w));
+    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
   }
   // Grandeur réaffichée : ses mesures n'ont pas été chargées
   let shown = "";
@@ -126,13 +133,16 @@
     const curves: ChartSeries[] = [];
     for (const m of members) {
       const s = seriesOf(m.node.id, prop);
-      if (s) curves.push({ id: s.id, name: m.node.id === placeId ? `${m.node.name} (capteur propre)` : m.node.name, color: m.color, points: data.get(s.id) ?? [] });
+      if (s) curves.push({ id: s.id, name: m.node.id === placeId ? `${m.node.name} (capteur propre)` : m.node.name, color: m.color,
+                           points: data.get(s.id) ?? [], ...(bandMode ? { band: bands.get(s.id) ?? [] } : {}) });
     }
     if (!curves.length) return [];
     const p = properties.find((x) => x.code === prop)!;
     const unit = series.find((s) => s.property === prop)?.unit ?? "";
     if (curves.length > 1)
-      curves.unshift({ id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: averagePoints(curves.map((c) => c.points)) });
+      curves.unshift(bandMode
+        ? { id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: [], band: averageBands(curves.map((c) => c.band ?? [])) }
+        : { id: `avg-${prop}`, name: "Moyenne", color: groupColor, dashed: true, points: averagePoints(curves.map((c) => c.points)) });
     curves.push(...weatherCurve(weather, prop, members.map((m) => m.node.id)));
     return [{ prop, title: p.name, unit, curves }];
   }));

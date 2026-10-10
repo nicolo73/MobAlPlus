@@ -6,6 +6,7 @@
   import type { Place, Point, SeriesInfo } from "../lib/types";
   import { flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import * as sel from "../lib/chartsel";
+  import { isBand, type DayBand } from "../lib/longview";
   import type { AlertEvent } from "../lib/types";
   import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
@@ -29,6 +30,9 @@
   let win = $state<Window>(initial);
   let loaded = $state<Window>(loadRange(initial));
   let data = $state(new Map<number, Point[]>());
+  /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
+  let bands = $state(new Map<number, DayBand[]>());
+  let bandMode = $state(false);
   let loading = $state(false);
   let dark = $state(isDark());
   let reqId = 0;
@@ -107,7 +111,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
   });
 
   // Prévision des stations météo choisies
@@ -137,9 +141,12 @@
     const id = ++reqId;
     loading = true;
     try {
-      const res = await api.seriesData(ids, range[0], range[1]);
+      const band = isBand(win);
+      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
       if (id !== reqId) return;
-      data = res;
+      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
+      else { data = res as Map<number, Point[]>; bands = new Map(); }
+      bandMode = band;
       loaded = range;
       loadEvents(range[0]);
       error = "";
@@ -152,7 +159,7 @@
 
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded)) load(loadRange(w));
+    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
   }
 
   // Grandeur réaffichée : ses mesures n'ont pas été chargées
@@ -174,9 +181,14 @@
     }
     for (const c of selected) {
       for (const [prop, chart] of byProp) {
+        const base = { id: c.key, name: c.name, color: colorOf(c.key) };
+        if (bandMode) {
+          const band = sel.curveBand(c, prop, seriesByPlace, bands);
+          if (band) chart.series.push({ ...base, points: [], band, dashed: c.avg });
+          continue;
+        }
         const points = curvePoints(c, prop);
         if (!points) continue;
-        const base = { id: c.key, name: c.name, color: colorOf(c.key) };
         chart.series.push({ ...base, points, dashed: c.avg });
         // Station météo : sa prévision prolonge sa courbe
         const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === prop)?.id;
@@ -186,6 +198,13 @@
     for (const [prop, c] of byProp) if (c.series.length) c.series.push(...weatherCurve(weather, prop, selected.map((x) => x.node.id)));
     return [...byProp.entries()].filter(([, c]) => c.series.length).sort(([a], [b]) => rank(a) - rank(b));
   });
+
+  /** Récapitulatif d'une courbe en bandes : moyenne du dernier jour, minimum et maximum de la fenêtre */
+  function summaryBand(band: DayBand[]) {
+    const inWin = band.filter((b) => b.ts >= win[0] - 43_200_000 && b.ts <= win[1] + 43_200_000);
+    if (!inWin.length) return null;
+    return { last: inWin.at(-1)!.avg, min: Math.min(...inWin.map((b) => b.min)), max: Math.max(...inWin.map((b) => b.max)) };
+  }
 
   /** Tableau récapitulatif de la fenêtre visible : dernière valeur, minimum, maximum */
   function summary(points: Point[]) {
@@ -280,7 +299,7 @@
           <table>
             <thead>
               <tr><th>Emplacement</th>
-                {#each charts as [prop, c] (prop)}<th class="r">{c.title} actuelle</th><th class="r">min – max</th>{/each}
+                {#each charts as [prop, c] (prop)}<th class="r">{c.title} {bandMode ? "moyenne du dernier jour" : "actuelle"}</th><th class="r">min – max</th>{/each}
               </tr>
             </thead>
             <tbody>
@@ -289,8 +308,9 @@
                   <td><span class="key" class:dashed={p.avg} style="--c:{colorOf(p.key)}"></span>
                     {#if p.avg}{p.name}{:else}<a href="#/lieu/{p.node.id}">{p.name}</a>{/if}</td>
                   {#each charts as [prop, c] (prop)}
-                    {@const pts = curvePoints(p, prop)}
-                    {@const sum = pts ? summary(pts) : null}
+                    {@const band = bandMode ? sel.curveBand(p, prop, seriesByPlace, bands) : null}
+                    {@const pts = bandMode ? null : curvePoints(p, prop)}
+                    {@const sum = band ? summaryBand(band) : pts ? summary(pts) : null}
                     <td class="r num">{sum ? fmtValue(sum.last, c.unit) : "–"}</td>
                     <td class="r num">{sum ? `${fmtValue(sum.min, c.unit)} – ${fmtValue(sum.max, c.unit)}` : "–"}</td>
                   {/each}

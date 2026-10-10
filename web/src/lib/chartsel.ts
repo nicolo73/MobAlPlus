@@ -3,6 +3,7 @@
 
 import { slotColor } from "./colors";
 import { averagePoints, type PlaceNode } from "./placetree";
+import { averageBands, type DayBand } from "./longview";
 import type { Point, SeriesInfo } from "./types";
 
 const DAY = 86_400_000;
@@ -75,6 +76,14 @@ export function curvePoints(c: Selected, prop: string, seriesByPlace: Map<number
     .map((s) => data.get(s.id) ?? []);
   if (!lists.length) return null;
   return c.avg ? averagePoints(lists) : lists[0];
+}
+
+/** Bandes min – max journalières d'une courbe (temps long) : celles de l'emplacement, ou leur moyenne */
+export function curveBand(c: Selected, prop: string, seriesByPlace: Map<number, SeriesInfo[]>, bands: Map<number, DayBand[]>): DayBand[] | null {
+  const lists = c.places.flatMap((id) => (seriesByPlace.get(id) ?? []).filter((s) => s.property === prop))
+    .map((s) => bands.get(s.id) ?? []);
+  if (!lists.length) return null;
+  return c.avg ? averageBands(lists) : lists[0];
 }
 
 export function groupByPlace(series: SeriesInfo[]): Map<number, SeriesInfo[]> {

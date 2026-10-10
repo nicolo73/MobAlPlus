@@ -4,6 +4,7 @@
   import { trendTone, zoneOf } from "../lib/zones";
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
+  import { gapThreshold, isBand, type DayBand } from "../lib/longview";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
@@ -31,6 +32,9 @@
   let win = $state<Window>([Date.now() - DAY, Date.now()]);
   let loaded = $state<Window>(loadRange([Date.now() - DAY, Date.now()]));
   let data = $state(new Map<number, Point[]>());
+  /** Temps long (plus de 8 jours affichés) : bandes min – max journalières au lieu des mesures */
+  let bands = $state(new Map<number, DayBand[]>());
+  let bandMode = $state(false);
   let stats = $state(new Map<number, SeriesStats>());
   let rows = $state<Observation[]>([]);
   let moreAvailable = $state(true);
@@ -99,9 +103,15 @@
     });
   /** Silence au-delà duquel une période est « sans mesure » : seuil « capteur muet » de la série, 3 h sinon */
   const silenceOf = (id: number) => (rules.find((r) => r.series_id === id && r.kind === "silent" && r.enabled)?.threshold ?? 3) * 3_600_000;
-  /** Périodes sans mesure, grisées et sans tracé sur la courbe */
+  /**
+   * Interruption à signaler : au-delà du seuil « capteur muet », mais aussi assez longue pour la
+   * période affichée et pour la réduction des points chargés (sinon fausses coupures sur un mois)
+   */
+  const gapOf = (id: number) => gapThreshold(silenceOf(id), loaded, win);
+  /** Périodes sans mesure, grisées et sans tracé sur la courbe (temps long : jours sans mesure, bande interrompue) */
   function gapsOf(id: number): [number, number][] {
-    const gap = silenceOf(id);
+    if (bandMode) return [];
+    const gap = gapOf(id);
     const pts = (data.get(id) ?? []).filter((p) => p.quality !== "rejected");
     const out: [number, number][] = [];
     for (let i = 1; i < pts.length; i++) if (pts[i].ts - pts[i - 1].ts > gap) out.push([pts[i - 1].ts, pts[i].ts]);
@@ -142,7 +152,7 @@
   $effect(() => {
     const [a, b] = loaded, on = display.weather;
     void homeWeather.stations;
-    loadWeather(on, a, b, display.forecast).then((w) => (weather = w));
+    loadWeather(on, a, b, display.forecast, bandMode).then((w) => (weather = w));
   });
 
   /** Couleur des courbes : celle choisie pour l'emplacement (comme dans les courbes superposées), sinon celle de la grandeur */
@@ -214,9 +224,13 @@
     const id = ++reqId;
     loading = true;
     try {
-      const res = await api.seriesData(shownSeries.map((s) => s.id), range[0], range[1]);
+      const band = isBand(win);
+      const ids = shownSeries.map((s) => s.id);
+      const res = band ? await api.seriesDaily(ids, range[0], range[1]) : await api.seriesData(ids, range[0], range[1]);
       if (id !== reqId) return;
-      data = res;
+      if (band) { bands = res as Map<number, DayBand[]>; data = new Map(); }
+      else { data = res as Map<number, Point[]>; bands = new Map(); }
+      bandMode = band;
       if (range[0] < loaded[0]) setTimeout(loadAlertData, 0);  // période élargie : alertes plus anciennes
       loaded = range;
     } catch (e) {
@@ -242,7 +256,7 @@
 
   function setWindow(w: Window) {
     win = w;
-    if (needsReload(w, loaded)) load(loadRange(w));
+    if (needsReload(w, loaded) || isBand(w) !== bandMode) load(loadRange(w));
     clearTimeout(statsTimer);
     statsTimer = setTimeout(() => { loadStats(); loadRows(true); }, 400);
   }
@@ -375,12 +389,13 @@
     {@const st = stats.get(s.id)}
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
-      <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [] },
+      <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [],
+                            ...(bandMode ? { band: bands.get(s.id) ?? [] } : {}) },
                          ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: curveColor(s.property) },
                                                               data.get(s.id) ?? [], forecast.get(s.id)) : []),
                          ...weatherCurve(weather, s.property, [s.place_id])]}
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
-                 curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={silenceOf(s.id)}
+                 curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={gapOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
       {#if st}
         <dl class="stats">

@@ -219,6 +219,25 @@ de la station ; alertes « prévu au-dessus / en dessous de » dans les 24 h. Pi
 d'alerte réglable (12 h, 48 h), autres grandeurs prévues (pluie, vent, ensoleillement), alerte
 « écart prévu dehors / dedans », actions anticipées (voir 17).
 
+## 8 bis. Lecture sur le temps long
+
+**Fait (10/10/2026)** : au-delà de 8 jours affichés, bandes min – max journalières calculées par la
+base (`series_daily()`, jour civil du fuseau), hebdomadaires au-delà de 3 mois ; repères à la
+semaine / au mois / à l'année ; points d'alerte masqués au-delà de 7 jours ; interruptions signalées
+selon la période affichée et la réduction des points (les « trous » d'un mois venaient en partie de
+la réduction à ~1000 points : deux points gardés pouvaient être à plus de 3 h l'un de l'autre).
+
+**Pistes** (inspirées des outils de suivi de température et de climatologie) :
+- **carte de chaleur « jour × heure »** (carpet plot) : une ligne par jour, une colonne par heure,
+  couleur = température ; montre d'un coup d'œil le cycle journalier sur des mois (chauffage,
+  ensoleillement, canicule, effet d'une isolation) ;
+- **comparaison d'une année sur l'autre** (même période superposée) et **écart à la normale** ;
+- **degrés-jours** (DJU chauffage / climatisation) par mois, pour relier températures et consommation ;
+- **moyenne glissante 24 h** en surimpression des mesures brutes ;
+- **boîtes à moustaches** par mois (répartition des valeurs) ;
+- statistiques horaires pré-calculées (comme les « statistiques long terme » de Home Assistant) si le
+  calcul à la volée devient lent sur plusieurs années.
+
 ## 9. Statistiques par groupe d'emplacements
 
 **Fait en partie (05/10/2026)** : page Courbes organisée selon l'imbrication des emplacements ;

@@ -274,6 +274,7 @@ erDiagram
 | `reading_all`, `channel_readings()` | mesures d'un canal, tous niveaux de stockage réunis |
 | `observation`, `series_observations()` | mesures d'une série : affectations et corrections appliquées |
 | `series_data()`, `series_data_multi()` | points d'une courbe, réduits en min / max par intervalle si nécessaire |
+| `series_daily()` | minimum, maximum, moyenne par jour civil (courbes sur le temps long) |
 | `series_stats()`, `series_bounds()` | minimum, maximum, moyenne ; première et dernière mesure |
 | `current_values()` | dernière valeur de chaque série (page Maintenant) |
 | `collect_targets()`, `ingest_readings()`, `record_sync_error()` | collecteur |

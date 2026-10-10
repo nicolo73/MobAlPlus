@@ -255,6 +255,8 @@ export interface Api {
   seriesList(): Promise<SeriesInfo[]>;
   /** Points d'affichage (tous, ou min / max réels par intervalle au-delà de maxPoints) */
   seriesData(ids: number[], from: number, to: number, maxPoints?: number): Promise<Map<number, Point[]>>;
+  /** Minimum, maximum et moyenne par jour (courbes sur le temps long), par série */
+  seriesDaily(ids: number[], from: number, to: number): Promise<Map<number, import("./longview").DayBand[]>>;
   /** Prévisions (stations météo) : heures à venir, par série ; vide pour un capteur */
   seriesForecast(ids: number[], from: number, to: number): Promise<Map<number, Point[]>>;
   seriesStats(id: number, from: number, to: number): Promise<SeriesStats>;

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { dayNoon, type DayBand } from "./longview";
 import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
@@ -138,6 +139,18 @@ export class SupabaseApi implements Api {
       return [id, rows.map((r) => ({ ts: Date.parse(r.ts), value: r.value, quality: r.quality }))] as const;
     }));
     return new Map<number, Point[]>(lists);
+  }
+
+  async seriesDaily(ids: number[], from: number, to: number) {
+    // Un appel par série (comme seriesData) : chacun reste court
+    const lists = await Promise.all(ids.map(async (id) => {
+      const rows = check(await this.sb.rpc("series_daily", {
+        p_series: id, p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(),
+        p_tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
+      })) as { day: string; vmin: number; vmax: number; vavg: number }[];
+      return [id, rows.map((r) => ({ ts: dayNoon(r.day), min: r.vmin, max: r.vmax, avg: r.vavg }))] as const;
+    }));
+    return new Map<number, DayBand[]>(lists);
   }
 
   async seriesForecast(ids: number[], from: number, to: number) {

@@ -62,19 +62,28 @@ export async function loadWeatherStations(homeId: number | null) {
  */
 export function weatherCurve(w: WeatherSeries | null, prop: string, shown: number[] = []): ChartSeries[] {
   const points = prop === "temperature" ? w?.temperature : prop === "humidity" ? w?.humidity : undefined;
+  const band = prop === "temperature" ? w?.bands?.temperature : prop === "humidity" ? w?.bands?.humidity : undefined;
   const st = primaryStation();
-  if (!points?.length || !st || shown.includes(st.placeId)) return [];
+  if (!st || shown.includes(st.placeId)) return [];
   const base = { id: `meteo-${prop}`, name: st.name, color: cssVar("--muted") };
+  if (band?.length) return [{ ...base, dotted: true, points: [], band }];
+  if (!points?.length) return [];
   const fc = prop === "temperature" ? w?.forecast?.temperature : prop === "humidity" ? w?.forecast?.humidity : undefined;
   return [{ ...base, dotted: true, points }, ...forecastCurve(base, points, fc)];
 }
 
 /** Mesures de la station de comparaison sur une période (null si désactivée ou sans station) */
-export async function loadWeather(enabled: boolean, from: number, to: number, withForecast = false): Promise<WeatherSeries | null> {
+export async function loadWeather(enabled: boolean, from: number, to: number, withForecast = false, band = false): Promise<WeatherSeries | null> {
   const st = primaryStation();
   if (!enabled || !st) return null;
   const ids = [st.temperature, st.humidity].filter((x): x is number => x !== null);
   try {
+    if (band) {
+      // Temps long : bandes min – max journalières, pas de prévision (heures à venir, invisibles à cette échelle)
+      const b = await api.seriesDaily(ids, from, to);
+      return { temperature: [], humidity: [], bands: { temperature: st.temperature ? b.get(st.temperature) ?? [] : [],
+                                                       humidity: st.humidity ? b.get(st.humidity) ?? [] : [] } };
+    }
     const [data, fc] = await Promise.all([api.seriesData(ids, from, to), withForecast ? loadForecast(ids) : new Map<number, Point[]>()]);
     const get = (m: Map<number, Point[]>, id: number | null) => (id ? m.get(id) ?? [] : []);
     return { temperature: get(data, st.temperature), humidity: get(data, st.humidity),

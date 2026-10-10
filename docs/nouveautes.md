@@ -6,6 +6,10 @@
 
 
 ## 10 octobre 2026
+- **Courbes sur le temps long** (plus de 8 jours) : une **bande min – max par jour** (par semaine
+  au-delà de 3 mois) au lieu des oscillations jour / nuit ; repères à la semaine, au mois ou à
+  l'année ; points d'alerte masqués au-delà de 7 jours ; fausses interruptions corrigées (elles
+  venaient de la réduction des points), seules les vraies absences longues sont grisées, plus légèrement.
 - Import : les gros classeurs (anciens tableurs Mobile Alerts de plusieurs dizaines de Mo) sont lus
   **onglet par onglet**, sans saturer la mémoire du navigateur ; heures des dates Excel arrondies à
   la seconde (les mesures déjà collectées sont reconnues à l'identique).

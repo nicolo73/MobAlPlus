@@ -11,6 +11,7 @@
   import type { Window } from "../lib/period";
   import type { Point } from "../lib/types";
   import { GAP, curveData, valueAt, type CurveMode } from "../lib/curve";
+  import { WEEKLY_FROM, gridLines, scaleOf, weeklyBands, type DayBand } from "../lib/longview";
 
   export interface ChartSeries {
     id: number | string;
@@ -23,6 +24,8 @@
     dotted?: boolean;
     /** Prévision (dans le futur) : trait mixte, plus pâle */
     forecast?: boolean;
+    /** Temps long : bande min – max par jour (à la place des points) */
+    band?: DayBand[];
   }
 
   interface Props {
@@ -85,6 +88,8 @@
   }
 
   const HOUR = 3_600_000;
+  /** Échelle des repères et affichage des points : nouveau rendu quand elle change (zoom) */
+  const scaleKey = $derived(`${scaleOf(window)}-${window[1] - window[0] > 7.5 * 86_400_000}-${window[1] - window[0] > WEEKLY_FROM}`);
   /** Fin de la prévision la plus lointaine (0 sans prévision) */
   const futureEnd = $derived(Math.max(0, ...series.filter((s) => s.forecast).map((s) => s.points.at(-1)?.ts ?? 0)));
   /**
@@ -101,6 +106,10 @@
     const now = Date.now();
     const axisMax = Math.max(loaded[1], futureEnd);
     const [ws, we] = shown(window);
+    // Repères verticaux selon la largeur visible ; au-delà d'une semaine, pas de points d'alerte
+    // (trop nombreux) ni de quadrillage horaire
+    const scale = scaleOf([ws, we]);
+    const long = we - ws > 7.5 * 86_400_000;   // « 7 j » (plus l'heure de prévision) garde ses points
     // Étiquettes en bout de courbe de 2 à 4 séries ; une seule série est nommée par le titre
     // (pas sur écran étroit : la place va à la courbe, les couleurs sont rappelées au-dessus)
     const measured = series.filter((s) => !s.forecast).length;
@@ -110,7 +119,12 @@
     // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
     const prepared = series.map((s) => ({ s, data: curveData(s.points, curve, cutAfter) }));
     const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
-    const showPoints = alertPoints.length > 0 && (!alertsWideOnly || full || (el?.clientWidth ?? 0) >= 500);
+    const showPoints = alertPoints.length > 0 && !long && (!alertsWideOnly || full || (el?.clientWidth ?? 0) >= 500);
+    // Au-delà de ~3 mois : une bande par semaine (moyennes des min et max journaliers)
+    const weekly = we - ws > WEEKLY_FROM;
+    const bandsOf = (s: ChartSeries) => (weekly ? weeklyBands(s.band ?? []) : s.band ?? []);
+    /** Bande d'une courbe à l'instant t (le jour, ou la semaine) */
+    const bandAt = (b: DayBand[], t: number) => b.find((x) => Math.abs(x.ts - t) <= (weekly ? 3.5 : 0.5) * 86_400_000) ?? null;
     // Échelle : les seuils proches des mesures sont inclus, les seuils lointains n'écrasent pas la courbe
     const near = (v: { min: number; max: number }) => {
       const span = Math.max(v.max - v.min, unit === "%" ? 5 : 1);
@@ -131,7 +145,7 @@
           formatter: { year: "{yyyy}", month: "{MMM} {yyyy}", day: "{d} {MMM}", hour: "{HH}:{mm}", minute: "{HH}:{mm}", second: "{HH}:{mm}:{ss}" },
         },
         // Lignes verticales aux graduations (heures, jours, semaines… selon le zoom)
-        splitLine: { show: true, lineStyle: { color: border, opacity: 0.45 } },
+        splitLine: { show: scale === "day", lineStyle: { color: border, opacity: 0.45 } },
       },
       yAxis: {
         type: "value", scale: true,
@@ -159,16 +173,24 @@
         formatter: (params: { axisValue: number }[]) => {
           const t = params[0]?.axisValue;
           if (t == null) return "";
+          const banded = series.some((s) => s.band);
           const rows = prepared
-            .map(({ s, data }) => ({ s, v: valueAt(data, t, curve !== "step") }))
-            .filter((r): r is { s: ChartSeries; v: number } => r.v !== null)
+            .map(({ s, data }) => {
+              if (s.band) { const b = bandAt(bandsOf(s), t); return { s, v: b?.max ?? null, text: b ? `${fmt(b.min)} – ${fmt(b.max)}` : "" }; }
+              const v = valueAt(data, t, curve !== "step");
+              return { s, v, text: v === null ? "" : fmt(v) };
+            })
+            .filter((r): r is { s: ChartSeries; v: number; text: string } => r.v !== null)
             .sort((a, b) => b.v - a.v)
-            .map(({ s, v }) => `<div style="display:flex;align-items:center;gap:.5rem">
+            .map(({ s, text }) => `<div style="display:flex;align-items:center;gap:.5rem">
               <span style="display:inline-block;width:14px;border-top:2px ${dotted.has(s.name) ? "dotted" : dashed.has(s.name) ? "dashed" : "solid"} ${s.color}"></span>
-              <b style="min-width:4.5rem">${fmt(v)} ${escapeHtml(unit)}</b>
+              <b style="min-width:4.5rem">${text} ${escapeHtml(unit)}</b>
               <span style="color:${muted}">${escapeHtml(s.name)}</span></div>`)
             .join("");
-          return `<div style="font-size:12px;color:${muted};margin-bottom:4px">${fmtTime(t)}</div>${rows}`;
+          const when = !banded ? fmtTime(t)
+            : weekly ? `semaine du ${new Date(t - ((new Date(t).getDay() + 6) % 7) * 86_400_000).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} · moyennes des min et max`
+            : `${new Date(t).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })} · min – max du jour`;
+          return `<div style="font-size:12px;color:${muted};margin-bottom:4px">${when}</div>${rows}`;
         },
       },
       dataZoom: [
@@ -185,7 +207,7 @@
             new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
           brushSelect: false },
       ],
-      series: [...prepared.map(({ s, data }, i) => ({
+      series: [...withMarks(prepared.flatMap<object>(({ s, data }) => s.band ? bandSeries({ ...s, band: bandsOf(s) }, endLabels, muted, weekly) : [{
         id: String(s.id), name: s.name, type: "line",
         // Lissage monotone : pas de faux pics au-delà des valeurs mesurées
         ...(curve === "step" ? { step: "end", smooth: false } : { step: false, smooth: 0.35, smoothMonotone: "x" }),
@@ -198,15 +220,17 @@
         endLabel: endLabels && !s.forecast ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false },
         labelLayout: { moveOverlap: "shiftY" },
         data,
-        ...(i === 0 && gaps.length ? {
+      }]), {
+        // Périodes sans mesure : grisé léger ; étiquette seulement si la période est assez large pour l'écrire
+        ...(gaps.length ? {
           markArea: {
             silent: true, animation: false,
-            itemStyle: { color: muted, opacity: 0.12 },
-            label: { show: true, position: "insideTop", color: muted, fontSize: 10, formatter: "sans mesure" },
-            data: gaps.map(([a, b]) => [{ xAxis: a }, { xAxis: b }]),
+            itemStyle: { color: muted, opacity: 0.07 },
+            label: { show: false, position: "insideTop", color: muted, fontSize: 10, formatter: "sans mesure" },
+            data: gaps.map(([a, b]) => [{ xAxis: a, label: { show: b - a > (we - ws) / 12 } }, { xAxis: b }]),
           },
         } : {}),
-        ...(i === 0 && thresholds.length ? {
+        ...(thresholds.length ? {
           markLine: {
             silent: true, symbol: "none", animation: false,
             data: thresholds.map((t) => ({
@@ -216,16 +240,16 @@
             })),
           },
         } : {}),
-      })),
-      // Minuits marqués d'un trait plus net tant que la période chargée ne dépasse pas ~ 45 jours
-      ...(loaded[1] - loaded[0] <= 45 * 86_400_000 ? [{
+      }),
+      // Repères verticaux : minuits jusqu'à une semaine, puis lundis, 1ers du mois ou 1ers janvier
+      {
         id: "jours", type: "line", data: [], silent: true,
         markLine: {
           silent: true, symbol: "none", animation: false, label: { show: false },
-          lineStyle: { color: muted, type: "solid", width: 1, opacity: 0.35 },
-          data: midnights(loaded[0], loaded[1]).map((t) => ({ xAxis: t })),
+          lineStyle: { color: muted, type: "solid", width: 1, opacity: scale === "day" ? 0.35 : 0.25 },
+          data: gridLines(loaded[0], axisMax, scale).map((t) => ({ xAxis: t })),
         },
-      }] : []),
+      },
       // Futur (prévisions) : zone légèrement grisée, trait « maintenant »
       ...(futureEnd > now ? [{
         id: "futur", type: "line", data: [], silent: true,
@@ -263,13 +287,33 @@
     };
   }
 
-  /** Minuits (heure locale) d'une période */
-  function midnights(from: number, to: number): number[] {
-    const out: number[] = [];
-    const d = new Date(from);
-    d.setHours(24, 0, 0, 0);
-    for (; d.getTime() < to && out.length < 400; d.setDate(d.getDate() + 1)) out.push(d.getTime());
-    return out;
+  /** Seuils et périodes sans mesure, portés par la première courbe */
+  function withMarks<T extends object>(list: T[], marks: object): T[] {
+    return list.map((x, i) => (i === 0 ? { ...x, ...marks } : x));
+  }
+
+  /**
+   * Bande min – max d'une courbe (temps long) : minimum (trait fin), puis l'écart jusqu'au maximum
+   * empilé dessus, rempli de la couleur de la courbe en plus léger ; le haut de l'empilement est le maximum.
+   */
+  function bandSeries(s: ChartSeries, endLabels: boolean, muted: string, weekly: boolean) {
+    const band = s.band ?? [];
+    const stack = `bande-${s.id}`;
+    // Jour manquant : la bande s'interrompt
+    const withBreaks = <V,>(f: (b: DayBand) => V) => band.flatMap((b, i) =>
+      i > 0 && b.ts - band[i - 1].ts > (weekly ? 10 : 1.5) * 86_400_000 ? [[b.ts - 86_400_000, null], [b.ts, f(b)]] : [[b.ts, f(b)]]);
+    const common = {
+      type: "line", stack, stackStrategy: "all", showSymbol: false, smooth: curve === "step" ? false : 0.3,
+      emphasis: { focus: "series", lineStyle: { width: 2.5 } }, blur: { lineStyle: { opacity: 0.18 }, areaStyle: { opacity: 0.05 } },
+      lineStyle: { width: 1.2, color: s.color, type: s.dotted ? [2, 3] : s.dashed ? [6, 4] : "solid" },
+      itemStyle: { color: s.color },
+    };
+    return [
+      { ...common, id: `${s.id}-min`, name: s.name, data: withBreaks((b) => b.min) },
+      { ...common, id: `${s.id}-range`, name: s.name, data: withBreaks((b) => b.max - b.min),
+        areaStyle: { color: s.color, opacity: s.dotted ? 0.08 : 0.2 },
+        endLabel: endLabels ? { show: true, formatter: "{a}", color: muted, fontSize: 11, width: 88, overflow: "truncate" } : { show: false } },
+    ];
   }
 
   function render() {
@@ -282,8 +326,10 @@
   /** Mise en évidence demandée par la page (ligne de légende survolée ou touchée) */
   function applyHighlight() {
     if (!chart) return;
-    chart.dispatchAction({ type: "downplay", seriesIndex: series.map((_, i) => i) });
-    if (highlight.length) chart.dispatchAction({ type: "highlight", seriesId: highlight });
+    const n = ((chart.getOption() as { series?: unknown[] }).series ?? []).length;
+    chart.dispatchAction({ type: "downplay", seriesIndex: [...Array(n).keys()] });
+    // Une courbe en bande est faite de deux séries (minimum, écart jusqu'au maximum)
+    if (highlight.length) chart.dispatchAction({ type: "highlight", seriesId: highlight.flatMap((id) => [id, `${id}-min`, `${id}-range`]) });
   }
   $effect(() => { void highlight; applyHighlight(); });
 
@@ -373,7 +419,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter;
+    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter; void scaleKey;
     render();
   });
 

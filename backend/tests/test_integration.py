@@ -866,3 +866,20 @@ def test_weather_forecast_and_alerts(conn):
     conn.execute("SELECT evaluate_alerts(%s)", (now,))
     assert conn.execute("SELECT ended_at FROM alert_event").fetchone()[0] == now
     conn.commit()
+
+
+def test_series_daily(conn):
+    ch = channel_id(conn, "07AAAAAAAAAA", 1)
+    sid = series_id(conn, "salon", "temperature")
+    # 6 oct. 2026 à Paris (UTC+2) : de 22 h UTC la veille à 22 h UTC ; une valeur rejetée exclue
+    rows = [(datetime(2026, 10, 5, 21, 30, tzinfo=UTC), 30.0),   # 5 oct. 23 h 30 à Paris
+            (datetime(2026, 10, 5, 22, 30, tzinfo=UTC), 18.0),   # 6 oct. 0 h 30
+            (datetime(2026, 10, 6, 12, 0, tzinfo=UTC), 24.0),
+            (datetime(2026, 10, 6, 13, 0, tzinfo=UTC), 99.0)]    # rejetée
+    db.insert_readings(conn, [(ch, ts, v) for ts, v in rows])
+    conn.execute("INSERT INTO correction (channel_id, ts_range, action, reason) VALUES (%s, tstzrange(%s, %s, '[]'), 'reject', 'test')",
+                 (ch, rows[3][0], rows[3][0]))
+    days = conn.execute("SELECT day, vmin, vmax, vavg, n FROM series_daily(%s, %s, %s)",
+                        (sid, datetime(2026, 10, 5, tzinfo=UTC), datetime(2026, 10, 7, tzinfo=UTC))).fetchall()
+    assert [(d.day, mn, mx, n) for d, mn, mx, _, n in days] == [(5, 30.0, 30.0, 1), (6, 18.0, 24.0, 2)]
+    assert days[1][3] == pytest.approx(21.0)

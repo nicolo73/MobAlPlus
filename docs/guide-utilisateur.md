@@ -85,7 +85,13 @@ Plusieurs emplacements superposés, une courbe par grandeur ([écran](#ecran-cou
   à droite de chaque courbe ([écran](#ecran-plein-ecran)), avec un quadrillage plus fin.
 - **Rendu** : *Escalier* (fidèle aux mesures), *Lissé*, *Simplifié* (sans les marches dues à
   l'arrondi du capteur).
-- Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran).
+- Petits triangles : **alertes importantes** (sur ordinateur ou en plein écran), jusqu'à 7 jours affichés.
+- **Temps long** (plus de 8 jours affichés) : au lieu des oscillations jour / nuit, chaque courbe devient
+  une **bande** entre le **minimum et le maximum de chaque jour**, remplie de sa couleur en plus léger ;
+  au-delà de 3 mois, une bande par **semaine** (moyennes des minimums et des maximums, comme les
+  normales des sites météo). L'infobulle donne « min – max ». Repères verticaux à la semaine, au mois
+  ou à l'année ; seules les interruptions de mesure assez longues pour la période affichée sont
+  grisées (sur un mois, quelques heures sans mesure ne coupent plus la courbe).
 
 ## Météo publique
 
