@@ -198,14 +198,14 @@
     <small>dernière mesure {fmtAgo(lastTs)}</small>
   </section>
 
-  <PeriodBar window={win} onchange={setWindow} {loading} />
   {#if properties.length}<DisplayBar {properties} />{/if}
 
-  {#each charts as c (c.prop)}
+  {#each charts as c, i (c.prop)}
     <section class="card">
       <h2>{c.title} <small class="muted">({c.unit})</small></h2>
       <TimeChart series={c.curves} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
                  curve={display.curve} group="groupe-{placeId}" label="{c.title} – {node.name}" />
+      {#if i === 0}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
     </section>
   {/each}
 

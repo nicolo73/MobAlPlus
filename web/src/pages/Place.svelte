@@ -383,14 +383,13 @@
     </section>
   {/if}
 
-  <PeriodBar window={win} onchange={setWindow} {loading} />
   {#if sorted.length}<DisplayBar {properties} />{/if}
 
   {#if series && series.length === 0}
     <div class="card muted">Aucun capteur n'est affecté à cet emplacement.</div>
   {/if}
 
-  {#each shownSeries as s (s.id)}
+  {#each shownSeries as s, i (s.id)}
     {@const st = stats.get(s.id)}
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
@@ -402,6 +401,8 @@
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
                  curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={gapOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
+      <!-- Durée et retour à maintenant, sous la première courbe (les courbes de la page bougent ensemble) -->
+      {#if i === 0}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
       {#if st}
         <dl class="stats">
           <div><dt>Minimum</dt><dd class="num">{fmtValue(st.vmin, s.unit)}</dd><small>{fmtDate(st.tmin)}</small></div>

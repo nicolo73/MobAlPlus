@@ -121,6 +121,12 @@
     if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
   }
 
+  /** Curseur à maintenant, et période ramenée au présent si on a navigué dans le temps */
+  function backToNow() {
+    cursor = null;
+    if (!followsNow(win)) setWindow([Date.now() - (win[1] - win[0]), Date.now()]);
+  }
+
   function addNew() {
     location.hash = `#/courbes?d=${encodeURIComponent(addDashboard(ctx.homeId))}`;
   }
@@ -340,9 +346,10 @@
           {#if bandMode}<small class="muted">min – max du jour ({shownProps.map((p) => p.unit).join(", ")})</small>{/if}
           {#if cursor !== null}
             <small class="muted">{at > Date.now() ? `prévision, ${fmtIn(at)}` : fmtAgo(new Date(at).toISOString(), Date.now())}</small>
-            <button class="link" onclick={() => (cursor = null)}>maintenant ›</button>
-          {:else if !bandMode}
-            <small class="muted">{new Date(now).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</small>
+            <button class="link" onclick={backToNow}>maintenant ›</button>
+          {:else}
+            {#if !bandMode}<small class="muted">{new Date(now).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</small>{/if}
+            {#if !followsNow(win)}<button class="link" onclick={backToNow} title="Revenir à la période actuelle">période actuelle ›</button>{/if}
           {/if}
         </div>
         <ul>

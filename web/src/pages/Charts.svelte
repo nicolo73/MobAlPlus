@@ -258,7 +258,6 @@
   <small class="muted">Emplacements, durée, grandeurs et rendu de cette page de synthèse. Une autre synthèse se crée avec
     le bouton + de la page Synthèse.</small>
 
-  <PeriodBar window={win} onchange={setWindow} {loading} />
 
   {#if error}<div class="notice err" role="alert">{error}</div>{/if}
 
@@ -312,11 +311,12 @@
     {#if selected.length === 0}
       <div class="card muted">Choisissez un ou plusieurs emplacements ci-dessus (ou la moyenne d'un groupe).</div>
     {:else}
-      {#each charts as [prop, c] (prop)}
+      {#each charts as [prop, c], i (prop)}
         <section class="card">
           <h2>{c.title} <small class="muted">({c.unit})</small></h2>
           <TimeChart series={c.series} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
                      curve={display.curve} alertPoints={markersOf(prop)} alertsWideOnly group="courbes" label="{c.title} : {c.series.map((s) => s.name).join(', ')}" />
+          {#if i === 0}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
         </section>
       {/each}
       <small class="muted">Toucher ou survoler une courbe pour lire les valeurs ; zoomer à deux doigts ou à la molette ;

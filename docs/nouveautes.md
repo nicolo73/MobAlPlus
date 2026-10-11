@@ -5,6 +5,14 @@
 -->
 
 
+## 11 octobre 2026
+- **Barre de glissement plus intelligente** sous les courbes : quand une poignée arrive au bout, la
+  barre s'élargit (on peut aller toujours plus loin dans le passé) ; quand la période est réduite,
+  elle se remet à l'échelle.
+- Boutons **‹ ›** de part et d'autre de la barre (période précédente / suivante), aussi dans la
+  **Synthèse** ; lien « période actuelle › » pour revenir au présent.
+- Choix de la durée (24 h… 1 an) et bouton **Maintenant** placés juste sous la barre de la première courbe.
+
 ## 10 octobre 2026
 - **Synthèses et préférences enregistrées dans le compte** : les mêmes sur le téléphone et
   l'ordinateur (sauf taille du texte et présentation compacte, propres à chaque appareil).

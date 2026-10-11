@@ -69,6 +69,8 @@ réglage, et dessous (à côté en paysage) la **légende avec les valeurs**.
   <img src="images/icones/alerte.svg" alt="⚠" height="16"> en cas d'alerte.
 - **Toucher ou glisser sur la courbe** pour lire un autre instant : la date s'affiche avec
   « il y a… » ; **maintenant ›** revient au présent.
+- **‹ ›** sous chaque courbe : période **précédente** ou **suivante** ; la barre entre les deux
+  s'étire avec ses poignées. **période actuelle ›** revient au présent.
 - Groupe : son nom suivi du nombre d'emplacements moyennés, ex. « Jardin (3) ».
 - **Mettre une courbe en évidence** : survoler sa ligne à la souris, ou toucher ses **valeurs** sur le
   téléphone (toucher de nouveau pour revenir) ; les autres courbes s'estompent. Le **nom** ouvre
@@ -84,10 +86,16 @@ toutes les pages.
 
 - **Choisir les emplacements** en touchant leurs noms (12 courbes au plus).
 - **Emplacement parent** (bouton en pointillé) : **moyenne** de ses sous-emplacements, en tirets.
-- **Période** : 24 h à 1 an ; **‹ ›** pour reculer ou avancer ; **Maintenant** pour revenir au présent.
+- **Période** : 24 h à 1 an, sous la barre de la première courbe ; **Maintenant** pour revenir au présent.
 - **Lire les valeurs** : toucher la courbe et glisser le doigt ; l'infobulle donne la valeur de
   **chaque courbe** à cet instant, de la plus haute à la plus basse.
 - **Zoomer** : à deux doigts (ou molette) ; **se déplacer** : faire glisser la barre sous la courbe.
+- **Barre de glissement** (sous chaque courbe, ici comme dans la Synthèse et les pages d'emplacement
+  ou de groupe) : tirer une poignée étire ou réduit la période. Elle s'adapte toute seule : quand
+  une poignée arrive au bout, la barre s'élargit au relâchement (on peut tirer de nouveau pour aller
+  plus loin) ; quand la période devient petite, elle se remet à l'échelle (la période en occupe
+  environ les deux tiers). **‹ ›** de part et d'autre : période **précédente** ou **suivante** (même
+  durée) ; **›** est grisé au présent (ou à la fin des prévisions).
 - <img src="images/icones/plein-ecran.svg" alt="plein écran" height="16"> **Plein écran**, en haut
   à droite de chaque courbe ([écran](#ecran-plein-ecran)), avec un quadrillage plus fin.
 - **Rendu** : *Escalier* (fidèle aux mesures), *Lissé*, *Simplifié* (sans les marches dues à

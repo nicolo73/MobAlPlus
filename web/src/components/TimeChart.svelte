@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
   import type { ECharts } from "echarts/core";
   import { cssVar } from "../lib/colors";
-  import type { Window } from "../lib/period";
+  import { barRange, needsRescale, shiftWindow, type Window } from "../lib/period";
   import type { Point } from "../lib/types";
   import { GAP, curveData, valueAt, type CurveMode } from "../lib/curve";
   import { WEEKLY_FROM, bandMain, ghostLevel, gridLines, scaleOf, weeklyBands, type DayBand } from "../lib/longview";
@@ -77,6 +77,14 @@
   let full = $state(false);
   let chart: ECharts | null = null;
   let applied: Window = [0, 0];
+  /**
+   * Étendue de la barre de glissement (et de l'axe) : un peu plus large que la fenêtre, recalculée
+   * quand une poignée atteint un bord ou que la fenêtre devient trop petite ou trop grande pour elle ;
+   * on peut ainsi continuer à glisser ou étirer sans limite
+   */
+  let bar: Window = [0, 0];
+  let dragging = false;
+  let rescaleTimer: ReturnType<typeof setTimeout> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const decimals = $derived(unit === "%" ? 0 : 1);
@@ -106,8 +114,11 @@
   function option() {
     const text = cssVar("--text"), muted = cssVar("--muted"), border = cssVar("--border"), surface = cssVar("--surface");
     const now = Date.now();
-    const axisMax = Math.max(loaded[1], futureEnd);
     const [ws, we] = shown(window);
+    const limit = Math.max(now, futureEnd);
+    // (jamais pendant un glissement : la barre bougerait sous le doigt ; recalcul au relâchement)
+    if (bar[1] <= bar[0] || (!dragging && needsRescale([ws, we], bar, limit))) bar = barRange([ws, we], limit);
+    const axisMax = bar[1];
     // Repères verticaux selon la largeur visible ; au-delà d'une semaine, pas de points d'alerte
     // (trop nombreux) ni de quadrillage horaire
     const scale = scaleOf([ws, we]);
@@ -146,7 +157,7 @@
       grid: oncursor ? { left: 46, right: 16, top: 12, bottom: 64, containLabel: false }
         : { left: 8, right: endLabels ? 96 : 16, top: 12, bottom: 64, containLabel: true },
       xAxis: {
-        type: "time", min: loaded[0], max: axisMax,
+        type: "time", min: bar[0], max: axisMax,
         axisLine: { lineStyle: { color: border } }, axisTick: { lineStyle: { color: border } },
         axisLabel: {
           color: muted, hideOverlap: true,
@@ -259,7 +270,7 @@
         markLine: {
           silent: true, symbol: "none", animation: false, label: { show: false },
           lineStyle: { color: muted, type: "solid", width: 1, opacity: scale === "day" ? 0.35 : 0.25 },
-          data: gridLines(loaded[0], axisMax, scale).map((t) => ({ xAxis: t })),
+          data: gridLines(bar[0], axisMax, scale).map((t) => ({ xAxis: t })),
         },
       },
       // Futur (prévisions) : zone légèrement grisée, trait « maintenant »
@@ -424,11 +435,17 @@
       });
       chart.on("datazoom", () => {
         const dz = (chart!.getOption() as { dataZoom: { startValue: number; endValue: number }[] }).dataZoom[0];
-        const w: Window = [Math.round(dz.startValue), Math.round(dz.endValue)];
+        let w: Window = [Math.round(dz.startValue), Math.round(dz.endValue)];
+        // Fin laissée sur l'heure de prévision ajoutée à l'affichage : la fenêtre reste calée sur maintenant
+        const [, se] = shown(window);
+        if (se !== window[1] && Math.abs(w[1] - se) < 5 * 60_000) w = [w[0], window[1]];
         applied = w;
         clearTimeout(timer);
         timer = setTimeout(() => onwindow?.(w), 250);
+        scheduleRescale();
       });
+      // Glissement des poignées : la barre se recalcule une fois le doigt (ou la souris) relâché
+      chart.getZr().on("mousedown", () => (dragging = true));
       render();
       ro.observe(el);
       scheme.addEventListener("change", onScheme);
@@ -458,12 +475,48 @@
     if (chart && oncursor) chart.setOption({ series: [cursorSeries()] });
   });
 
+  /** Après un glissement ou un zoom : barre recalculée si la fenêtre touche un bord ou n'est plus à l'échelle */
+  function scheduleRescale(ms = 400) {
+    clearTimeout(rescaleTimer);
+    rescaleTimer = setTimeout(() => {
+      if (dragging || !chart) return;
+      const limit = Math.max(Date.now(), futureEnd);
+      if (!needsRescale(shown(applied), bar, limit)) return;
+      const [ss, se] = shown(applied);
+      bar = barRange([ss, se], limit);
+      // Axe d'abord, fenêtre ensuite : dans un même appel, ECharts convertirait les bornes de la fenêtre
+      // en pourcentages de l'ancienne barre (la fin glisserait d'un recalcul à l'autre)
+      chart.setOption({ xAxis: { min: bar[0], max: bar[1] } });
+      chart.dispatchAction({ type: "dataZoom", startValue: ss, endValue: se });
+    }, ms);
+  }
+  onMount(() => {
+    const up = () => { if (dragging) { dragging = false; scheduleRescale(150); } };
+    addEventListener("pointerup", up);
+    addEventListener("touchend", up);
+    return () => { removeEventListener("pointerup", up); removeEventListener("touchend", up); clearTimeout(rescaleTimer); };
+  });
+
+  /** Période précédente / suivante (boutons de part et d'autre de la barre) */
+  const limitNow = () => Math.max(Date.now(), futureEnd);
+  const atLimit = $derived(window[1] >= limitNow() - 60_000);
+  function shift(dir: -1 | 1) {
+    onwindow?.(shiftWindow(window, dir, limitNow()));
+  }
+
   // Fenêtre changée par les boutons (et non par un glissement sur la courbe) : on la déplace
   $effect(() => {
     const [s, e] = window;
     if (!chart || (Math.abs(s - applied[0]) < 1000 && Math.abs(e - applied[1]) < 1000)) return;
     applied = [s, e];
     const [ss, se] = shown([s, e]);
+    const limit = Math.max(Date.now(), futureEnd);
+    // Fenêtre hors de la barre ou plus à son échelle (durée choisie, période précédente…) : nouvelle barre
+    if (needsRescale([ss, se], bar, limit)) {
+      bar = barRange([ss, se], limit);
+      render();
+      return;
+    }
     chart.dispatchAction({ type: "dataZoom", startValue: ss, endValue: se });
   });
 </script>
@@ -471,6 +524,11 @@
 <div class="box" class:full bind:this={box}>
   {#if full}<div class="full-title">{label}</div>{/if}
   <div class="chart" class:loading style={full ? "" : `height:${height}px`} bind:this={el} role="img" aria-label={label}></div>
+  {#if onwindow}
+    <!-- Période précédente / suivante, de part et d'autre de la barre de glissement -->
+    <button class="nav prev" onclick={() => shift(-1)} title="Période précédente" aria-label="Période précédente">‹</button>
+    <button class="nav next" onclick={() => shift(1)} disabled={atLimit} title="Période suivante" aria-label="Période suivante">›</button>
+  {/if}
   {#if fullscreen || full}<button class="fs" onclick={toggleFull} title={full ? "Quitter le plein écran" : "Plein écran"}
           aria-label={full ? "Quitter le plein écran" : `Plein écran : ${label}`}>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -487,6 +545,15 @@
   .fs { position: absolute; top: 0; right: 0; min-height: 0; padding: 0.3rem; border-radius: 6px;
         background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--muted); z-index: 2; }
   .fs:hover { color: var(--text); }
+  /* Alignés sur la barre de glissement (hauteur 28 px, à 8 px du bas, marges de 40 px) */
+  .nav { position: absolute; bottom: 8px; width: 32px; height: 28px; min-height: 0; padding: 0; justify-content: center;
+         font-size: 1.15rem; line-height: 1; border-radius: 6px; color: var(--muted); background: var(--surface); z-index: 2; }
+  .nav.prev { left: 4px; }
+  .nav.next { right: 4px; }
+  .nav:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+  .full .nav { bottom: calc(8px + max(0.5rem, env(safe-area-inset-bottom))); }
+  .full .nav.prev { left: calc(4px + max(0.5rem, env(safe-area-inset-left))); }
+  .full .nav.next { right: calc(4px + max(0.5rem, env(safe-area-inset-right))); }
   .fs svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .full { position: fixed; inset: 0; z-index: 100; background: var(--surface); display: flex; flex-direction: column;
           padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
