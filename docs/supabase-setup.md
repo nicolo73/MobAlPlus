@@ -46,6 +46,11 @@ Lien direct : <https://supabase.com/dashboard/account/tokens>
 
 *Generate new token*, nom `github-mobalplus`, copier le jeton 🔒 (`sbp_…`).
 
+⏳ Le jeton a une **durée de validité** (choisie à la création, ex. 7 ou 90 jours). Une fois expiré,
+le workflow « Déploiement Supabase » échoue dès `supabase link` avec
+`Invalid access token` : régénérer un jeton, puis remplacer le secret `SUPABASE_ACCESS_TOKEN`
+(étape 3). Jeton actuel : 90 jours, généré le 14/10/2026, **expire vers le 12/01/2027**.
+
 ## 3. ⬛ Donner le jeton à GitHub et déployer
 
 1. Dépôt `MobAlPlus` sur GitHub > **Settings** > **Secrets and variables** > **Actions** >
