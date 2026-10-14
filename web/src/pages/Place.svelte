@@ -57,7 +57,7 @@
     (order.indexOf(a.property) + 9) % 9 - (order.indexOf(b.property) + 9) % 9));
   const properties = $derived(sorted.map((s) => ({ code: s.property, name: s.property_name })));
   /** Grandeurs dont le volet est ouvert : seules leurs courbes sont chargées et tracées */
-  const visible = $derived(properties.map((p) => p.code).filter((c) => isOpen(`place.${c}`, true)));
+  const visible = $derived(properties.map((p) => p.code).filter((c) => isOpen(`place.${placeId}.${c}`, true)));
   /** Séries dont la courbe est affichée (volets repliés : ni chargées ni tracées) */
   const shownSeries = $derived(sorted.filter((s) => visible.includes(s.property)));
   const name = $derived(series?.[0]?.place_name ?? current[0]?.place_name ?? "Emplacement");
@@ -276,7 +276,7 @@
   });
 
   /** Volet « Mesures » : liste chargée à l'ouverture (et à chaque changement de période) */
-  const rowsOpen = $derived(isOpen("place.rows", false));
+  const rowsOpen = $derived(isOpen(`place.${placeId}.rows`, false));
   $effect(() => { if (rowsOpen && series) untrack(() => loadRows(true).catch((e) => (error = String(e)))); });
 
   // Volet « Alertes » : un onglet par grandeur ; raccourci depuis le volet de chaque courbe
@@ -287,7 +287,7 @@
   const activeOf = (id: number) => events.filter((e) => e.series_id === id && e.ended_at == null && !e.archived);
   function gotoAlerts(prop: string) {
     alertTab = prop;
-    reveal("place.alerts", "alertes");
+    reveal(`place.${placeId}.alerts`, "alertes");
   }
 
   /** Une ligne par horodatage : température et humidité côte à côte */
@@ -361,7 +361,7 @@
 
   {#if isStation}<StationCard {placeId} {name} onrefreshed={stationRefreshed} />{/if}
   {#if forecastDays.length}
-    <Panel key="forecast" title="Prévisions" sub="(Open-Meteo, 7 jours)">
+    <Panel key="place.{placeId}.forecast" title="Prévisions" sub="(Open-Meteo, 7 jours)">
       <div class="table-wrap">
         <table class="forecast">
           <thead>
@@ -407,7 +407,7 @@
     {@const c = current.find((x) => x.series_id === s.id)}
     {@const n = ruleCount(s.id)}
     {@const active = activeOf(s.id).length}
-    <Panel key="place.{s.property}" title={s.property_name} sub="({s.unit})">
+    <Panel key="place.{placeId}.{s.property}" title={s.property_name} sub="({s.unit})">
       {#snippet summary()}
         <span class="num pv {s.property}"><span class="zv {zoneOf(c?.value ?? null, rulesOf(s.id)) ?? ''}">{fmtValue(c?.value ?? null, s.unit)}</span></span>
       {/snippet}
@@ -442,7 +442,7 @@
   {#if sorted.length}
     {@const totalRules = sorted.reduce((t, s) => t + ruleCount(s.id), 0)}
     {@const totalActive = sorted.reduce((t, s) => t + activeOf(s.id).length, 0)}
-    <Panel key="place.alerts" title="Alertes" id="alertes" defaultOpen={false}>
+    <Panel key="place.{placeId}.alerts" title="Alertes" id="alertes" defaultOpen={false}>
       {#snippet summary()}
         <span class="muted">{totalRules ? `${totalRules} règle${totalRules > 1 ? "s" : ""}` : "aucune règle"}</span>
         {#if totalActive}<span class="badge err">{totalActive} en cours</span>{/if}
@@ -466,7 +466,7 @@
   {/if}
 
   {#if sorted.length}
-    <Panel key="place.rows" title="Mesures" sub="(période affichée, plus récentes d'abord)" defaultOpen={false}>
+    <Panel key="place.{placeId}.rows" title="Mesures" sub="(période affichée, plus récentes d'abord)" defaultOpen={false}>
       <div class="table-wrap values-table">
         <table>
           <thead>
@@ -497,7 +497,7 @@
       {/if}
     </Panel>
 
-    <Panel key="place.sensors" title="Capteurs" defaultOpen={false}>
+    <Panel key="place.{placeId}.sensors" title="Capteurs" defaultOpen={false}>
       {#snippet summary()}<span class="muted">{deployments.length} affectation{deployments.length > 1 ? "s" : ""}</span>{/snippet}
       <div class="table-wrap">
         <table>

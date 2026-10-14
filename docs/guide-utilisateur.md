@@ -167,9 +167,9 @@ d'historique dès sa création.
 ## Page d'un emplacement
 
 Valeurs actuelles et tendances en tête, puis des **volets repliables** : toucher l'en-tête d'un
-volet l'ouvre ou le replie (▸ / ▾) ; son en-tête reste visible avec un résumé. L'état de chaque
-volet est retenu sur l'appareil, pour tous les emplacements (replier « Humidité » la replie
-partout), **Exporter les données** en haut ([écran](#ecran-emplacement)).
+volet l'ouvre ou le replie (▸ / ▾) ; son en-tête reste visible avec un résumé. L'état des volets
+est retenu sur l'appareil **pour chaque emplacement** (humidité ouverte pour l'extérieur, repliée
+pour une chambre). **Exporter les données** en haut ([écran](#ecran-emplacement)).
 
 - **Une grandeur par volet** (**Température**, **Humidité relative**) : courbe, durée (24 h… 1 an),
   minimum, maximum, moyenne ; l'en-tête donne la valeur actuelle. Replier un volet masque sa courbe

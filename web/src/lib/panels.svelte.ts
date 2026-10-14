@@ -1,7 +1,7 @@
 // Volets repliables des pages (station, prévisions, courbes de chaque grandeur, alertes, mesures,
-// capteurs…) : ouvert ou fermé, mémorisé sur l'appareil par type de volet (le même pour tous les
-// emplacements : « courbe de température », « mesures »…), pas dans le compte (téléphone et
-// ordinateur n'ont pas la même place).
+// capteurs…) : ouvert ou fermé, mémorisé sur l'appareil pour chaque emplacement (clé
+// « place.<id>.<volet> » : l'humidité ouverte dehors et repliée dans une chambre ; une station aura
+// ses propres volets), pas dans le compte (téléphone et ordinateur n'ont pas la même place).
 
 const STORE = "mobalplus.panels";
 
@@ -9,7 +9,8 @@ export const panels = $state<Record<string, boolean>>({});
 try {
   const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}");
   if (saved && typeof saved === "object") {
-    for (const [k, v] of Object.entries(saved)) if (typeof v === "boolean") panels[k] = v;
+    // (clés communes à tous les emplacements de la première version, sans identifiant : ignorées)
+    for (const [k, v] of Object.entries(saved)) if (typeof v === "boolean" && /\.\d+\./.test(k)) panels[k] = v;
   }
 } catch { /* stockage indisponible : valeurs par défaut */ }
 

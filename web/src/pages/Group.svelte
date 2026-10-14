@@ -43,7 +43,7 @@
     .map(([code, name]) => ({ code, name })).sort((a, b) => rank(a.code) - rank(b.code));
   const all = properties.map((p) => p.code);
   /** Grandeurs dont le volet est ouvert : seules leurs courbes sont chargées et tracées */
-  const visible = $derived(all.filter((c) => isOpen(`group.${c}`, true)));
+  const visible = $derived(all.filter((c) => isOpen(`group.${placeId}.${c}`, true)));
   // svelte-ignore state_referenced_locally
   const seriesOf = (placeId: number, prop: string) => series.find((s) => s.place_id === placeId && s.property === prop);
 
@@ -208,7 +208,7 @@
 
   {#each charts as c (c.prop)}
     {@const avg = averages.find((a) => a.property === c.prop)}
-    <Panel key="group.{c.prop}" title={c.title} sub="({c.unit})">
+    <Panel key="group.{placeId}.{c.prop}" title={c.title} sub="({c.unit})">
       {#snippet summary()}{#if avg}<span class="num pv {c.prop}">⌀ {fmtValue(avg.value, avg.unit)}</span>{/if}{/snippet}
       <TimeChart series={c.curves} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
                  curve={display.curve} group="groupe-{placeId}" label="{c.title} – {node.name}" />
@@ -216,7 +216,7 @@
     </Panel>
   {/each}
 
-  <Panel key="group.members" title="Sous-emplacements">
+  <Panel key="group.{placeId}.members" title="Sous-emplacements">
     {#snippet summary()}<span class="muted">{members.length}</span>{/snippet}
     <ul class="members">
       {#each members as m (m.node.id)}

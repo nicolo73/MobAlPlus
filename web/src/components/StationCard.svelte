@@ -34,7 +34,7 @@
   onMount(async () => {
     await loadInfo();
     // Anomalie (erreur de collecte ou des normales) : fiche ouverte d'emblée
-    if (info && (info.sync?.status === "ERROR" || info.normals?.error)) setOpen("station", true);
+    if (info && (info.sync?.status === "ERROR" || info.normals?.error)) setOpen(`place.${placeId}.station`, true);
     // Détails en direct, sans collecte
     try { details = (await api.refreshWeatherStation(placeId, false)).details; } catch { /* fonction pas à jour : sans détails */ }
   });
@@ -117,7 +117,7 @@
   });
 </script>
 
-<Panel key="station" title="Station météo" defaultOpen={false} class="station">
+<Panel key="place.{placeId}.station" title="Station météo" defaultOpen={false} class="station">
   {#snippet summary()}
     <span class="badge {syncTone}">collecte</span>
     <span class="badge {info?.forecast?.n ? 'ok' : 'warn'}">prévision</span>
