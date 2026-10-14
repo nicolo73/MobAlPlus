@@ -19,8 +19,10 @@
     onsaved: () => void;
     /** Station météo avec prévision : alertes « prévu au-dessus / en dessous » */
     forecast?: boolean;
+    /** Sans repli propre (dans le volet Alertes de la page) */
+    bare?: boolean;
   }
-  let { series, rules, editable, onsaved, forecast = false }: Props = $props();
+  let { series, rules, editable, onsaved, forecast = false, bare = false }: Props = $props();
 
   const LEVELS: { v: AlertLevel; label: string }[] = [{ v: "info", label: "Info" }, { v: "warning", label: "Importante" }];
   interface Row { kind: AlertKind; label: string; value: boolean; unit?: string; ref?: boolean; help?: string; fc?: boolean }
@@ -112,11 +114,19 @@
   }
 </script>
 
-<details class="rules" open={count > 0}>
-  <summary>
-    <strong>Alertes</strong>
-    <span class="muted">{count ? `${count} règle${count > 1 ? "s" : ""}` : "aucune"}</span>
-  </summary>
+{#if bare}
+  <div class="bare">{@render body()}</div>
+{:else}
+  <details class="rules" open={count > 0}>
+    <summary>
+      <strong>Alertes</strong>
+      <span class="muted">{count ? `${count} règle${count > 1 ? "s" : ""}` : "aucune"}</span>
+    </summary>
+    {@render body()}
+  </details>
+{/if}
+
+{#snippet body()}
   <table>
     <thead><tr><th></th>{#each LEVELS as l (l.v)}<th class="lvl {l.v}">{l.label}</th>{/each}</tr></thead>
     <tbody>
@@ -170,13 +180,15 @@
   {:else}
     <small class="muted">Réglage réservé aux comptes « gestion » de la maison.</small>
   {/if}
-</details>
+{/snippet}
 
 <style>
   .rules { margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
   summary { cursor: pointer; display: flex; gap: 0.6rem; align-items: baseline; list-style: none; }
   summary::before { content: "▸"; color: var(--muted); }
   .rules[open] summary::before { content: "▾"; }
+  .bare { display: flex; flex-direction: column; gap: 0.4rem; }
+  .bare table { margin-top: 0; }
   table { margin: 0.5rem 0; width: auto; max-width: 100%; }
   th, td { padding: 0.25rem 0.3rem; border: none; vertical-align: middle; }
   th:first-child { padding-left: 0; }

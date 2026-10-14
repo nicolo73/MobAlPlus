@@ -149,9 +149,9 @@ d'historique dès sa création.
   pour les masquer. Calcul par tranches de 10 ans, une à chaque collecte (toutes les 30 minutes) :
   une nouvelle station a ses normales en 1 h 30 environ (ou plus vite avec **Actualiser**, une
   tranche par appui) ; si la station change de position, elles sont recalculées.
-- **Fiche « Station météo »** en haut de la page de la station, avec trois pastilles d'état
-  (collecte, prévision, normales : vert = bon, orange = en attente, rouge = erreur) ; la toucher
-  pour l'ouvrir (ouverte d'office en cas d'erreur) :
+- **Volet « Station météo »** en haut de la page de la station, avec trois pastilles d'état
+  (collecte, prévision, normales : vert = bon, orange = en attente, rouge = erreur) ; le toucher
+  pour l'ouvrir (ouvert d'office en cas d'erreur) :
   - **carte** de situation (OpenStreetMap, zoom + / −, **Agrandir** ouvre la carte complète) :
     l'épingle est la position de la station, le petit carré le **point de grille** du modèle météo
     dont viennent les valeurs ;
@@ -166,12 +166,26 @@ d'historique dès sa création.
 
 ## Page d'un emplacement
 
-Valeurs actuelles et tendances, courbes, minimum, maximum, moyenne, liste des mesures, capteurs
-affectés, **Exporter les données** ([écran](#ecran-emplacement)).
+Valeurs actuelles et tendances en tête, puis des **volets repliables** : toucher l'en-tête d'un
+volet l'ouvre ou le replie (▸ / ▾) ; son en-tête reste visible avec un résumé. L'état de chaque
+volet est retenu sur l'appareil, pour tous les emplacements (replier « Humidité » la replie
+partout), **Exporter les données** en haut ([écran](#ecran-emplacement)).
 
+- **Une grandeur par volet** (**Température**, **Humidité relative**) : courbe, durée (24 h… 1 an),
+  minimum, maximum, moyenne ; l'en-tête donne la valeur actuelle. Replier un volet masque sa courbe
+  (elle n'est plus chargée) : il remplace les anciens boutons Température / Humidité. Lien
+  **Alertes ›** à droite de l'en-tête (avec le nombre de règles, et une pastille rouge si une alerte
+  est en cours) : ouvre le volet Alertes sur l'onglet de cette grandeur.
+- **Alertes** : un **onglet par grandeur** (Température, Humidité, et d'autres plus tard), avec ses
+  réglages (ci-dessous) ; l'en-tête du volet donne le nombre de règles et d'alertes en cours. Les
+  seuils restent tracés en tirets sur les courbes et les mesures au-delà marquées par des points
+  ([écran](#ecran-emplacement-alertes)).
+- **Mesures** (replié par défaut) : liste des mesures de la période affichée, chargée à l'ouverture.
+- **Capteurs** (replié par défaut) : capteurs affectés et leurs périodes.
+- Station météo : volets **Station météo** et **Prévisions** en plus (voir Météo publique).
 - **Couleur dans les courbes** (droits « gestion ») : palette, gris, marron… ou personnalisée.
-- **Seuils d'alerte** : lignes en tirets sur la courbe ; les mesures au-delà sont marquées par des
-  points ([écran](#ecran-emplacement-alertes)).
+- Page d'un **groupe** : un volet par grandeur (courbes des sous-emplacements et moyenne) et le
+  volet **Sous-emplacements**.
 
 ## Alertes
 
@@ -179,8 +193,8 @@ affectés, **Exporter les données** ([écran](#ecran-emplacement)).
 indique le nombre d'alertes à voir (rouge s'il y en a une importante) et ouvre la liste
 ([écran](#ecran-alertes)).
 
-**Régler les alertes** : page de l'emplacement, sous chaque courbe, rubrique **Alertes**
-(droits « gestion »).
+**Régler les alertes** : page de l'emplacement, volet **Alertes**, onglet de la grandeur (ou lien
+**Alertes ›** dans l'en-tête de sa courbe) ; droits « gestion ».
 
 | | <img src="images/icones/info.svg" alt="ⓘ" height="16"> Info | <img src="images/icones/alerte.svg" alt="⚠" height="16"> Importante |
 |---|---|---|

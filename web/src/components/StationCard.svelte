@@ -8,6 +8,8 @@
   import { fmtAgo, fmtDate } from "../lib/format";
   import type { WeatherDetails, WeatherRefresh, WeatherStationInfo } from "../lib/types";
   import StationMap from "./StationMap.svelte";
+  import Panel from "./Panel.svelte";
+  import { setOpen } from "../lib/panels.svelte";
 
   interface Props {
     placeId: number;
@@ -23,7 +25,6 @@
   let busy = $state(false);
   let report = $state("");
   let reportError = $state(false);
-  let open = $state(false);
 
   async function loadInfo() {
     try { info = await api.weatherStationInfo(placeId); infoError = ""; }
@@ -33,7 +34,7 @@
   onMount(async () => {
     await loadInfo();
     // Anomalie (erreur de collecte ou des normales) : fiche ouverte d'emblée
-    if (info && (info.sync?.status === "ERROR" || info.normals?.error)) open = true;
+    if (info && (info.sync?.status === "ERROR" || info.normals?.error)) setOpen("station", true);
     // Détails en direct, sans collecte
     try { details = (await api.refreshWeatherStation(placeId, false)).details; } catch { /* fonction pas à jour : sans détails */ }
   });
@@ -116,26 +117,21 @@
   });
 </script>
 
-<section class="card station">
-  <div class="head">
-    <button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>
-      <h2>Station météo</h2>
-      <span class="chips">
-        <span class="badge {syncTone}">collecte</span>
-        <span class="badge {info?.forecast?.n ? 'ok' : 'warn'}">prévision</span>
-        <span class="badge {normals.tone}">normales</span>
-      </span>
-      <span class="chev" aria-hidden="true">{open ? "▴" : "▾"}</span>
-    </button>
-    <button class="refresh" onclick={refresh} disabled={busy || !info}
+<Panel key="station" title="Station météo" defaultOpen={false} class="station">
+  {#snippet summary()}
+    <span class="badge {syncTone}">collecte</span>
+    <span class="badge {info?.forecast?.n ? 'ok' : 'warn'}">prévision</span>
+    <span class="badge {normals.tone}">normales</span>
+    {#if report}<small class:err-text={reportError} class="report">{report}</small>{/if}
+    {#if infoError}<small class="err-text">{infoError}</small>{/if}
+  {/snippet}
+  {#snippet actions()}
+    <button onclick={refresh} disabled={busy || !info}
             title="Relever cette station maintenant (mesures, prévision, normales) sans attendre le prochain passage">
       {busy ? "Actualisation…" : "Actualiser"}
     </button>
-  </div>
-  {#if report}<small class:err-text={reportError} class="report">{report}</small>{/if}
-  {#if infoError}<small class="err-text">{infoError}</small>{/if}
-
-  {#if open && info}
+  {/snippet}
+  {#if info}
     <div class="body">
       <StationMap lat={info.lat} lon={info.lon} grid={details?.grid ?? null} label={name} />
       <dl>
@@ -178,19 +174,11 @@
       <small class="muted">Sources : Open-Meteo (prévisions des services météo nationaux, archives ERA5 pour l'historique
         et les normales) ; carte © les contributeurs d'OpenStreetMap.</small>
     </div>
-  {/if}
-</section>
+  {:else}<span class="muted">Chargement…</span>{/if}
+</Panel>
 
 <style>
-  .station { display: flex; flex-direction: column; gap: 0.5rem; }
-  .head { display: flex; align-items: center; gap: 0.5rem; }
-  .toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; border: none; background: none;
-            padding: 0; text-align: left; color: inherit; min-height: 2.2rem; }
-  .toggle h2 { margin: 0; font-size: 1.1rem; }
-  .chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-  .chev { color: var(--muted); }
-  .refresh { flex: none; }
-  .report { display: block; }
+  .report { flex-basis: 100%; }
   .err-text { color: var(--err); }
   .body { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
   /* Grand écran : carte à gauche, état à droite ; conditions et sources dessous */

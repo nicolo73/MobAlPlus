@@ -94,8 +94,10 @@ await shot(p, "plein-ecran");
 p = await phone();
 await go(p, "#/lieu/4", 2500);
 await shot(p, "emplacement");
-await p.locator("details.rules").first().evaluate((d) => (d.open = true));
-await shot(p, "emplacement-alertes", { scrollTo: "section.card h2", top: 60 });
+// Volet « Alertes », ouvert par le raccourci du volet Température
+await p.locator("button.alerts-link").first().click();
+await wait(600);
+await shot(p, "emplacement-alertes", { scrollTo: "#alertes", top: 60 });
 
 p = await phone();
 await go(p, "#/alertes", 2500);

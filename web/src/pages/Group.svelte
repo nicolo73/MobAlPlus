@@ -11,7 +11,9 @@
   import { averagePoints, flatten, placeTree, type PlaceNode } from "../lib/placetree";
   import { computeTrend } from "../lib/trend";
   import { rulesBySeries, zoneOf } from "../lib/zones";
-  import { display, visibleProps } from "../lib/display.svelte";
+  import { display } from "../lib/display.svelte";
+  import Panel from "../components/Panel.svelte";
+  import { isOpen } from "../lib/panels.svelte";
   import type { AlertRule, CurrentValue, Place, Point, SeriesInfo } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -39,7 +41,9 @@
   // svelte-ignore state_referenced_locally
   const properties = [...new Map(series.filter((s) => node.measured.includes(s.place_id)).map((s) => [s.property, s.property_name]))]
     .map(([code, name]) => ({ code, name })).sort((a, b) => rank(a.code) - rank(b.code));
-  const visible = $derived(visibleProps(properties.map((p) => p.code)));
+  const all = properties.map((p) => p.code);
+  /** Grandeurs dont le volet est ouvert : seules leurs courbes sont chargées et tracées */
+  const visible = $derived(all.filter((c) => isOpen(`group.${c}`, true)));
   // svelte-ignore state_referenced_locally
   const seriesOf = (placeId: number, prop: string) => series.find((s) => s.place_id === placeId && s.property === prop);
 
@@ -59,7 +63,8 @@
   let color = $state<ColorChoice>(place.color ?? place.color_slot ?? null);
   let colorOpen = $state(false);
 
-  const ids = () => members.flatMap((m) => visible.map((p) => seriesOf(m.node.id, p)?.id)).filter((id): id is number => id != null);
+  const idsOf = (props: string[]) => members.flatMap((m) => props.map((p) => seriesOf(m.node.id, p)?.id)).filter((id): id is number => id != null);
+  const ids = () => idsOf(visible);
 
   async function load(range = loadRange(win)) {
     const id = ++reqId;
@@ -84,7 +89,7 @@
       current = (await api.currentValues()).filter((c) => node.measured.includes(c.place_id));
       api.alertRules(current.map((c) => c.series_id)).then((r) => (rules = rulesBySeries(r))).catch(() => {});
       const to = Date.now();
-      history = await api.seriesData(ids(), to - 25 * 3_600_000, to);
+      history = await api.seriesData(idsOf(all), to - 25 * 3_600_000, to);   // tendances : toutes les grandeurs
     } catch { /* valeurs actuelles indisponibles : la page reste utilisable */ }
   }
   load();
@@ -108,7 +113,7 @@
   let shown = "";
   $effect(() => {
     const key = visible.join(",");
-    if (shown && key !== shown) { load(); loadCurrent(); }
+    if (shown && key !== shown && visible.some((v) => !shown.split(",").includes(v))) load();
     shown = key;
   });
   $effect(() => {
@@ -122,7 +127,7 @@
   });
 
   /** Moyenne actuelle et tendance de la moyenne, par grandeur affichée */
-  const averages = $derived(visible.flatMap((prop) => {
+  const averages = $derived(all.flatMap((prop) => {
     const items = current.filter((c) => c.property === prop && c.value !== null);
     if (!items.length) return [];
     const lists = items.map((c) => history.get(c.series_id)).filter((l): l is Point[] => !!l);
@@ -134,7 +139,7 @@
   }));
 
   /** Une courbe par grandeur : chaque sous-emplacement, et la moyenne en tirets */
-  const charts = $derived(visible.flatMap((prop) => {
+  const charts = $derived(all.flatMap((prop) => {
     const curves: ChartSeries[] = [];
     for (const m of members) {
       const s = seriesOf(m.node.id, prop);
@@ -198,22 +203,24 @@
     <small>dernière mesure {fmtAgo(lastTs)}</small>
   </section>
 
-  {#if properties.length}<DisplayBar {properties} />{/if}
+  <!-- Grandeurs : un volet chacune (replier masque sa courbe) ; ici, météo, prévision, normales et rendu -->
+  {#if properties.length}<DisplayBar properties={[]} />{/if}
 
-  {#each charts as c, i (c.prop)}
-    <section class="card">
-      <h2>{c.title} <small class="muted">({c.unit})</small></h2>
+  {#each charts as c (c.prop)}
+    {@const avg = averages.find((a) => a.property === c.prop)}
+    <Panel key="group.{c.prop}" title={c.title} sub="({c.unit})">
+      {#snippet summary()}{#if avg}<span class="num pv {c.prop}">⌀ {fmtValue(avg.value, avg.unit)}</span>{/if}{/snippet}
       <TimeChart series={c.curves} unit={c.unit} {loaded} window={win} onwindow={setWindow} {loading}
                  curve={display.curve} group="groupe-{placeId}" label="{c.title} – {node.name}" />
-      {#if i === 0}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
-    </section>
+      {#if c.prop === visible[0]}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
+    </Panel>
   {/each}
 
-  <section class="card">
-    <h2>Sous-emplacements</h2>
+  <Panel key="group.members" title="Sous-emplacements">
+    {#snippet summary()}<span class="muted">{members.length}</span>{/snippet}
     <ul class="members">
       {#each members as m (m.node.id)}
-        {@const cur = current.filter((c) => c.place_id === m.node.id && visible.includes(c.property))
+        {@const cur = current.filter((c) => c.place_id === m.node.id && all.includes(c.property))
           .sort((a, b) => rank(a.property) - rank(b.property))}
         <li>
           <span class="key" style="--c:{m.color}"></span>
@@ -229,7 +236,7 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </Panel>
 </div>
 
 <style>
@@ -241,7 +248,7 @@
   .temperature { color: var(--val-temp); }
   .humidity { color: var(--val-hum); }
   .arrow { font-size: 1rem; margin-left: 0.4rem; font-weight: 400; }
-  h2 small { font-weight: 400; }
+  .pv { font-weight: 700; }
   .color { display: grid; gap: 0.4rem; justify-items: start; }
   .color .link { font-size: 0.85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
   .dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--c); }

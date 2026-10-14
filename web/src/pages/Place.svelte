@@ -16,13 +16,16 @@
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
   import { forecastCurve, forgetNormals, homeWeather, loadForecast, loadNormals, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import StationCard from "../components/StationCard.svelte";
+  import Panel from "../components/Panel.svelte";
+  import { isOpen, reveal } from "../lib/panels.svelte";
+  import { untrack } from "svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
   import { router } from "../lib/router.svelte";
   import { loadAlerts } from "../lib/alerts.svelte";
   import { computeTrend } from "../lib/trend";
-  import { display, visibleProps } from "../lib/display.svelte";
+  import { display } from "../lib/display.svelte";
 
   let { placeId }: { placeId: number } = $props();
 
@@ -53,8 +56,9 @@
   const sorted = $derived([...(series ?? [])].sort((a, b) =>
     (order.indexOf(a.property) + 9) % 9 - (order.indexOf(b.property) + 9) % 9));
   const properties = $derived(sorted.map((s) => ({ code: s.property, name: s.property_name })));
-  const visible = $derived(visibleProps(properties.map((p) => p.code)));
-  /** Séries dont la courbe est affichée (les grandeurs masquées ne sont ni chargées ni tracées) */
+  /** Grandeurs dont le volet est ouvert : seules leurs courbes sont chargées et tracées */
+  const visible = $derived(properties.map((p) => p.code).filter((c) => isOpen(`place.${c}`, true)));
+  /** Séries dont la courbe est affichée (volets repliés : ni chargées ni tracées) */
   const shownSeries = $derived(sorted.filter((s) => visible.includes(s.property)));
   const name = $derived(series?.[0]?.place_name ?? current[0]?.place_name ?? "Emplacement");
   const lastTs = $derived(current.map((c) => c.ts).filter(Boolean).sort().at(-1) ?? null);
@@ -209,7 +213,7 @@
       current = cur.filter((c) => c.place_id === placeId);
       deployments = deps;
       // Courbes, statistiques et liste indépendantes : l'échec de l'une n'empêche pas les autres
-      const results = await Promise.allSettled([load(), loadRows(true), loadStats()]);
+      const results = await Promise.allSettled([load(), loadStats()]);
       setTimeout(loadTrends, 0);
       setTimeout(loadAlertData, 0);
       const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
@@ -260,7 +264,7 @@
     win = w;
     if (needsReload(w, loaded) || otherView(w, loadedKey)) load(loadRange(w));
     clearTimeout(statsTimer);
-    statsTimer = setTimeout(() => { loadStats(); loadRows(true); }, 400);
+    statsTimer = setTimeout(() => { loadStats(); if (rowsOpen) loadRows(true); }, 400);
   }
 
   // Grandeur réaffichée : ses courbes et statistiques n'ont pas été chargées
@@ -270,6 +274,21 @@
     if (series && shown && key !== shown && visible.some((v) => !shown.split(",").includes(v))) { load(); loadStats(); }
     shown = key;
   });
+
+  /** Volet « Mesures » : liste chargée à l'ouverture (et à chaque changement de période) */
+  const rowsOpen = $derived(isOpen("place.rows", false));
+  $effect(() => { if (rowsOpen && series) untrack(() => loadRows(true).catch((e) => (error = String(e)))); });
+
+  // Volet « Alertes » : un onglet par grandeur ; raccourci depuis le volet de chaque courbe
+  let alertTab = $state<string | null>(null);
+  const tab = $derived(sorted.find((s) => s.property === alertTab) ?? sorted[0]);
+  const rulesOf = (id: number) => rules.filter((r) => r.series_id === id);
+  const ruleCount = (id: number) => rulesOf(id).filter((r) => r.enabled).length;
+  const activeOf = (id: number) => events.filter((e) => e.series_id === id && e.ended_at == null && !e.archived);
+  function gotoAlerts(prop: string) {
+    alertTab = prop;
+    reveal("place.alerts", "alertes");
+  }
 
   /** Une ligne par horodatage : température et humidité côte à côte */
   const table = $derived.by(() => {
@@ -342,8 +361,7 @@
 
   {#if isStation}<StationCard {placeId} {name} onrefreshed={stationRefreshed} />{/if}
   {#if forecastDays.length}
-    <section class="card">
-      <h2>Prévisions <small class="muted">(Open-Meteo, mises à jour toutes les 30 minutes)</small></h2>
+    <Panel key="forecast" title="Prévisions" sub="(Open-Meteo, 7 jours)">
       <div class="table-wrap">
         <table class="forecast">
           <thead>
@@ -372,20 +390,33 @@
       </div>
       <small class="muted">Sur les courbes, la prévision prolonge la mesure en trait mixte : glisser la barre sous la
         courbe vers la droite pour voir les jours à venir. Alertes « prévu au-dessus / en dessous » sous chaque courbe.
-        {#if withNormals}Normale : minimum et maximum habituels du jour (moyennes 1991 – 2020), en bande tiret-point-point sur les courbes.{/if}</small>
-    </section>
+        {#if withNormals}Normale : minimum et maximum habituels du jour (moyennes 1991 – 2020), en bande tiret-point-point sur les courbes.{/if}
+        Mises à jour toutes les 30 minutes.</small>
+    </Panel>
   {/if}
 
-  {#if sorted.length}<DisplayBar {properties} />{/if}
+  <!-- Grandeurs : un volet chacune (replier masque sa courbe) ; ici, météo, prévision, normales et rendu -->
+  {#if sorted.length}<DisplayBar properties={[]} />{/if}
 
   {#if series && series.length === 0}
     <div class="card muted">Aucun capteur n'est affecté à cet emplacement.</div>
   {/if}
 
-  {#each shownSeries as s, i (s.id)}
+  {#each sorted as s (s.id)}
     {@const st = stats.get(s.id)}
-    <section class="card">
-      <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
+    {@const c = current.find((x) => x.series_id === s.id)}
+    {@const n = ruleCount(s.id)}
+    {@const active = activeOf(s.id).length}
+    <Panel key="place.{s.property}" title={s.property_name} sub="({s.unit})">
+      {#snippet summary()}
+        <span class="num pv {s.property}"><span class="zv {zoneOf(c?.value ?? null, rulesOf(s.id)) ?? ''}">{fmtValue(c?.value ?? null, s.unit)}</span></span>
+      {/snippet}
+      {#snippet actions()}
+        <button class="link alerts-link" onclick={() => gotoAlerts(s.property)}
+                title="Alertes de {s.property_name.toLowerCase()} : seuils, pics, comparaisons…">
+          {#if active}<span class="badge err">{active}</span>{/if}Alertes{n ? ` (${n})` : ""} ›
+        </button>
+      {/snippet}
       <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [],
                             ...(bands.has(s.id) ? { band: bands.get(s.id) } : {}),
                             ...(normals.has(s.id) ? { normal: normals.get(s.id) } : {}) },
@@ -395,8 +426,8 @@
                  unit={s.unit} {loaded} window={win} onwindow={setWindow} {loading} height={240}
                  curve={display.curve} thresholds={thresholdsOf(s.id)} alertPoints={alertPointsOf(s.id)} gaps={gapsOf(s.id)} cutAfter={gapOf(s.id)}
                  group="lieu-{placeId}" label="{s.property_name} – {name}" />
-      <!-- Durée et retour à maintenant, sous la première courbe (les courbes de la page bougent ensemble) -->
-      {#if i === 0}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
+      <!-- Durée et retour à maintenant, sous la première courbe affichée (les courbes de la page bougent ensemble) -->
+      {#if s.id === shownSeries[0]?.id}<PeriodBar window={win} onchange={setWindow} {loading} />{/if}
       {#if st}
         <dl class="stats">
           <div><dt>Minimum</dt><dd class="num">{fmtValue(st.vmin, s.unit)}</dd><small>{fmtDate(st.tmin)}</small></div>
@@ -405,14 +436,37 @@
           <div><dt>Mesures</dt><dd class="num">{st.n.toLocaleString("fr-FR")}</dd></div>
         </dl>
       {/if}
-      <AlertRulesEditor series={s} rules={rules.filter((r) => r.series_id === s.id)} editable={canEdit()} forecast={forecast.has(s.id)}
-                        onsaved={() => { loadAlertData(); loadAlerts(); }} />
-    </section>
+    </Panel>
   {/each}
 
   {#if sorted.length}
-    <section class="card">
-      <h2>Mesures <small class="muted">(période affichée, plus récentes d'abord)</small></h2>
+    {@const totalRules = sorted.reduce((t, s) => t + ruleCount(s.id), 0)}
+    {@const totalActive = sorted.reduce((t, s) => t + activeOf(s.id).length, 0)}
+    <Panel key="place.alerts" title="Alertes" id="alertes" defaultOpen={false}>
+      {#snippet summary()}
+        <span class="muted">{totalRules ? `${totalRules} règle${totalRules > 1 ? "s" : ""}` : "aucune règle"}</span>
+        {#if totalActive}<span class="badge err">{totalActive} en cours</span>{/if}
+      {/snippet}
+      {#if tab}
+        <div class="tabs" role="tablist" aria-label="Alertes par grandeur">
+          {#each sorted as s (s.id)}
+            {@const n = ruleCount(s.id)}
+            <button role="tab" aria-selected={tab.id === s.id} class:active={tab.id === s.id} onclick={() => (alertTab = s.property)}>
+              {s.property_name}{#if n}<span class="count">{n}</span>{/if}{#if activeOf(s.id).length}<span class="badge err">!</span>{/if}
+            </button>
+          {/each}
+        </div>
+        {#key tab.id}
+          <AlertRulesEditor series={tab} rules={rulesOf(tab.id)} editable={canEdit()} forecast={forecast.has(tab.id)} bare
+                            onsaved={() => { loadAlertData(); loadAlerts(); }} />
+        {/key}
+        <small class="muted">Les seuils haut et bas restent tracés sur les courbes (tirets) et colorent les valeurs.</small>
+      {/if}
+    </Panel>
+  {/if}
+
+  {#if sorted.length}
+    <Panel key="place.rows" title="Mesures" sub="(période affichée, plus récentes d'abord)" defaultOpen={false}>
       <div class="table-wrap values-table">
         <table>
           <thead>
@@ -439,12 +493,12 @@
         </table>
       </div>
       {#if moreAvailable && rows.length}
-        <button style="margin-top:0.75rem" onclick={() => loadRows()}>Afficher plus</button>
+        <button style="align-self:flex-start" onclick={() => loadRows()}>Afficher plus</button>
       {/if}
-    </section>
+    </Panel>
 
-    <section class="card">
-      <h2>Capteurs</h2>
+    <Panel key="place.sensors" title="Capteurs" defaultOpen={false}>
+      {#snippet summary()}<span class="muted">{deployments.length} affectation{deployments.length > 1 ? "s" : ""}</span>{/snippet}
       <div class="table-wrap">
         <table>
           <thead><tr><th>Capteur</th><th>Grandeur</th><th>Période</th></tr></thead>
@@ -459,7 +513,7 @@
           </tbody>
         </table>
       </div>
-    </section>
+    </Panel>
   {/if}
 </div>
 
@@ -476,8 +530,7 @@
   .big { font-size: 2rem; font-weight: 700; line-height: 1.1; }
   .big.temperature { color: var(--val-temp); }
   .big.humidity { color: var(--val-hum); }
-  h2 small { font-weight: 400; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem; margin: 0.75rem 0 0; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem; margin: 0.15rem 0 0; }
   .stats div { display: grid; gap: 0.1rem; }
   dt { font-size: 0.8rem; color: var(--muted); }
   dd { margin: 0; font-weight: 700; font-size: 1.1rem; }
@@ -487,4 +540,13 @@
   .forecast th.sub { font-size: 0.75rem; font-weight: 500; padding-top: 0; }
   .forecast td { white-space: nowrap; }
   .forecast td.normal { color: var(--muted); font-size: 0.85em; }
+  .pv { font-weight: 700; }
+  .pv.temperature { color: var(--val-temp); }
+  .pv.humidity { color: var(--val-hum); }
+  .alerts-link { font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  .tabs button { border-radius: 999px; min-height: 2rem; padding: 0.2rem 0.8rem; font-size: 0.9rem; color: var(--muted);
+                 display: inline-flex; align-items: center; gap: 0.35rem; }
+  .tabs button.active { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+  .tabs .count { font-size: 0.75rem; background: var(--border); color: var(--text); border-radius: 999px; padding: 0 0.4rem; }
 </style>

@@ -5,6 +5,14 @@
 -->
 
 
+## 14 octobre 2026 (volets)
+- Pages d'un emplacement et d'un groupe en **volets repliables** (comme la fiche de la station) :
+  une grandeur par volet (sa valeur actuelle dans l'en-tête ; replier masque la courbe, à la place
+  des boutons Température / Humidité), **Prévisions**, **Alertes**, **Mesures**, **Capteurs** ;
+  état retenu sur l'appareil.
+- **Alertes** dans un volet à part, avec un **onglet par grandeur** ; lien **Alertes ›** depuis
+  l'en-tête de chaque courbe (nombre de règles, pastille rouge si une alerte est en cours).
+
 ## 14 octobre 2026 (suite)
 - Page d'une station météo : fiche **Station météo** avec **carte** de situation, **diagnostic**
   (collecte, prévision, normales, erreurs), **conditions actuelles complètes** (vent, ressenti,
