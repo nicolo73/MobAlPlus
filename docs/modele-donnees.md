@@ -33,6 +33,9 @@ flowchart LR
 ```mermaid
 erDiagram
   home ||--o{ home_member : "membres"
+  home ||--o{ place_link : "emplacements reliés (partagés)"
+  place ||--o{ place_link : "relié à d'autres maisons"
+  place ||--o{ place_share : "partagé avec (e-mail)"
   home ||--o{ place : "contient"
   home ||--o{ device : "contient"
   place ||--o{ place : "parent de"
@@ -259,6 +262,11 @@ erDiagram
 |---|---|---|
 | `home` | maison : regroupe emplacements et capteurs | toutes les règles d'accès partent d'elle |
 | `home_member` | membres d'une maison, par e-mail | invitation possible avant la 1re connexion ; au moins un propriétaire |
+| `home.commons` | maison commune « Données publiques » (une seule) : stations météo publiques | sans membre ; on n'y entre pas, ses stations sont reliées aux maisons |
+| `place_share` | emplacement partagé avec un compte (e-mail) par un gestionnaire | supprimé : les liens qu'il a permis disparaissent |
+| `place_link` | emplacement d'une autre maison (partagé, ou station publique) affiché dans une maison, avec son rangement | lecture seule ; `my_place_ids()`, `my_series_ids()`, `my_channel_ids()` l'incluent en lecture |
+| `alert_rule.home_id`, `alert_event.home_id` | maison d'une règle d'alerte et de ses alertes | chaque maison a ses règles sur un emplacement partagé ; seuls ses membres sont notifiés |
+| `system_alert` | alertes de la plateforme (occupation de la base) | une ouverte par type ; notifiée aux administrateurs |
 | `place` | emplacements, en arborescence | même maison que son parent ; pas de boucle ; ordre `sort_order` ; un emplacement parent n'a pas de capteur affecté (et un emplacement équipé ne contient pas d'autres emplacements) |
 | `device` | capteurs physiques, et stations météo virtuelles (`vendor = 'open_meteo'`, position `lat` / `lon`) | `active = false` : plus collecté, historique conservé |
 | `device_channel` | canaux d'un capteur (une grandeur chacun) | créés automatiquement à la 1re collecte |
@@ -294,6 +302,9 @@ erDiagram
 | `collect_targets()`, `ingest_readings()`, `record_sync_error()` | collecteur |
 | `weather_targets()`, `add_weather_station()` | stations météo publiques : à collecter (Edge Function `weather`), création |
 | `store_forecast()`, `series_forecast()`, `evaluate_forecast_alerts()` | prévisions : enregistrement, lecture, alertes sur prévision |
+| `home_places()`, `share_place()`, `shared_with_me()`, `link_place()`, `unlink_place()`, `reorder_home_places()` | partage : emplacements d'une maison (reliés compris), partager, partagés avec moi, ajouter / retirer, ranger |
+| `public_stations()`, `make_station_public()` | stations météo publiques proches (et nombre de maisons qui les suivent), rendre publique une station |
+| `check_db_quota()`, `admin_db_usage()`, `pending_system_notifications()` | occupation de la base : alerte de quota (chaque heure), détail par maison / emplacement / capteur, notifications aux administrateurs |
 | `normals_targets()`, `save_normals_progress()`, `normals_error()`, `store_normals()`, `series_normals()` | normales saisonnières : station à calculer (ou à poursuivre), tranche faite, erreur, enregistrement, lecture |
 | `weather_station_info()` | diagnostic d'une station météo (position, collecte, prévision, normales), pour sa page |
 | `run_maintenance()`, `compact_readings()`, `simplify_old()` | maintenance nocturne |

@@ -79,3 +79,40 @@ export async function runNotify(db: Db, send: Send) {
   if (ids.length) await db.rpc("mark_notified", { p_ids: ids });
   return { events: ids.length, sent, failed, expired: gone.size };
 }
+
+// ── Alertes de la plateforme (occupation de la base…) : aux administrateurs ──
+
+export interface SystemPending {
+  alert_id: number;
+  kind: string;
+  level: "info" | "warning";
+  value: number | null;
+  threshold: number | null;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+export function systemMessage(p: SystemPending): { title: string; body: string } {
+  const pct = (v: number | null) => (v == null ? "–" : `${Math.round(v)} %`);
+  const icon = p.level === "warning" ? "⚠️" : "ℹ️";
+  if (p.kind === "db_quota") {
+    return { title: `${icon} Base de données`, body: `Occupation : ${pct(p.value)} du quota (seuil ${pct(p.threshold)}). Détail dans Admin › Base de données.` };
+  }
+  return { title: `${icon} MobAlPlus`, body: p.kind };
+}
+
+/** Envoie les alertes de la plateforme pas encore notifiées (base pas à jour : rien) */
+export async function runSystemNotify(db: Db, send: Send) {
+  const { data, error } = await db.rpc("pending_system_notifications");
+  if (error) return { alerts: 0, sent: 0 };
+  const rows = (data ?? []) as SystemPending[];
+  let sent = 0;
+  for (const p of rows) {
+    const payload = JSON.stringify({ ...systemMessage(p), tag: `systeme-${p.alert_id}`, url: "#/admin/base", level: p.level });
+    try { if ((await send({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }, payload)) < 400) sent++; } catch { /* suivant */ }
+  }
+  const ids = [...new Set(rows.map((r) => r.alert_id))];
+  if (ids.length) await db.rpc("mark_system_notified", { p_ids: ids });
+  return { alerts: ids.length, sent };
+}

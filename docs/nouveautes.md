@@ -5,6 +5,18 @@
 -->
 
 
+## 15 octobre 2026
+- **Partage d'emplacements entre maisons** : volet **Partage** d'un emplacement (adresse e-mail),
+  puis **Partagés avec moi** dans Admin › Emplacements chez l'ami ; l'emplacement s'affiche dans sa
+  maison en lecture seule (mention « partagé par … »).
+- **Stations météo publiques** : la station d'une commune est commune à toutes les maisons qui la
+  suivent (une seule collecte) ; celle qui existe à moins de 3 km est reprise. « Ma position » reste
+  privée ; une ancienne station peut être **rendue publique**.
+- **Alertes propres à chaque maison**, y compris sur un emplacement partagé ou une station publique.
+- **Admin › Base de données** : occupation par rapport au quota, seuils d'alerte réglables (info
+  40 %, importante 70 %, vérifiés chaque heure, notifiés aux administrateurs), détail par maison,
+  emplacement et capteur, et par niveau de stockage.
+
 ## 14 octobre 2026 (volets)
 - Pages d'un emplacement et d'un groupe en **volets repliables** (comme la fiche de la station) :
   une grandeur par volet (sa valeur actuelle dans l'en-tête ; replier masque la courbe, à la place

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
-  import type { Place } from "../lib/types";
+  import type { Place, SharedPlace } from "../lib/types";
   import { isWithin, placeOrder } from "../lib/placetree";
   import { isDark, placeColor } from "../lib/colors";
   import ColorPicker from "../components/ColorPicker.svelte";
@@ -22,11 +22,16 @@
   /** Emplacements qui ont un capteur affecté, et emplacements parents équipés (incohérence) */
   let occupied = $state(new Set<number>());
   let issues = $state<{ place_id: number; place_name: string; channels: number }[]>([]);
+  /** Emplacements d'autres comptes partagés avec moi (à ajouter à cette maison) */
+  let shared = $state<SharedPlace[]>([]);
   async function load() {
     try {
-      const [pl, devs, iss] = await Promise.all([api.places(), api.devices(), api.placeIssues()]);
-      occupied = new Set(devs.filter((d) => d.active).flatMap((d) => d.channels.map((c) => c.place_id))
+      const [pl, devs, iss, sh] = await Promise.all([api.places(), api.devices(), api.placeIssues(), api.sharedWithMe()]);
+      // (un emplacement partagé est mesuré : il ne contient pas de sous-emplacement)
+      occupied = new Set([...devs.filter((d) => d.active).flatMap((d) => d.channels.map((c) => c.place_id)),
+                          ...pl.filter((p) => p.shared).map((p) => p.id)]
         .filter((id): id is number => id != null));
+      shared = sh;
       issues = iss;
       places = pl;
     } catch (e) {
@@ -59,6 +64,17 @@
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  /** Emplacement partagé : ajouté à la maison, ou retiré (l'emplacement lui-même reste chez son propriétaire) */
+  async function link(s: SharedPlace) {
+    error = "";
+    try { await api.linkPlace(s.place_id); await load(); } catch (err) { error = err instanceof Error ? err.message : String(err); }
+  }
+  async function unlink(p: Place) {
+    if (!confirm(`Retirer « ${p.name} » de cette maison ? Il reste chez son propriétaire ; vos alertes dessus sont supprimées.`)) return;
+    error = "";
+    try { await api.unlinkPlace(p.id); await load(); } catch (err) { error = err instanceof Error ? err.message : String(err); }
   }
 
   async function remove(p: Place) {
@@ -175,7 +191,7 @@
         <label>Dans
           <select bind:value={draft.parent_id}>
             <option value={null}>— aucun —</option>
-            {#each (places ?? []).filter((p) => p.id !== draft?.id) as p (p.id)}
+            {#each (places ?? []).filter((p) => p.id !== draft?.id && !p.shared) as p (p.id)}
               <option value={p.id} disabled={occupied.has(p.id) && draft.parent_id !== p.id}>
                 {p.name}{occupied.has(p.id) ? " (a un capteur)" : ""}</option>
             {/each}
@@ -225,7 +241,9 @@
             <span class="name">{place.name}</span>
             {#if occupied.has(place.id)}<span class="sensor"><SensorIcon /></span>{/if}
             {#if place.color != null || place.color_slot != null}<span class="dot" style="--c:{placeColor(place, dark, 0)}" title="couleur dans les courbes"></span>{/if}
-            <span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>
+            {#if place.shared}
+              <span class="badge {place.shared.public ? 'ok' : ''}" title="Emplacement d'une autre maison, en lecture seule">{place.shared.public ? "public" : `partagé · ${place.shared.from}`}</span>
+            {:else}<span class="badge">{EXPOSURES[place.exposure ?? ""] ?? "–"}</span>{/if}
             <span class="spacer"></span>
             <span class="actions">
             <span class="moves">
@@ -238,17 +256,41 @@
               <button class="icon" disabled={busy || index === 0} onclick={() => indent(place, index)}
                       title="Ranger dans l'emplacement au-dessus" aria-label="Ranger {place.name} dans l'emplacement au-dessus">→</button>
             </span>
-            <button class="link" onclick={() => edit(place)}>modifier</button>
-            <button class="link danger" onclick={() => remove(place)}>supprimer</button>
+            {#if place.shared}
+              <button class="link danger" onclick={() => unlink(place)}>retirer</button>
+            {:else}
+              <button class="link" onclick={() => edit(place)}>modifier</button>
+              <button class="link danger" onclick={() => remove(place)}>supprimer</button>
+            {/if}
             </span>
           </li>
         {/each}
       </ul>
     {/if}
   </div>
+
+  {#if shared.length}
+    <div class="card stack">
+      <h3 style="margin:0">Partagés avec moi</h3>
+      <p class="muted hint">Emplacements que d'autres comptes vous ont partagés : ajoutés à cette maison, ils s'affichent
+        avec les vôtres (mesures, courbes, synthèses), en lecture seule ; vous y réglez vos propres alertes.</p>
+      <ul class="plain">
+        {#each shared as s (s.share_id)}
+          <li>
+            <strong>{s.place_name}</strong> <small class="muted">· {s.from_home}{s.shared_by ? ` (${s.shared_by})` : ""}</small>
+            <span class="spacer"></span>
+            {#if s.linked}<span class="muted">dans cette maison</span>
+            {:else}<button class="link" onclick={() => link(s)}>ajouter à cette maison</button>{/if}
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>
 
 <style>
+  .plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .plain li { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .tree { list-style: none; margin: 0; padding: 0; }
   .tree li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; padding: 0.4rem 0;
              padding-left: calc(var(--depth) * var(--indent, 1.5rem)); border-bottom: 1px solid var(--border); cursor: grab;

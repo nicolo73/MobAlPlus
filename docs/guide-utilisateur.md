@@ -118,8 +118,17 @@ publiques** (Open-Meteo, gratuit), pour comparer avec vos capteurs. Chaque commu
 **station météo** : un capteur virtuel relevé par le serveur toutes les 30 minutes, avec un an
 d'historique dès sa création.
 
-- **Ajouter une station** : **Admin › Partage › Météo publique** : chercher la commune, ou
-  **Ma position**. Plusieurs communes possibles ; **retirer** arrête la collecte (historique gardé).
+- **Ajouter une station** : **Admin › Partage › Météo publique** : chercher la commune. La station
+  d'une commune est **publique** : commune à toutes les maisons qui suivent cette commune (une seule
+  collecte, un seul historique). Si une maison suit déjà une station à moins de 3 km, elle est
+  reprise (liste « Déjà suivies à proximité ») plutôt que dupliquée. **Ma position** crée une station
+  **privée** (la position exacte de la maison n'est pas partagée). Plusieurs communes possibles.
+- **Retirer** une station publique la retire de la maison (elle n'est plus collectée quand plus
+  aucune maison ne la suit ; son historique reste) ; une station privée n'est plus collectée
+  (historique gardé). **Rendre publique** : une station privée créée avant les stations communes
+  devient commune aux autres maisons (elle reste dans la vôtre, avec ses alertes).
+- Chaque maison règle **ses propres alertes** sur une station publique (gel prévu, forte chaleur) :
+  seuls ses membres sont prévenus.
 - Une station est un **emplacement** comme les autres : fiche sur Maintenant (cadre pointillé,
   icône nuage), page avec courbes, tendances et **alertes** ; elle se range librement dans
   Admin › Emplacements (par exemple dans un groupe « Sites météo »). Elle ne compte pas dans la
@@ -275,6 +284,23 @@ envoyer le message proposé par **WhatsApp**, SMS ou e-mail ([écran](#ecran-par
 | **Gestion** | en plus : capteurs, emplacements, seuils d'alerte, import |
 | **Propriétaire** | tout, y compris le partage |
 
+Un compte peut être membre de **plusieurs maisons** (la sienne, celle d'un parent…) : choix de la
+maison en haut de l'écran. Une nouvelle maison est créée par l'administrateur de la plateforme, qui
+en invite le propriétaire.
+
+### Partager un emplacement avec une autre maison
+
+Pour montrer un capteur à un ami sans lui ouvrir toute la maison :
+
+1. Page de l'emplacement, volet **Partage** : son adresse e-mail, **Partager**.
+2. Lui : **Admin › Emplacements**, rubrique **Partagés avec moi**, **ajouter à cette maison**.
+
+L'emplacement apparaît alors dans sa maison avec la mention **partagé par …** : mesures, courbes,
+synthèses, prévision et normales, **en lecture seule** (capteurs et nom restent gérés par le
+propriétaire) ; il le range où il veut dans ses emplacements, et y règle **ses propres alertes**.
+**Retirer** (volet Partage, ou Admin › Emplacements) l'enlève de sa maison ; retirer le partage
+l'enlève de toutes les maisons de ce compte.
+
 ## Capteurs et emplacements
 
 - **Admin › Emplacements** : créer les pièces et zones, les ranger les unes dans les autres en les
@@ -282,6 +308,16 @@ envoyer le message proposé par **WhatsApp**, SMS ou e-mail ([écran](#ecran-par
   dessus) ([écran](#ecran-admin-emplacements)). <img src="images/icones/capteur.svg" alt="capteur" height="16"> signale un emplacement équipé d'un capteur. Un
   **emplacement parent ne reçoit pas de capteur** (il fait la moyenne de ses sous-emplacements) et un
   emplacement équipé ne peut pas contenir d'autres emplacements : l'application le refuse.
+- Emplacements **partagés** par d'autres maisons (et stations publiques) : mention **partagé** ou
+  **public** ; ils se rangent comme les autres mais ne se modifient pas (**retirer** les enlève de la
+  maison).
+- **Admin › Base de données** (administrateur de la plateforme) : occupation de la base par rapport
+  au quota (500 Mo pour l'offre gratuite), avec deux **seuils d'alerte** réglables (info, 40 % par
+  défaut ; importante, 70 %) vérifiés chaque heure : alerte affichée, et notification aux
+  administrateurs abonnés. **Détail** : base générale, puis chaque maison (ses propriétaires) et ses
+  emplacements, et les données publiques (chaque station et les maisons qui la suivent), avec la
+  place estimée par niveau de stockage (détail récent, compacté, simplifié, prévision et normales)
+  et le pourcentage du quota ([écran](#ecran-base-donnees)).
 - **Admin › Capteurs** : **Ajouter un capteur** (identifiant Mobile Alerts au dos), puis
   **affecter** chaque canal à un emplacement. **Déplacer** : nouvelle affectation datée ;
   **Retirer** : plus relevé, historique conservé.
@@ -321,5 +357,6 @@ l'agrandir.
 <a id="ecran-tendances" href="images/options-tendances.jpg"><img src="images/options-tendances.jpg" alt="Réglage des tendances" title="Réglage des tendances" width="150"></a>
 <a id="ecran-partage" href="images/partage.jpg"><img src="images/partage.jpg" alt="Message d'invitation" title="Message d'invitation" width="150"></a>
 <a id="ecran-admin-emplacements" href="images/admin-emplacements.jpg"><img src="images/admin-emplacements.jpg" alt="Organisation des emplacements" title="Organisation des emplacements" width="150"></a>
+<a id="ecran-base-donnees" href="images/base-donnees.jpg"><img src="images/base-donnees.jpg" alt="Base de données" title="Admin › Base de données : occupation par maison et emplacement" width="150"></a>
 <a id="ecran-plein-ecran" href="images/plein-ecran.jpg"><img src="images/plein-ecran.jpg" alt="Courbe en plein écran" title="Courbe en plein écran" width="300"></a>
 </p>

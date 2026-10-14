@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { message, type Pending, runNotify } from "../functions/notify/handler.ts";
+import { message, type Pending, runNotify, runSystemNotify } from "../functions/notify/handler.ts";
 
 const base: Pending = {
   event_id: 1, kind: "above", level: "warning", value: 27.3, threshold: 26, started_at: "2026-10-06T14:00:00Z",
@@ -41,4 +41,26 @@ test("envoi, abonnements expirés supprimés, alertes marquées notifiées", asy
   assert.deepEqual(sent, ["https://push/a #/lieu/4", "https://push/b #/lieu/4"]);
   assert.deepEqual(deleted, ["https://push/b"]);
   assert.deepEqual(calls, ["expire_notifications", "pending_notifications", 'mark_notified{"p_ids":[1,2]}']);
+});
+
+test("alertes de la plateforme : occupation de la base, aux administrateurs, marquées notifiées", async () => {
+  const calls: string[] = [];
+  const row = { alert_id: 3, kind: "db_quota", level: "warning", value: 71.6, threshold: 70, endpoint: "https://push/a", p256dh: "k", auth: "a" };
+  const db = {
+    rpc: async (fn: string, args?: Record<string, unknown>) => {
+      calls.push(fn + (args ? JSON.stringify(args) : ""));
+      return { data: fn === "pending_system_notifications" ? [row] : null, error: null };
+    },
+    from: () => ({ delete: () => ({ eq: async () => {} }) }),
+  };
+  const payloads: { title: string; body: string; url: string }[] = [];
+  const res = await runSystemNotify(db, async (_s, p) => { payloads.push(JSON.parse(p)); return 201; });
+  assert.deepEqual(res, { alerts: 1, sent: 1 });
+  assert.equal(payloads[0].title, "⚠️ Base de données");
+  assert.match(payloads[0].body, /^Occupation : 72 % du quota \(seuil 70 %\)/);
+  assert.equal(payloads[0].url, "#/admin/base");
+  assert.deepEqual(calls, ["pending_system_notifications", 'mark_system_notified{"p_ids":[3]}']);
+  // Base pas encore à jour : rien, sans erreur
+  const old = { rpc: async () => ({ data: null, error: { message: "inconnue" } }), from: db.from };
+  assert.deepEqual(await runSystemNotify(old, async () => 201), { alerts: 0, sent: 0 });
 });

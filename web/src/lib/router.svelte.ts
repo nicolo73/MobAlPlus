@@ -14,6 +14,7 @@ export const routes = {
   "/admin/capteurs": "Capteurs",
   "/admin/emplacements": "Emplacements",
   "/admin/partage": "Partage",
+  "/admin/base": "Base de données",
   "/admin/maintenance": "Maintenance",
 } as const;
 

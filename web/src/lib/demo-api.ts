@@ -4,7 +4,7 @@ import { isWithin, sortPlaces } from "./placetree";
 import type {
   Api, CollectResult, Context, CurrentValue, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
-  AlertEvent, AlertLevel, AlertRule,
+  AlertEvent, AlertLevel, AlertRule, DbUsage, PlaceShare,
 } from "./types";
 import { evaluateForecast, evaluateRule } from "./alerteval";
 import { dayNoon, type DayBand } from "./longview";
@@ -75,7 +75,9 @@ devices.push({
 });
 
 // Station météo publique (capteur virtuel Open-Meteo), en tête de liste
-places.push({ id: 15, code: "meteo-demo1", name: "Météo · Paris", exposure: "outdoor", parent_id: null, kind: "weather", sort_order: -1 });
+// (station publique, partagée entre maisons : reliée à la maison de démonstration)
+places.push({ id: 15, code: "meteo-demo1", name: "Météo · Paris", exposure: "outdoor", parent_id: null, kind: "weather", sort_order: -1,
+              lat: 48.8566, lon: 2.3522, shared: { from: "Données publiques", public: true, home_id: 0 } });
 const weatherDevice = (id: number, place: number, label: string): Device => ({
   id, ma_id: `METEO-DEMO${id}`, name: `Météo · ${label}`, ma_name: null, model: "Open-Meteo", vendor: "open_meteo", active: true,
   added_at: iso(366 * 86_400_000), retired_at: null,
@@ -130,7 +132,8 @@ function rawPoints(id: number, from: number, to: number): Point[] {
   return out;
 }
 
-const settings: Record<string, unknown> = { hot_days: 90, simplify_after_days: 1095, timezone: "Europe/Paris", db_quota_mb: 500 };
+const settings: Record<string, unknown> = { hot_days: 90, simplify_after_days: 1095, timezone: "Europe/Paris", db_quota_mb: 500,
+                                           db_alert_info_pct: 40, db_alert_warning_pct: 70 };
 const delay = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 150));
 
 export class DemoApi implements Api {
@@ -465,7 +468,7 @@ export class DemoApi implements Api {
   private archived = new Set<number>();
   private deleted = new Set<number>();
 
-  async addWeatherStation(label: string, _lat: number, _lon: number) {
+  async addWeatherStation(label: string, _lat: number, _lon: number, _isPublic = false) {
     const placeId = Math.max(...places.map((p) => p.id)) + 1;
     const code = `meteo-demo${placeId}`;
     EXTRA_DEFS.push([code, `Météo · ${label}`, "outdoor", 13, 78]);
@@ -509,6 +512,78 @@ export class DemoApi implements Api {
         today: { sunrise: t(8, 12), sunset: t(19, 3), uv_index_max: 2.4, precipitation_sum: 1.2, precipitation_probability_max: 35 },
       },
     });
+  }
+
+  /** Occupation fictive : quelques Mo par capteur, selon son ancienneté */
+  async dbUsage(): Promise<DbUsage> {
+    const ch = devices.flatMap((d) => d.channels.map((c) => {
+      const weather = d.vendor === "open_meteo";
+      const place = places.find((p) => p.id === c.place_id);
+      return {
+        channel_id: c.id, channel_no: c.channel_no, property: c.property, device_id: d.id, device_name: d.name ?? d.ma_id,
+        vendor: d.vendor ?? null, active: d.active, home_id: place?.shared?.public ? 0 : 1, place_id: c.place_id, place_name: place?.name ?? null,
+        n_detail: weather ? 4_400 : 18_500, n_compact: weather ? 8_000 : 55_000, n_simplified: 0,
+        detail: (weather ? 0.35 : 1.5) * 1024 * 1024, compact: (weather ? 0.1 : 0.6) * 1024 * 1024, simplified: 0,
+        weather: weather ? 0.06 * 1024 * 1024 : 0,
+      };
+    }));
+    return delay({
+      total_bytes: 118 * 1024 * 1024, quota_mb: Number(settings.db_quota_mb), info_pct: Number(settings.db_alert_info_pct ?? 40) || null,
+      warning_pct: Number(settings.db_alert_warning_pct ?? 70) || null, tables: {}, alert: null, channels: ch,
+      homes: [{ id: 1, name: "Maison démo", commons: false, owners: ["demo@mobalplus"] }, { id: 0, name: "Données publiques", commons: true, owners: [] }],
+      links: [{ place_id: 15, home_id: 1 }],
+    });
+  }
+
+  /** Partages fictifs (gardés le temps de la session) */
+  private shares: PlaceShare[] = [];
+  async placeShares(placeId: number) { return delay(this.shares.filter((s) => s.place_id === placeId)); }
+  async sharePlace(placeId: number, email: string) {
+    const e = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error("Adresse e-mail invalide");
+    if (!this.shares.some((s) => s.place_id === placeId && s.email === e)) {
+      this.shares.push({ id: this.shares.length + 1, place_id: placeId, email: e, shared_by: "demo@mobalplus", created_at: new Date().toISOString() });
+    }
+    await delay(null);
+  }
+  async removeShare(shareId: number) { this.shares = this.shares.filter((s) => s.id !== shareId); await delay(null); }
+  /** Un emplacement d'une maison amie, partagé avec le compte de démonstration */
+  async sharedWithMe() {
+    return delay([{ share_id: 1, place_id: 16, place_name: "Serre", kind: "room", from_home: "Chez Camille",
+                    shared_by: "camille@exemple.fr", linked: places.some((p) => p.id === 16) }]);
+  }
+  async linkPlace(placeId: number, parentId: number | null = null) {
+    if (placeId === 16 && !places.some((p) => p.id === 16)) {
+      EXTRA_DEFS.push(["serre", "Serre", "indoor", 21.5, 55]);
+      places.push({ id: 16, code: "serre", name: "Serre", exposure: "indoor", parent_id: parentId, kind: "room",
+                    sort_order: 99, shared: { from: "Chez Camille", public: false, home_id: 2 } });
+      devices.push({
+        id: 30, ma_id: "03DEMO000030", name: "Capteur serre", ma_name: null, model: null, active: true,
+        added_at: iso(200 * 86_400_000), retired_at: null,
+        channels: [
+          { id: 301, channel_no: 1, label: "Température", property: "temperature", property_name: "Température", unit: "°C", place_id: 16, since: iso(200 * 86_400_000) },
+          { id: 302, channel_no: 2, label: "Humidité relative", property: "humidity", property_name: "Humidité relative", unit: "%", place_id: 16, since: iso(200 * 86_400_000) },
+        ],
+      });
+    }
+    await delay(null);
+  }
+  async unlinkPlace(placeId: number) {
+    const i = places.findIndex((p) => p.id === placeId && p.shared);
+    if (i >= 0) places.splice(i, 1);
+    for (const d of devices) if (d.channels.some((c) => c.place_id === placeId)) d.active = false;
+    await delay(null);
+  }
+  async publicStations(lat: number, lon: number) {
+    const st = places.filter((p) => p.kind === "weather" && p.shared?.public && p.lat != null && p.lon != null);
+    return delay(st.map((p) => ({ place_id: p.id, name: p.name, lat: p.lat!, lon: p.lon!, homes: 3,
+      km: Math.round(Math.hypot((p.lat! - lat) * 111, (p.lon! - lon) * 111 * Math.cos((lat * Math.PI) / 180)) * 10) / 10 }))
+      .filter((s) => s.km <= 50).sort((a, b) => a.km - b.km));
+  }
+  async makeStationPublic(placeId: number) {
+    const p = places.find((x) => x.id === placeId);
+    if (p) p.shared = { from: "Données publiques", public: true, home_id: 0 };
+    await delay(null);
   }
 
   async placeIssues() {

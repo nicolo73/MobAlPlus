@@ -11,7 +11,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { type Db, runNotify } from "./handler.ts";
+import { type Db, runNotify, runSystemNotify, type Send } from "./handler.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const json = (body: unknown, status = 200) =>
@@ -26,15 +26,17 @@ Deno.serve(async (req) => {
   webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:admin@example.org", env("VAPID_PUBLIC_KEY"), env("VAPID_PRIVATE_KEY"));
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
   try {
-    const result = await runNotify(db as unknown as Db, async (sub, payload) => {
+    const send: Send = async (sub, payload) => {
       try {
         const res = await webpush.sendNotification(sub, payload, { TTL: 6 * 3600, urgency: "high" });
         return res.statusCode;
       } catch (e) {
         return (e as { statusCode?: number }).statusCode ?? 500;
       }
-    });
-    return json(result);
+    };
+    const result = await runNotify(db as unknown as Db, send);
+    const system = await runSystemNotify(db as unknown as Db, send);
+    return json({ ...result, system });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

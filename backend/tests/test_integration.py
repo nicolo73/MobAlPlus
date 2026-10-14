@@ -960,3 +960,125 @@ def test_user_options_per_account(conn):
     finally:
         conn.rollback()
         conn.execute("RESET ROLE")
+
+
+def test_place_sharing_and_public_stations(conn, workbook):
+    for s in iter_file_sheets(workbook):
+        import_sheet(conn, s)
+    home_a = conn.execute("SELECT default_home_id()").fetchone()[0]
+    home_b = conn.execute("INSERT INTO home (name) VALUES ('Chez Paul') RETURNING id").fetchone()[0]
+    a, b = uuid.uuid4(), uuid.uuid4()
+    conn.execute("INSERT INTO home_member (home_id, email, user_id, role) VALUES (%s, 'a@ex.fr', %s, 'owner'), "
+                 "(%s, 'b@ex.fr', %s, 'owner')", (home_a, a, home_b, b))
+    salon = conn.execute("SELECT id FROM place WHERE code = 'salon'").fetchone()[0]
+    temp = series_id(conn, "salon", "temperature")
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        # Avant partage : B ne voit rien du salon de A
+        as_user(conn, b, "b@ex.fr")
+        assert conn.execute("SELECT count(*) FROM series WHERE place_id = %s", (salon,)).fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM series_observations(%s, '2000-01-01', '2100-01-01')", (temp,)).fetchone()[0] == 0
+        with pytest.raises(psycopg.errors.RaiseException):
+            conn.execute("SELECT link_place(%s, %s)", (home_b, salon))
+        conn.rollback()
+        # A partage son salon avec B
+        as_user(conn, a, "a@ex.fr")
+        share = conn.execute("SELECT share_place(%s, 'B@ex.fr')", (salon,)).fetchone()[0]
+        conn.commit()
+        # B le voit dans « partagés avec moi » et l'ajoute à sa maison, en lecture seule
+        as_user(conn, b, "b@ex.fr")
+        assert conn.execute("SELECT place_name, from_home, linked FROM shared_with_me(%s)", (home_b,)).fetchall() == [
+            ("Salon", "Ma maison", False)]
+        conn.execute("SELECT link_place(%s, %s)", (home_b, salon))
+        places = [r[0] for r in conn.execute("SELECT home_places(%s)", (home_b,)).fetchall()]
+        shared = [p for p in places if p["id"] == salon][0]
+        assert shared["shared"]["from"] == "Ma maison" and shared["home_id"] == home_b
+        assert conn.execute("SELECT count(*) FROM series_observations(%s, '2000-01-01', '2100-01-01')", (temp,)).fetchone()[0] > 0
+        assert salon in [r[0] for r in conn.execute("SELECT place_id FROM current_values(%s)", (home_b,)).fetchall()]
+        assert conn.execute("UPDATE place SET name = 'x' WHERE id = %s", (salon,)).rowcount == 0   # lecture seule
+        # Alertes propres à la maison de B, invisibles de A (et inversement)
+        conn.execute("SELECT set_alert_rules(%s, %s, %s)", (temp, Jsonb([{"kind": "above", "level": "info", "threshold": 25}]), home_b))
+        assert conn.execute("SELECT home_id FROM alert_rule").fetchall() == [(home_b,)]
+        conn.commit()
+        as_user(conn, a, "a@ex.fr")
+        assert conn.execute("SELECT count(*) FROM alert_rule").fetchone()[0] == 0
+        conn.execute("SELECT set_alert_rules(%s, %s)", (temp, Jsonb([{"kind": "above", "level": "info", "threshold": 22}])))
+        assert conn.execute("SELECT threshold FROM alert_rule").fetchall() == [(22.0,)]
+        # Partage retiré : l'emplacement disparaît de la maison de B
+        conn.execute("DELETE FROM place_share WHERE id = %s", (share,))
+        conn.commit()
+        as_user(conn, b, "b@ex.fr")
+        assert conn.execute("SELECT count(*) FROM home_places(%s) p WHERE (p->>'id')::int = %s", (home_b, salon)).fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM series WHERE place_id = %s", (salon,)).fetchone()[0] == 0
+        conn.commit()
+
+        # Station publique : une seule pour Paris, suivie par les deux maisons
+        as_user(conn, b, "b@ex.fr")
+        p1 = conn.execute("SELECT add_weather_station(%s, 'Paris', 48.8566, 2.3522, NULL, true)", (home_b,)).fetchone()[0]
+        conn.commit()
+        as_user(conn, a, "a@ex.fr")
+        assert conn.execute("SELECT name, homes FROM public_stations(48.86, 2.35)").fetchall() == [("Météo · Paris", 1)]
+        p2 = conn.execute("SELECT add_weather_station(%s, 'Paris 11e', 48.859, 2.38, NULL, true)", (home_a,)).fetchone()[0]
+        assert p2 == p1
+        assert conn.execute("SELECT homes FROM public_stations(48.86, 2.35)").fetchone()[0] == 2
+        conn.commit()
+        # Données de la station lisibles depuis les deux maisons ; pas de maison « Données publiques » au menu
+        assert [h["name"] for h in conn.execute("SELECT my_context() -> 'homes'").fetchone()[0]] == ["Ma maison"]
+        # Plus suivie par personne : plus collectée
+        conn.execute("SELECT unlink_place(%s, %s)", (home_a, p1))
+        conn.commit()
+        as_user(conn, b, "b@ex.fr")
+        conn.execute("SELECT unlink_place(%s, %s)", (home_b, p1))
+        conn.commit()
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")
+    assert conn.execute("SELECT count(*) FROM weather_targets()").fetchone()[0] == 0
+    # Station d'une maison rendue publique : reste dans la maison, reliée
+    st = conn.execute("SELECT add_weather_station(%s, 'Lyon', 45.76, 4.84)", (home_a,)).fetchone()[0]
+    conn.execute("SELECT make_station_public(%s)", (st,))
+    assert conn.execute("SELECT home_id = commons_home_id() FROM place WHERE id = %s", (st,)).fetchone()[0] is True
+    assert conn.execute("SELECT count(*) FROM place_link WHERE home_id = %s AND place_id = %s", (home_a, st)).fetchone()[0] == 1
+    conn.commit()
+
+
+def test_db_quota_alert_and_usage(conn, workbook):
+    for s in iter_file_sheets(workbook):
+        import_sheet(conn, s)
+    mb = 1024 * 1024
+    t0 = datetime(2026, 10, 1, tzinfo=UTC)
+    q = lambda bytes_, h=0: conn.execute("SELECT check_db_quota(%s, %s)", (t0 + timedelta(hours=h), bytes_)).fetchone()[0]
+    assert q(100 * mb) is None                       # 20 % de 500 Mo
+    assert q(210 * mb, 1) == "info"                  # 42 % ≥ 40 %
+    assert q(205 * mb, 2) == "info"                  # 41 % : même alerte, valeur mise à jour
+    assert conn.execute("SELECT count(*), max(value)::int FROM system_alert").fetchone() == (1, 41)
+    assert q(196 * mb, 3) == "info"                  # 39,2 % : marge de 2 points, toujours ouverte
+    assert q(360 * mb, 4) == "warning"               # 72 % : l'alerte info se ferme, l'importante s'ouvre
+    assert conn.execute("SELECT level, ended_at IS NULL FROM system_alert ORDER BY id").fetchall() == [("info", False), ("warning", True)]
+    assert q(50 * mb, 5) is None
+    assert conn.execute("SELECT count(*) FROM system_alert WHERE ended_at IS NULL").fetchone()[0] == 0
+    # Seuils réglables
+    conn.execute("UPDATE app_setting SET value = '10' WHERE key = 'db_alert_info_pct'")
+    assert q(60 * mb, 6) == "info"
+    # Détail : réservé à l'administrateur, chaque canal avec sa place estimée
+    admin = uuid.uuid4()
+    conn.execute("INSERT INTO app_user (user_id, email, role) VALUES (%s, 'admin@ex.fr', 'admin')", (admin,))
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, uuid.uuid4(), "x@ex.fr")
+        with pytest.raises(psycopg.errors.RaiseException):
+            conn.execute("SELECT admin_db_usage()")
+        conn.rollback()
+        as_user(conn, admin, "admin@ex.fr")
+        u = conn.execute("SELECT admin_db_usage()").fetchone()[0]
+        assert u["total_bytes"] > 0 and u["quota_mb"] == 500 and u["info_pct"] == 10 and u["alert"]["level"] == "info"
+        chans = [c for c in u["channels"] if c["n_detail"] + c["n_compact"] > 0]
+        assert chans and all(c["detail"] + c["compact"] > 0 for c in chans)
+        # Tables réparties entre les canaux (mesures anciennes du classeur : toutes compactées)
+        assert sum(c["compact"] + c["simplified"] for c in u["channels"]) == pytest.approx(u["tables"]["reading_day"], rel=0.01)
+        assert {h["name"] for h in u["homes"]} >= {"Ma maison", "Données publiques"}
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")

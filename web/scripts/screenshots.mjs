@@ -127,6 +127,12 @@ p = await phone();
 await go(p, "#/admin/emplacements");
 await shot(p, "admin-emplacements");
 
+p = await phone();
+await go(p, "#/admin/base", 2500);
+await p.locator("tr.group").nth(0).click();
+await wait(300);
+await shot(p, "base-donnees", { scrollTo: "table.usage", top: 60 });
+
 // Aperçu sur ordinateur, pour la documentation technique
 const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, colorScheme: "light", locale: "fr-FR" });
 await desk.addInitScript(() => localStorage.setItem("mobalplus.news-seen", "x"));

@@ -49,7 +49,38 @@ export interface Place {
   color_slot?: number | null;
   /** Couleur personnalisée (#rrggbb), prioritaire sur color_slot */
   color?: string | null;
+  /** Emplacement d'une autre maison relié à celle-ci (lecture seule) : maison d'origine, publique ou non */
+  shared?: { from: string; public: boolean; home_id: number } | null;
+  lat?: number | null;
+  lon?: number | null;
 }
+
+/** Occupation de la base (Admin › Base de données) : canal par canal, estimée par niveau de stockage */
+export interface DbChannelUsage {
+  channel_id: number; channel_no: number; property: string; device_id: number; device_name: string; vendor: string | null;
+  active: boolean; home_id: number; place_id: number | null; place_name: string | null;
+  n_detail: number; n_compact: number; n_simplified: number;
+  /** Octets estimés : détail récent, compacté, simplifié, prévision et normales (stations météo) */
+  detail: number; compact: number; simplified: number; weather: number;
+}
+export interface DbUsage {
+  total_bytes: number; quota_mb: number; info_pct: number | null; warning_pct: number | null;
+  tables: Record<string, number>;
+  alert: { id: number; level: "info" | "warning"; value: number; threshold: number; started_at: string } | null;
+  channels: DbChannelUsage[];
+  homes: { id: number; name: string; commons: boolean; owners: string[] }[];
+  links: { place_id: number; home_id: number }[];
+}
+
+/** Partage d'un emplacement avec un compte */
+export interface PlaceShare { id: number; place_id: number; email: string; shared_by: string | null; created_at: string }
+
+/** Emplacement partagé avec le compte connecté */
+export interface SharedPlace { share_id: number; place_id: number; place_name: string; kind: string | null;
+                               from_home: string; shared_by: string | null; linked: boolean }
+
+/** Station météo publique proche */
+export interface PublicStation { place_id: number; name: string; lat: number; lon: number; km: number; homes: number }
 
 export interface Channel {
   id: number;
@@ -323,7 +354,23 @@ export interface Api {
   collectNow(maIds?: string[]): Promise<CollectResult[]>;
   runMaintenance(): Promise<Record<string, unknown>>;
   /** Crée une station météo publique (capteur virtuel + emplacement) ; renvoie l'emplacement */
-  addWeatherStation(label: string, lat: number, lon: number): Promise<number>;
+  /** Station météo : publique (commune, partagée entre maisons : réutilisée si elle existe à moins de 3 km) ou privée */
+  addWeatherStation(label: string, lat: number, lon: number, isPublic?: boolean): Promise<number>;
+  /** Stations publiques proches d'une position */
+  publicStations(lat: number, lon: number, km?: number): Promise<PublicStation[]>;
+  /** Station de la maison rendue publique (elle reste dans la maison) */
+  makeStationPublic(placeId: number): Promise<void>;
+  /** Partages d'un emplacement de la maison */
+  placeShares(placeId: number): Promise<PlaceShare[]>;
+  sharePlace(placeId: number, email: string): Promise<void>;
+  removeShare(shareId: number): Promise<void>;
+  /** Emplacements que d'autres comptes partagent avec moi */
+  sharedWithMe(): Promise<SharedPlace[]>;
+  /** Occupation détaillée de la base (administrateur de la plateforme) */
+  dbUsage(): Promise<DbUsage>;
+  /** Ajoute à la maison un emplacement partagé (ou public), ou l'en retire */
+  linkPlace(placeId: number, parentId?: number | null): Promise<void>;
+  unlinkPlace(placeId: number): Promise<void>;
   /** Lance la collecte météo (après création d'une station) */
   collectWeather(): Promise<WeatherResult[]>;
   /** Diagnostic d'une station météo (null : l'emplacement n'en est pas une) */

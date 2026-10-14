@@ -322,6 +322,20 @@ flowchart LR
   connexion, et les droits suivent l'adresse même si le compte est recréé.
 - Cohérence garantie par la base : un capteur n'alimente qu'un emplacement de sa maison, une
   maison garde au moins un propriétaire, un emplacement ne peut pas être son propre ancêtre.
+- **Partage entre maisons** : un emplacement (et ses capteurs) appartient à une seule maison ; un
+  gestionnaire le partage avec un compte (`place_share`, par e-mail), qui le **relie** à l'une de
+  ses maisons (`place_link`, avec son propre rangement). Les fonctions d'accès `my_place_ids()`,
+  `my_series_ids()`, `my_channel_ids()`, `my_device_ids()` incluent, **en lecture seulement**, les
+  emplacements reliés à mes maisons et les canaux qui les alimentent. Les **stations météo
+  publiques** sont dans une maison commune sans membre (`home.commons`), reliées aux maisons qui les
+  suivent ; une station n'est plus collectée quand plus personne ne la suit. Les **règles d'alerte**
+  appartiennent à une maison (`alert_rule.home_id`) : chaque foyer a les siennes sur un même
+  emplacement, et les notifications vont aux membres de la maison de la règle.
+- **Occupation de la base** : `check_db_quota()` chaque heure (pg_cron, minute 23) ouvre, change ou
+  ferme l'alerte `system_alert` selon les seuils `db_alert_info_pct` / `db_alert_warning_pct` (% de
+  `db_quota_mb`) ; l'Edge Function `notify` l'envoie aux administrateurs abonnés.
+  `admin_db_usage()` répartit la taille de chaque table entre les canaux (au prorata des lignes, ou
+  des octets des tableaux compactés) pour Admin › Base de données.
 - Le collecteur utilise la clé *service_role* ; il n'accepte que le jeton de pg_cron,
   l'administrateur, ou un gestionnaire de maison pour ses propres capteurs (`can_collect`).
 

@@ -5,7 +5,7 @@ import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
-  AlertEvent, AlertLevel, AlertRule, WeatherRefresh, WeatherResult, WeatherStationInfo,
+  AlertEvent, AlertLevel, AlertRule, DbUsage, PlaceShare, PublicStation, SharedPlace, WeatherRefresh, WeatherResult, WeatherStationInfo,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -117,9 +117,10 @@ export class SupabaseApi implements Api {
   }
 
   async seriesList(): Promise<SeriesInfo[]> {
+    const placeIds = (await this.places()).map((p) => p.id);
     const rows = check(await this.sb.from("series")
       .select("id, name, place_id, place!inner(name, exposure, home_id), observed_property(code, name, unit)")
-      .eq("place.home_id", this.homeId ?? -1)
+      .in("place_id", placeIds.length ? placeIds : [-1])
       .order("id")) as unknown as {
         id: number; name: string; place_id: number; place: { name: string; exposure: Place["exposure"] };
         observed_property: { code: string; name: string; unit: string };
@@ -269,8 +270,14 @@ export class SupabaseApi implements Api {
   }
 
   async places() {
-    const rows = check(await this.sb.from("place").select("*").eq("home_id", this.homeId ?? -1)) as Place[];
-    return sortPlaces(rows);
+    // Emplacements de la maison et emplacements partagés reliés (rangement propre à la maison)
+    const { data, error } = await this.sb.rpc("home_places", { p_home: this.homeId ?? -1 });
+    if (error) {
+      // Base pas encore à jour : emplacements de la maison seulement
+      const rows = check(await this.sb.from("place").select("*").eq("home_id", this.homeId ?? -1)) as Place[];
+      return sortPlaces(rows);
+    }
+    return sortPlaces(data as Place[]);
   }
 
   async setPlaceColor(id: number, color: number | string | null) {
@@ -280,7 +287,8 @@ export class SupabaseApi implements Api {
   }
 
   async reorderPlaces(parentId: number | null, ids: number[]) {
-    check(await this.sb.rpc("reorder_places", { p_parent: parentId, p_ids: ids }));
+    // Emplacements de la maison et emplacements reliés, rangés ensemble
+    check(await this.sb.rpc("reorder_home_places", { p_home: this.homeId, p_parent: parentId, p_ids: ids }));
   }
 
   async properties() {
@@ -337,8 +345,49 @@ export class SupabaseApi implements Api {
     return check(await this.sb.rpc("admin_run_maintenance")) as Record<string, unknown>;
   }
 
-  async addWeatherStation(label: string, lat: number, lon: number) {
-    return check(await this.sb.rpc("add_weather_station", { p_home: this.homeId, p_label: label, p_lat: lat, p_lon: lon })) as number;
+  async addWeatherStation(label: string, lat: number, lon: number, isPublic = false) {
+    return check(await this.sb.rpc("add_weather_station", {
+      p_home: this.homeId, p_label: label, p_lat: lat, p_lon: lon, p_public: isPublic,
+    })) as number;
+  }
+
+  async publicStations(lat: number, lon: number, km = 50) {
+    return (check(await this.sb.rpc("public_stations", { p_lat: lat, p_lon: lon, p_km: km })) ?? []) as PublicStation[];
+  }
+
+  async makeStationPublic(placeId: number) {
+    check(await this.sb.rpc("make_station_public", { p_place: placeId }));
+  }
+
+  async placeShares(placeId: number) {
+    return check(await this.sb.from("place_share").select("id, place_id, email, shared_by, created_at")
+      .eq("place_id", placeId).order("email")) as PlaceShare[];
+  }
+
+  async sharePlace(placeId: number, email: string) {
+    check(await this.sb.rpc("share_place", { p_place: placeId, p_email: email }));
+  }
+
+  async removeShare(shareId: number) {
+    check(await this.sb.from("place_share").delete().eq("id", shareId));
+  }
+
+  async dbUsage() {
+    return check(await this.sb.rpc("admin_db_usage")) as DbUsage;
+  }
+
+  async sharedWithMe() {
+    const { data, error } = await this.sb.rpc("shared_with_me", { p_home: this.homeId ?? -1 });
+    if (error) return [];  // base pas encore à jour
+    return data as SharedPlace[];
+  }
+
+  async linkPlace(placeId: number, parentId: number | null = null) {
+    check(await this.sb.rpc("link_place", { p_home: this.homeId, p_place: placeId, p_parent: parentId }));
+  }
+
+  async unlinkPlace(placeId: number) {
+    check(await this.sb.rpc("unlink_place", { p_home: this.homeId, p_place: placeId }));
   }
 
   async collectWeather() {
@@ -377,18 +426,19 @@ export class SupabaseApi implements Api {
   async alertRules(seriesIds: number[]) {
     if (!seriesIds.length) return [];
     return check(await this.sb.from("alert_rule").select("series_id, kind, level, threshold, enabled, ref_series_id")
-      .in("series_id", seriesIds)) as AlertRule[];
+      .in("series_id", seriesIds).eq("home_id", this.homeId ?? -1)) as AlertRule[];
   }
 
   async saveAlertRules(seriesId: number, rules: Omit<AlertRule, "series_id">[]) {
-    check(await this.sb.rpc("set_alert_rules", { p_series: seriesId, p_rules: rules }));
+    // Règles propres à la maison courante (un emplacement partagé a celles de chaque maison)
+    check(await this.sb.rpc("set_alert_rules", { p_series: seriesId, p_rules: rules, p_home: this.homeId }));
   }
 
   async alertEvents({ since, seriesIds }: { since: number; seriesIds?: number[] }): Promise<AlertEvent[]> {
     let q = this.sb.from("alert_event")
       .select("id, series_id, kind, level, threshold, started_at, ended_at, value, ref_series_id, forecast_at, "
         + "series!inner(place_id, place!inner(name, home_id), observed_property(code, unit)), alert_archive(user_id)")
-      .eq("series.place.home_id", this.homeId ?? -1)
+      .eq("home_id", this.homeId ?? -1)
       .or(`ended_at.is.null,started_at.gte.${new Date(since).toISOString()}`)
       .order("started_at", { ascending: false })
       .limit(500);

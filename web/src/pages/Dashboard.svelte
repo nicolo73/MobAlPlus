@@ -33,6 +33,9 @@
 
   const quota = $derived(Number(stats?.settings.db_quota_mb ?? 500) * 1024 * 1024);
   const usage = $derived(stats ? stats.db_size_bytes / quota : 0);
+  /** Seuils d'alerte (Admin › Base de données) */
+  const infoPct = $derived(Number(stats?.settings.db_alert_info_pct) || null);
+  const warnPct = $derived(Number(stats?.settings.db_alert_warning_pct) || null);
   const totalValues = $derived(stats ? stats.values.recent + stats.values.compacted + stats.values.simplified : 0);
 
   function status(d: Stats["devices"][number]) {
@@ -51,12 +54,12 @@
       <div class="card">
         <small>Base de données</small>
         <div class="kpi num">{fmtBytes(stats.db_size_bytes)}</div>
-        <div class="bar" class:warn={usage > 0.7} class:err={usage > 0.9}
+        <div class="bar" class:warn={infoPct != null && usage * 100 >= infoPct} class:err={warnPct != null && usage * 100 >= warnPct}
              role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(usage * 100)}
              aria-label="Occupation du quota">
           <span style="width:{Math.min(100, usage * 100)}%"></span>
         </div>
-        <small class="num">{Math.round(usage * 100)} % de {fmtBytes(quota)}</small>
+        <small class="num">{Math.round(usage * 100)} % de {fmtBytes(quota)} · <a href="#/admin/base">détail</a></small>
       </div>
       <div class="card">
         <small>Capteurs actifs</small>

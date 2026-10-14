@@ -7,7 +7,7 @@
   import { gapThreshold, bandMain, type DayBand } from "../lib/longview";
   import { normalAt, type NormalDay } from "../lib/normals";
   import { loadCurves, otherView } from "../lib/curveload";
-  import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
+  import type { CurrentValue, Observation, Place, PlaceDeployment, PlaceShare, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart from "../components/TimeChart.svelte";
   import DisplayBar from "../components/DisplayBar.svelte";
@@ -208,7 +208,7 @@
   async function init() {
     try {
       const [all, cur, deps] = await Promise.all([api.seriesList(), api.currentValues(), api.placeDeployments(placeId)]);
-      api.places().then((ps) => { const p = ps.find((x) => x.id === placeId); color = p?.color ?? p?.color_slot ?? null; }).catch(() => {});
+      api.places().then((ps) => { const p = ps.find((x) => x.id === placeId); placeRow = p ?? null; color = p?.color ?? p?.color_slot ?? null; }).catch(() => {});
       series = all.filter((s) => s.place_id === placeId);
       current = cur.filter((c) => c.place_id === placeId);
       deployments = deps;
@@ -275,6 +275,32 @@
     shown = key;
   });
 
+  // Partage : emplacement d'une autre maison (lecture seule), ou partages de cet emplacement
+  let placeRow = $state<Place | null>(null);
+  const sharedFrom = $derived(placeRow?.shared ?? null);
+  let shares = $state<PlaceShare[]>([]);
+  let shareEmail = $state("");
+  let shareError = $state("");
+  const shareOpen = $derived(isOpen(`place.${placeId}.share`, false));
+  const loadShares = () => api.placeShares(placeId).then((s) => (shares = s)).catch(() => {});
+  $effect(() => { if (shareOpen && !sharedFrom && canEdit()) untrack(loadShares); });
+  async function addShare(e: SubmitEvent) {
+    e.preventDefault();
+    shareError = "";
+    try { await api.sharePlace(placeId, shareEmail); shareEmail = ""; await loadShares(); }
+    catch (err) { shareError = err instanceof Error ? err.message : String(err); }
+  }
+  async function removeShare(id: number) {
+    shareError = "";
+    try { await api.removeShare(id); await loadShares(); }
+    catch (err) { shareError = err instanceof Error ? err.message : String(err); }
+  }
+  async function unlinkHere() {
+    if (!confirm(`Retirer « ${name} » de cette maison ? Il reste chez son propriétaire ; vos alertes dessus sont supprimées.`)) return;
+    try { await api.unlinkPlace(placeId); location.hash = "#/"; }
+    catch (err) { shareError = err instanceof Error ? err.message : String(err); }
+  }
+
   /** Volet « Mesures » : liste chargée à l'ouverture (et à chaque changement de période) */
   const rowsOpen = $derived(isOpen(`place.${placeId}.rows`, false));
   $effect(() => { if (rowsOpen && series) untrack(() => loadRows(true).catch((e) => (error = String(e)))); });
@@ -332,6 +358,7 @@
     <div class="row">
       <h1 style="margin:0">{name}</h1>
       {#if series?.[0]?.exposure}<span class="badge">{EXPOSURE[series[0].exposure]}</span>{/if}
+      {#if sharedFrom}<span class="badge {sharedFrom.public ? 'ok' : ''}" title="Emplacement d'une autre maison, en lecture seule">{sharedFrom.public ? "station publique" : `partagé par ${sharedFrom.from}`}</span>{/if}
     </div>
     <div class="values">
       {#each sorted as s (s.id)}
@@ -345,7 +372,7 @@
         </div>
       {/each}
     </div>
-    {#if canEdit() && color !== undefined}
+    {#if canEdit() && color !== undefined && !sharedFrom}
       <div class="color">
         <button class="link" onclick={() => (colorOpen = !colorOpen)} aria-expanded={colorOpen}>
           {#if color !== null}<span class="dot" style="--c:{typeof color === "string" ? color : slotColor(color, dark)}"></span>{/if}
@@ -514,6 +541,41 @@
         </table>
       </div>
     </Panel>
+
+    {#if sharedFrom || canEdit()}
+      <Panel key="place.{placeId}.share" title="Partage" defaultOpen={false}>
+        {#snippet summary()}
+          <span class="muted">{sharedFrom ? (sharedFrom.public ? "donnée publique, lecture seule" : `de ${sharedFrom.from}, lecture seule`)
+            : shares.length ? `avec ${shares.length} compte${shares.length > 1 ? "s" : ""}` : ""}</span>
+        {/snippet}
+        {#if sharedFrom}
+          <p class="muted" style="margin:0">{sharedFrom.public
+            ? "Station publique, commune aux maisons qui suivent cette commune : une seule collecte, un seul historique."
+            : `Emplacement de la maison « ${sharedFrom.from} », partagé avec vous.`}
+            Vous en voyez les mesures, courbes, prévision et normales ; ses capteurs et son nom sont gérés par son
+            propriétaire. Les alertes que vous y réglez sont propres à votre maison.</p>
+          {#if canEdit()}<button style="align-self:flex-start" onclick={unlinkHere}>Retirer de cette maison</button>{/if}
+        {:else}
+          <p class="muted" style="margin:0">Partager cet emplacement avec un autre compte (son adresse e-mail) : il pourra
+            l'ajouter à l'une de ses maisons (Admin › Emplacements › Partagés avec moi) et en voir les mesures, en lecture
+            seule. Chacun y règle ses propres alertes.{#if isStation} Pour la station d'une commune, « rendre publique »
+            (Admin › Partage › Météo publique) la met à disposition de toutes les maisons proches.{/if}</p>
+          {#if shares.length}
+            <ul class="shares">
+              {#each shares as sh (sh.id)}
+                <li><span>{sh.email}</span><span class="spacer"></span>
+                  <button class="link danger" onclick={() => removeShare(sh.id)}>retirer</button></li>
+              {/each}
+            </ul>
+          {/if}
+          <form class="row" onsubmit={addShare}>
+            <input type="email" required placeholder="adresse@exemple.fr" bind:value={shareEmail} aria-label="Adresse e-mail" style="flex:1 1 14rem" />
+            <button type="submit" disabled={!shareEmail.trim()}>Partager</button>
+          </form>
+        {/if}
+        {#if shareError}<small class="err-text">{shareError}</small>{/if}
+      </Panel>
+    {/if}
   {/if}
 </div>
 
@@ -541,6 +603,9 @@
   .forecast td { white-space: nowrap; }
   .forecast td.normal { color: var(--muted); font-size: 0.85em; }
   .pv { font-weight: 700; }
+  .shares { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+  .shares li { display: flex; align-items: center; gap: 0.5rem; }
+  .danger { color: var(--err); }
   .pv.temperature { color: var(--val-temp); }
   .pv.humidity { color: var(--val-hum); }
   .alerts-link { font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }

@@ -12,6 +12,7 @@
   import Devices from "./pages/Devices.svelte";
   import Places from "./pages/Places.svelte";
   import Maintenance from "./pages/Maintenance.svelte";
+  import DbUsage from "./pages/DbUsage.svelte";
   import Place from "./pages/PlaceRoute.svelte";
   import Sharing from "./pages/Sharing.svelte";
   import Welcome from "./pages/Welcome.svelte";
@@ -82,6 +83,7 @@
     ["/admin/capteurs", canEdit()],
     ["/admin/emplacements", canEdit()],
     ["/admin/partage", isOwner()],
+    ["/admin/base", ctx.platformAdmin],
     ["/admin/maintenance", ctx.platformAdmin],
   ] as [Route, boolean][]).filter(([, ok]) => ok).map(([r]) => r));
   // « Admin » ouvre le premier onglet accessible
@@ -193,6 +195,7 @@
               {:else if adminRoute === "/admin/capteurs"}<Devices />
               {:else if adminRoute === "/admin/emplacements"}<Places />
               {:else if adminRoute === "/admin/partage"}<Sharing />
+              {:else if adminRoute === "/admin/base"}<DbUsage />
               {:else}<Maintenance />{/if}
             {/if}
           {:else if router.route === "/courbes"}
