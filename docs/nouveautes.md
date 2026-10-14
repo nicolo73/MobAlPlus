@@ -5,6 +5,13 @@
 -->
 
 
+## 14 octobre 2026 (suite)
+- Page d'une station météo : fiche **Station météo** avec **carte** de situation, **diagnostic**
+  (collecte, prévision, normales, erreurs), **conditions actuelles complètes** (vent, ressenti,
+  pression, soleil…) et bouton **Actualiser** (relevé immédiat de la station).
+- Normales : calcul par tranches de 10 ans (la requête de 30 ans dépassait la limite du service
+  météo gratuit), erreurs visibles dans la fiche de la station.
+
 ## 14 octobre 2026
 - **Normales saisonnières** des stations météo : minimum et maximum habituels de chaque jour
   (moyennes 1991 – 2020), en **bande tiret-point-point** sous la courbe de la station, dans

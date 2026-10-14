@@ -170,11 +170,21 @@ affecté à un emplacement de type `weather`. Elle passe par le même chemin que
   `evaluate_forecast_alerts()`, franchissement prévu dans les 24 heures (heure prévue dans
   `alert_event.forecast_at`) ; destinées aussi à déclencher plus tard des actions (volets).
 - **Normales saisonnières** : à chaque passage, au plus une station sans normales
-  (`normals_targets()`, une tentative par jour en cas d'échec ; nouveau calcul si la station change
-  de position) : archives ERA5 journalières 1991 – 2020 (minimums et maximums de température et
-  d'humidité, une seule requête lourde par station), moyenne par jour de l'année lissée sur
-  21 jours, enregistrée dans `normal` (`store_normals()`, 366 lignes par canal). L'application les
+  (`normals_targets()` ; nouveau calcul si la station change de position) : archives ERA5
+  journalières 1991 – 2020 (minimums et maximums de température et d'humidité), **par tranches de
+  10 ans**, une par passage (30 ans en une requête comptent pour ~780 appels et dépassent la limite
+  par minute du service gratuit) ; sommes partielles dans `normal_source.progress`
+  (`save_normals_progress()`), erreur dans `normal_source.error` (`normals_error()`, nouvel essai
+  une heure après) ; si l'humidité journalière est refusée (400), température seule. À la fin :
+  moyenne par jour de l'année lissée sur 21 jours, enregistrée dans `normal` (`store_normals()`,
+  366 lignes par canal). L'application les
   lit avec `series_normals()` (une fois par session) et les déplie sur les jours affichés.
+- **Une seule station, à la demande** : corps `{ place }` (bouton « Actualiser » de la page de la
+  station, tout membre de la maison ; accès vérifié par `weather_station_info()` avec le jeton du
+  compte) : collecte de cette station, une tranche de normales sans délai, et **détails en direct**
+  (point de grille, altitude, conditions complètes, soleil : un appel Open-Meteo, rien
+  d'enregistré) ; `{ place, refresh: false }` : détails seuls (ouverture de la page). Le diagnostic
+  affiché vient de `weather_station_info()` (collecte, prévision, normales).
 
 ## Stockage en trois niveaux
 

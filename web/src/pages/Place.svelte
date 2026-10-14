@@ -14,7 +14,8 @@
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
-  import { forecastCurve, homeWeather, loadForecast, loadNormals, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, forgetNormals, homeWeather, loadForecast, loadNormals, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import StationCard from "../components/StationCard.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
@@ -165,31 +166,19 @@
 
   // Station météo : prévision horaire des prochains jours (prolonge ses courbes, tableau par jour)
   let forecast = $state(new Map<number, Point[]>());
-  let forecastLoaded = $state(false);
   const isStation = $derived(homeWeather.stations.some((st) => st.placeId === placeId));
-  const refreshForecast = () => series && loadForecast(series.map((x) => x.id)).then((f) => { forecast = f; forecastLoaded = true; });
+  const refreshForecast = () => series && loadForecast(series.map((x) => x.id)).then((f) => (forecast = f));
   $effect(() => { if (isStation && series) refreshForecast(); });
   // Station météo : normales saisonnières (bande sous ses courbes, colonne du tableau des prévisions)
   let normals = $state(new Map<number, NormalDay[]>());
   $effect(() => { if (isStation && series) loadNormals(series.map((x) => x.id)).then((n) => (normals = n)); });
-  // Pas encore de prévision : collecte à la demande, avec son compte rendu (ou l'erreur)
-  let collecting = $state(false);
-  let collectInfo = $state("");
-  async function collectNow() {
-    collecting = true;
-    collectInfo = "";
-    try {
-      const res = await api.collectWeather();
-      const errs = res.filter((r) => r.error);
-      collectInfo = errs.length ? `Erreur : ${errs.map((r) => r.error).join(" ; ")}`
-        : `Collecte faite : ${res.reduce((t, r) => t + (r.forecast ?? 0), 0)} valeurs de prévision reçues.`;
-      await refreshForecast();
-      load();
-    } catch (e) {
-      collectInfo = `Erreur : ${e instanceof Error ? e.message : String(e)}`;
-    } finally {
-      collecting = false;
-    }
+  // Station actualisée depuis sa fiche : mesures, prévision et normales rechargées
+  function stationRefreshed() {
+    if (!series) return;
+    forgetNormals(series.map((x) => x.id));
+    loadNormals(series.map((x) => x.id)).then((n) => (normals = n));
+    refreshForecast();
+    load();
   }
   /** Prévision par jour : minimum et maximum de chaque grandeur */
   const forecastDays = $derived.by(() => {
@@ -351,17 +340,7 @@
     </small>
   </section>
 
-  {#if isStation && forecastLoaded && !forecastDays.length}
-    <section class="card stack">
-      <h2 style="margin:0">Prévisions</h2>
-      <p class="muted" style="margin:0">Pas encore de prévision pour cette station : elles arrivent avec la collecte météo
-        (toutes les 30 minutes) une fois la base à jour (workflow « Déploiement Supabase »).</p>
-      <div class="row">
-        <button onclick={collectNow} disabled={collecting}>{collecting ? "Collecte…" : "Mettre à jour maintenant"}</button>
-        {#if collectInfo}<small class:err-text={collectInfo.startsWith("Erreur")}>{collectInfo}</small>{/if}
-      </div>
-    </section>
-  {/if}
+  {#if isStation}<StationCard {placeId} {name} onrefreshed={stationRefreshed} />{/if}
   {#if forecastDays.length}
     <section class="card">
       <h2>Prévisions <small class="muted">(Open-Meteo, mises à jour toutes les 30 minutes)</small></h2>

@@ -221,11 +221,15 @@ d'alerte réglable (12 h, 48 h), autres grandeurs prévues (pluie, vent, ensolei
 
 **Normales saisonnières (14/10/2026)** : minimum et maximum normaux de chaque jour de l'année
 (1991 – 2020, archives ERA5 à la position de la station, lissés sur 21 jours), calculés une fois par
-station (table `normal`) ; bande tiret-point-point sous la courbe de la station, infobulle, légende
+station (table `normal`, par tranches de 10 ans) ; bande tiret-point-point sous la courbe de la station, infobulle, légende
 de la Synthèse, colonne du tableau des prévisions. Pistes : **écart à la normale** (« +3,2 °C ») sur
 Maintenant et dans les tableaux, alertes « au-dessus de la normale de plus de X » (vague de chaleur,
 froid inhabituel), normales officielles Météo-France d'une station proche (API à clé), autres
 grandeurs (pluie, ensoleillement).
+
+**Fiche station (14/10/2026)** : carte de situation (tuiles OpenStreetMap), diagnostic (collecte,
+prévision, normales, erreurs), conditions complètes en direct, actualisation à la demande. Pistes :
+enregistrer aussi vent, pluie et pression (nouvelles grandeurs), historique des erreurs de collecte.
 
 ## 8 bis. Lecture sur le temps long
 

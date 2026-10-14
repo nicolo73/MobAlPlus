@@ -26,6 +26,9 @@ export async function loadForecast(ids: number[]): Promise<Map<number, Point[]>>
  */
 const normalsCache = new Map<number, { days: NormalDay[]; at: number }>();
 
+/** Oublie les normales gardées (après une actualisation de la station) */
+export const forgetNormals = (ids: number[]) => ids.forEach((id) => normalsCache.delete(id));
+
 /** Normales saisonnières de séries (seulement celles qui en ont) */
 export async function loadNormals(ids: number[]): Promise<Map<number, NormalDay[]>> {
   const now = Date.now();

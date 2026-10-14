@@ -5,7 +5,7 @@ import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
   Property, SeriesInfo, SeriesStats, Stats, ExportOptions, ImportMode, ImportPreview, ImportResult, ImportRows,
-  AlertEvent, AlertLevel, AlertRule, WeatherResult,
+  AlertEvent, AlertLevel, AlertRule, WeatherRefresh, WeatherResult, WeatherStationInfo,
 } from "./types";
 
 /** Bornes d'un tstzrange renvoyé par PostgREST, ex. ["2026-02-01 00:00:00+00",) */
@@ -349,6 +349,22 @@ export class SupabaseApi implements Api {
       throw new Error(detail?.error ?? error.message);
     }
     return ((data as { results?: WeatherResult[] })?.results ?? []);
+  }
+
+  async weatherStationInfo(placeId: number) {
+    const { data, error } = await this.sb.rpc("weather_station_info", { p_place: placeId });
+    if (error) throw new Error(error.message.includes("weather_station_info") ? "Base pas encore à jour (workflow « Déploiement Supabase »)" : error.message);
+    return (data as WeatherStationInfo | null) ?? null;
+  }
+
+  async refreshWeatherStation(placeId: number, refresh: boolean) {
+    const { data, error } = await this.sb.functions.invoke("weather", { body: { place: placeId, refresh } });
+    if (error) {
+      const detail = await (error as { context?: Response }).context?.json?.().catch(() => null);
+      throw new Error(detail?.error ?? error.message);
+    }
+    const d = data as Partial<WeatherRefresh> | null;
+    return { results: d?.results ?? [], normals: d?.normals ?? null, details: d?.details ?? null };
   }
 
   async placeIssues() {

@@ -478,6 +478,39 @@ export class DemoApi implements Api {
     return delay(devices.filter((d) => d.vendor === "open_meteo" && d.active)
       .map((d) => ({ station: d.ma_id, received: 2, inserted: 0, forecast: 336 })));
   }
+  /** Diagnostic fictif : collecte normale, prévision, normales calculées */
+  async weatherStationInfo(placeId: number) {
+    const dev = devices.find((d) => d.vendor === "open_meteo" && d.channels.some((c) => c.place_id === placeId));
+    if (!dev) return delay(null);
+    const at = (ms: number) => new Date(now - ms).toISOString();
+    return delay({
+      ma_id: dev.ma_id, name: dev.name, lat: 48.8566, lon: 2.3522, added_at: at(2 * 86_400_000), active: dev.active,
+      first_ts: at(366 * 86_400_000),
+      sync: { last_ts: at(9 * 60_000), last_run: at(4 * 60_000), status: "OK", message: null, nb_imported: 2 },
+      forecast: { n: 336, issued_at: at(4 * 60_000), until: new Date(now + 7 * 86_400_000).toISOString() },
+      normals: { computed_at: at(86_400_000), period: "1991-2020", tried_at: at(86_400_000), error: null, error_at: null,
+                 next_year: null, humidity: true, rows: 732 },
+    });
+  }
+
+  /** Détails fictifs (en démonstration, rien n'est appelé) */
+  async refreshWeatherStation(_placeId: number, _refresh: boolean) {
+    const d = new Date(now);
+    const t = (h: number, m: number) => { const x = new Date(d); x.setHours(h, m, 0, 0); return x.toISOString().slice(0, 16); };
+    return delay({
+      results: [], normals: null,
+      details: {
+        grid: { lat: 48.84, lon: 2.36, elevation: 43 }, timezone: "Europe/Paris",
+        current: { temperature_2m: 12.4, relative_humidity_2m: 81, apparent_temperature: 10.9, dew_point_2m: 9.2,
+                   precipitation: 0, weather_code: 3, cloud_cover: 92, pressure_msl: 1017.6, wind_speed_10m: 12.6,
+                   wind_direction_10m: 225, wind_gusts_10m: 27.4, is_day: 1 },
+        units: { temperature_2m: "°C", apparent_temperature: "°C", dew_point_2m: "°C", precipitation: "mm", cloud_cover: "%",
+                 pressure_msl: "hPa", wind_speed_10m: "km/h", wind_gusts_10m: "km/h", relative_humidity_2m: "%" },
+        today: { sunrise: t(8, 12), sunset: t(19, 3), uv_index_max: 2.4, precipitation_sum: 1.2, precipitation_probability_max: 35 },
+      },
+    });
+  }
+
   async placeIssues() {
     const out: { place_id: number; place_name: string; channels: number }[] = [];
     for (const p of places) {

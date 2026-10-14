@@ -875,9 +875,17 @@ def test_weather_normals(conn):
     temp = conn.execute("""SELECT s.id FROM series s JOIN observed_property op ON op.id = s.property_id
                            WHERE s.place_id = %s AND op.code = 'temperature'""", (place,)).fetchone()[0]
     now = datetime.now(UTC)
-    # Station sans normales : à calculer, une tentative par jour au plus
-    assert conn.execute("SELECT ma_id, lat, lon FROM normals_targets(%s)", (now,)).fetchall() == [(ma_id, 43.6045, 1.444)]
-    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(hours=1),)).fetchone()[0] == 0
+    # Station sans normales : à calculer (par tranches : de nouveau proposée au passage suivant)
+    assert conn.execute("SELECT ma_id, lat, lon, progress FROM normals_targets(%s)", (now,)).fetchall() == [(ma_id, 43.6045, 1.444, None)]
+    conn.execute("SELECT save_normals_progress(%s, %s)", (ma_id, Jsonb({"next": 2001, "lat": 43.6045})))
+    assert conn.execute("SELECT progress->>'next' FROM normals_targets(%s)", (now,)).fetchone()[0] == "2001"
+    # Erreur : enregistrée, nouvelle tentative une heure après (tout de suite si demandée pour cette station)
+    conn.execute("SELECT normals_error(%s, 'normales : Open-Meteo 429', %s)", (ma_id, now))
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(minutes=30),)).fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s, %s)", (now + timedelta(minutes=30), ma_id)).fetchone()[0] == 1
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(hours=2),)).fetchone()[0] == 1
+    info = conn.execute("SELECT weather_station_info(%s)", (place,)).fetchone()[0]
+    assert info["normals"]["error"] == "normales : Open-Meteo 429" and info["normals"]["next_year"] == 2001
     rows = [{"md": 101, "min": [2.1, 70], "max": [9.4, 95]}, {"md": 715, "min": [17.0, 40], "max": [29.5, None]}]
     assert conn.execute("SELECT store_normals(%s, %s)", (ma_id, Jsonb(rows))).fetchone()[0] == 3
     assert conn.execute("SELECT md, vmin, vmax FROM series_normals(%s)", ([temp],)).fetchall() == [
@@ -892,7 +900,23 @@ def test_weather_normals(conn):
     assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(days=4),)).fetchone()[0] == 0
     # Capteur ordinaire : aucune normale
     assert conn.execute("SELECT count(*) FROM series_normals(%s)", ([series_id(conn, "salon", "temperature")],)).fetchone()[0] == 0
+    # Diagnostic : normales faites, erreur et sommes partielles effacées
+    info = conn.execute("SELECT weather_station_info(%s)", (place,)).fetchone()[0]
+    assert info["ma_id"] == ma_id and info["lat"] == 43.7
+    assert info["normals"]["error"] is None and info["normals"]["next_year"] is None and info["normals"]["rows"] == 2
+    assert info["normals"]["period"] == "1991-2020" and info["forecast"]["n"] == 0
+    salon_place = conn.execute("SELECT place_id FROM series WHERE id = %s", (series_id(conn, "salon", "temperature"),)).fetchone()[0]
+    assert conn.execute("SELECT weather_station_info(%s)", (salon_place,)).fetchone()[0] is None   # pas une station
     conn.commit()
+    # Compte sans accès à la maison : rien
+    grant_api_roles(conn)
+    conn.commit()
+    try:
+        as_user(conn, uuid.uuid4(), "x@ex.fr")
+        assert conn.execute("SELECT weather_station_info(%s)", (place,)).fetchone()[0] is None
+    finally:
+        conn.rollback()
+        conn.execute("RESET ROLE")
 
 
 def test_series_daily(conn):

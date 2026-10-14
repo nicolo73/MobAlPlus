@@ -231,6 +231,33 @@ export interface AlertEvent {
 /** Résultat de la collecte météo d'une station */
 export interface WeatherResult { station: string; received: number; inserted: number; forecast?: number; error?: string }
 
+/** Diagnostic d'une station météo (base) */
+export interface WeatherStationInfo {
+  ma_id: string; name: string | null; lat: number; lon: number; added_at: string; active: boolean;
+  first_ts: string | null;
+  sync: { last_ts: string | null; last_run: string | null; status: string | null; message: string | null; nb_imported: number | null } | null;
+  forecast: { n: number; issued_at: string | null; until: string | null } | null;
+  normals: { computed_at: string | null; period: string | null; tried_at: string | null; error: string | null;
+             error_at: string | null; next_year: number | null; humidity: boolean | null; rows: number } | null;
+}
+
+/** Détails en direct d'une station (Open-Meteo, non enregistrés) */
+export interface WeatherDetails {
+  grid: { lat: number; lon: number; elevation: number | null } | null;
+  timezone: string | null;
+  current: Record<string, number | string | null>;
+  units: Record<string, string>;
+  today: Record<string, number | string | null>;
+  error?: string;
+}
+
+/** Résultat de l'actualisation d'une station */
+export interface WeatherRefresh {
+  results: WeatherResult[];
+  normals: { station: string; normals: number; done?: string; error?: string } | null;
+  details: WeatherDetails | null;
+}
+
 export interface Api {
   readonly demo: boolean;
   session(): Promise<{ email: string } | null>;
@@ -299,6 +326,10 @@ export interface Api {
   addWeatherStation(label: string, lat: number, lon: number): Promise<number>;
   /** Lance la collecte météo (après création d'une station) */
   collectWeather(): Promise<WeatherResult[]>;
+  /** Diagnostic d'une station météo (null : l'emplacement n'en est pas une) */
+  weatherStationInfo(placeId: number): Promise<WeatherStationInfo | null>;
+  /** Station d'un emplacement : collecte forcée (refresh) et / ou détails en direct */
+  refreshWeatherStation(placeId: number, refresh: boolean): Promise<WeatherRefresh>;
   /** Emplacements parents qui ont encore un capteur affecté (incohérence à corriger) */
   placeIssues(): Promise<{ place_id: number; place_name: string; channels: number }[]>;
   alertRules(seriesIds: number[]): Promise<AlertRule[]>;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeNormals, rowsOf, runNormals, runWeather, type NormalRow } from "../functions/weather/handler.ts";
+import { computeNormals, rowsOf, runNormals, runWeather, stationDetails, type NormalRow, type Progress } from "../functions/weather/handler.ts";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 7, 10, 20);
@@ -92,32 +92,93 @@ test("normales : le lissage efface les écarts d'un jour isolé", () => {
   assert.deepEqual(rows[0].min, [10, null]);   // pas d'humidité dans la réponse
 });
 
-test("normales : une station sans normales, archives 1991 – 2020, enregistrement", async () => {
+test("normales : par tranches de 10 ans, sommes gardées entre deux passages, puis enregistrement", async () => {
   const urls: string[] = [];
+  let progress: Progress | null = null;
   const calls: { fn: string; args?: Record<string, unknown> }[] = [];
   const db = {
     rpc: async (fn: string, args?: Record<string, unknown>) => {
       calls.push({ fn, args });
-      if (fn === "normals_targets") return { data: [{ ma_id: "METEO-AB", lat: 43.6, lon: 1.44 }], error: null };
-      return { data: 732, error: null };
+      if (fn === "normals_targets") return { data: [{ ma_id: "METEO-AB", lat: 43.6, lon: 1.44, progress }], error: null };
+      if (fn === "save_normals_progress") progress = JSON.parse(JSON.stringify(args!.p_progress));
+      return { data: fn === "store_normals" ? 732 : null, error: null };
     },
   };
-  const res = await runNormals(db, async (url) => {
+  const archive = async (url: string) => {
     urls.push(url);
-    return { daily: { time: ["1991-01-01"], temperature_2m_min: [2], temperature_2m_max: [9],
+    const year = url.match(/start_date=(\d{4})/)![1];
+    return { daily: { time: [`${year}-01-01`], temperature_2m_min: [Number(year) - 1990], temperature_2m_max: [9],
                       relative_humidity_2m_min: [70], relative_humidity_2m_max: [95] } };
-  });
-  assert.match(urls[0], /archive-api.*latitude=43\.6&longitude=1\.44.*daily=temperature_2m_min.*start_date=1991-01-01&end_date=2020-12-31/);
-  const store = calls.find((c) => c.fn === "store_normals")!;
-  assert.equal(store.args!.p_period, "1991-2020");
-  assert.ok((store.args!.p_rows as NormalRow[]).length > 0);
-  assert.deepEqual(res, { station: "METEO-AB", normals: 732 });
+  };
+  assert.deepEqual(await runNormals(db, archive), { station: "METEO-AB", normals: 0, done: "1991–2000" });
+  assert.deepEqual(await runNormals(db, archive), { station: "METEO-AB", normals: 0, done: "1991–2010" });
+  assert.deepEqual(await runNormals(db, archive), { station: "METEO-AB", normals: 732, done: "1991-2020" });
+  assert.equal(urls.length, 3);
+  assert.match(urls[0], /archive-api.*latitude=43\.6&longitude=1\.44.*daily=temperature_2m_min.*start_date=1991-01-01&end_date=2000-12-31/);
+  assert.match(urls[2], /start_date=2011-01-01&end_date=2020-12-31/);
+  const rows = calls.find((c) => c.fn === "store_normals")!.args!.p_rows as NormalRow[];
+  assert.deepEqual(rows.find((r) => r.md === 101), { md: 101, min: [11, 70], max: [9, 95] });   // (1 + 11 + 21) / 3
 });
 
-test("normales : rien à faire, ou erreur rapportée sans exception", async () => {
+test("normales : la station a bougé, le calcul repart de 1991", async () => {
+  const urls: string[] = [];
+  const progress = { lat: 1, lon: 1, next: 2011, humidity: true, acc: [[{ sum: [], n: [] }, { sum: [], n: [] }], []] };
+  const db = { rpc: async (fn: string) => ({ data: fn === "normals_targets" ? [{ ma_id: "M", lat: 2, lon: 2, progress }] : null, error: null }) };
+  await runNormals(db, async (url) => { urls.push(url); return { daily: { time: [] } }; });
+  assert.match(urls[0], /start_date=1991-01-01/);
+});
+
+test("normales : humidité journalière refusée par les archives (400) → température seule", async () => {
+  const urls: string[] = [];
+  let saved: Progress | null = null;
+  const db = { rpc: async (fn: string, args?: Record<string, unknown>) => {
+    if (fn === "save_normals_progress") saved = args!.p_progress as Progress;
+    return { data: fn === "normals_targets" ? [{ ma_id: "M", lat: 2, lon: 2, progress: null }] : null, error: null };
+  } };
+  const res = await runNormals(db, async (url) => {
+    urls.push(url);
+    if (url.includes("relative_humidity")) throw new Error("Open-Meteo 400 : Cannot initialize WeatherVariable");
+    return { daily: { time: ["1991-01-01"], temperature_2m_min: [1], temperature_2m_max: [8] } };
+  });
+  assert.equal(urls.length, 2);
+  assert.doesNotMatch(urls[1], /relative_humidity/);
+  assert.equal(res!.error, undefined);
+  assert.equal(saved!.humidity, false);
+});
+
+test("normales : rien à faire, ou erreur enregistrée pour le diagnostic, sans exception", async () => {
   const none = { rpc: async () => ({ data: [], error: null }) };
   assert.equal(await runNormals(none, async () => ({})), null);
-  const one = { rpc: async () => ({ data: [{ ma_id: "METEO-X", lat: 1, lon: 1 }], error: null }) };
-  const res = await runNormals(one, async () => { throw new Error("Open-Meteo 429 : trop de requêtes"); });
-  assert.deepEqual(res, { station: "METEO-X", normals: 0, error: "normales : Open-Meteo 429 : trop de requêtes" });
+  const calls: { fn: string; args?: Record<string, unknown> }[] = [];
+  const one = { rpc: async (fn: string, args?: Record<string, unknown>) => {
+    calls.push({ fn, args });
+    return { data: fn === "normals_targets" ? [{ ma_id: "METEO-X", lat: 1, lon: 1, progress: null }] : null, error: null };
+  } };
+  const res = await runNormals(one, async () => { throw new Error("Open-Meteo 429 : Minutely API request limit exceeded"); }, "METEO-X");
+  assert.deepEqual(res, { station: "METEO-X", normals: 0, error: "normales : Open-Meteo 429 : Minutely API request limit exceeded" });
+  assert.deepEqual(calls[0].args, { p_ma_id: "METEO-X" });
+  assert.deepEqual(calls.at(-1), { fn: "normals_error", args: { p_ma_id: "METEO-X", p_message: res!.error } });
+});
+
+test("collecte d'une seule station (actualisation depuis sa page)", async () => {
+  const urls: string[] = [];
+  const db = { rpc: async (fn: string) => fn === "weather_targets"
+    ? { data: [{ ma_id: "A", lat: 1, lon: 1, since: new Date(NOW - DAY).toISOString() },
+               { ma_id: "B", lat: 2, lon: 2, since: new Date(NOW - DAY).toISOString() }], error: null }
+    : { data: { received: 0, inserted: 0 }, error: null } };
+  const res = await runWeather(db, async (url) => { urls.push(url); return {}; }, NOW, "B");
+  assert.deepEqual(res.map((r) => r.station), ["B"]);
+  assert.match(urls[0], /latitude=2&longitude=2/);
+});
+
+test("détails en direct : point de grille, altitude, conditions, soleil du jour", async () => {
+  const d = await stationDetails(async (url) => {
+    assert.match(url, /current=.*apparent_temperature.*&daily=sunrise/);
+    return { latitude: 48.84, longitude: 2.36, elevation: 43, timezone: "Europe/Paris",
+             current: { time: "2026-10-14T08:00", wind_speed_10m: 12.5 }, current_units: { wind_speed_10m: "km/h" },
+             daily: { time: ["2026-10-14"], sunrise: ["2026-10-14T08:12"], uv_index_max: [2.1] } };
+  }, 48.85, 2.35);
+  assert.deepEqual(d.grid, { lat: 48.84, lon: 2.36, elevation: 43 });
+  assert.equal(d.current.wind_speed_10m, 12.5);
+  assert.deepEqual(d.today, { sunrise: "2026-10-14T08:12", uv_index_max: 2.1 });
 });

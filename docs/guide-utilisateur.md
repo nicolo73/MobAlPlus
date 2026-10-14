@@ -146,8 +146,23 @@ d'historique dès sa création.
   l'infobulle donne « normale 9,1 – 16,8 °C » du jour pointé. Dans la **Synthèse**, une ligne
   « Normale Paris » sous la légende donne la normale du jour du curseur. Sur la page de la station,
   colonne **normale** dans le tableau des prévisions. Bouton **Normales** (à côté de Prévisions)
-  pour les masquer. Une nouvelle station reçoit ses normales lors de la collecte suivante (dans
-  la demi-heure) ; si la station change de position, elles sont recalculées.
+  pour les masquer. Calcul par tranches de 10 ans, une à chaque collecte (toutes les 30 minutes) :
+  une nouvelle station a ses normales en 1 h 30 environ (ou plus vite avec **Actualiser**, une
+  tranche par appui) ; si la station change de position, elles sont recalculées.
+- **Fiche « Station météo »** en haut de la page de la station, avec trois pastilles d'état
+  (collecte, prévision, normales : vert = bon, orange = en attente, rouge = erreur) ; la toucher
+  pour l'ouvrir (ouverte d'office en cas d'erreur) :
+  - **carte** de situation (OpenStreetMap, zoom + / −, **Agrandir** ouvre la carte complète) :
+    l'épingle est la position de la station, le petit carré le **point de grille** du modèle météo
+    dont viennent les valeurs ;
+  - **diagnostic** : position, point du modèle (distance, altitude retenue), début de l'historique,
+    dernier passage et dernière mesure de la collecte (et l'erreur éventuelle), prévision reçue
+    (nombre de valeurs, jusqu'à quand), état des normales (calculées, en cours, ou erreur avec
+    son message) ;
+  - **conditions actuelles en direct** (non enregistrées) : temps, ressenti, point de rosée, vent
+    et rafales, précipitations, nébulosité, pression, lever et coucher du soleil, UV, pluie du jour ;
+  - **Actualiser** : relève la station tout de suite (mesures, prévision, une tranche de normales)
+    sans attendre la demi-heure, avec un compte rendu ; courbes et tableaux sont rechargés.
 
 ## Page d'un emplacement
 
