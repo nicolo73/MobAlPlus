@@ -395,6 +395,26 @@ frais que l'intérieur.
 
 ---
 
+## 18. Ouverture à d'autres foyers (voire offre payante)
+
+**Constat (14/10/2026)** : l'application gère déjà plusieurs maisons dans une même base (partage,
+rôles, sécurité ligne à ligne). Volume mesuré : ≈ 3 Mo par capteur pour les 90 jours détaillés, puis
+≈ 1,5 Mo par capteur et par an compacté ; une maison de 5 capteurs ≈ 20 Mo la 1re année, ≈ 35 Mo à
+3 ans. Le quota gratuit (500 Mo) tient donc 10 à 20 maisons.
+
+**Choix recommandé** : une seule base partagée (pas une base par maison : 2 projets actifs gratuits
+seulement chez Supabase, ≈ 10 $/mois par projet payant, migrations et suivi multipliés). Plan Pro
+(25 $/mois, 8 Go inclus, puis ≈ 0,125 $/Go) jusqu'à quelques milliers de maisons ; découpage en
+plusieurs bases (annuaire commun + bases de données par lot de maisons) seulement au-delà.
+L'auto-hébergement (sa propre base Supabase) reste possible pour les utilisateurs avertis.
+
+**Préalables à une ouverture** : accord du fabricant pour la collecte (lecture du site
+measurements.mobile-alerts.eu, une requête par capteur toutes les 10 min : ne passera pas à grande
+échelle sans accord ni API adaptée) ; Open-Meteo payant en usage commercial (≈ 29 à 99 $/mois ;
+mutualiser les stations par commune) ; collecte par lots en file d'attente (durée limitée des Edge
+Functions) ; RGPD (position de la maison, e-mails : hébergement UE, mentions, confidentialité) ;
+quotas par maison (capteurs, durée d'historique) ; abonnement (Stripe, plutôt annuel).
+
 ## Fait
 
 | Date | Évolution |
