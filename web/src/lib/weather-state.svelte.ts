@@ -1,11 +1,13 @@
 // Stations météo de la maison courante : emplacements de type « weather » alimentés côté serveur
 // par la collecte Open-Meteo (capteurs virtuels). L'application ne lit que la base : aucun appel
 // au service météo depuis les navigateurs. Les stations ont aussi une prévision horaire (7 jours),
-// tracée dans le prolongement de leur courbe, dans un style distinct.
+// tracée dans le prolongement de leur courbe, dans un style distinct, et des normales saisonnières
+// (bande des minimums et maximums habituels de chaque jour).
 
 import { api } from "./api";
 import { cssVar } from "./colors";
 import type { WeatherSeries } from "./weather-parse";
+import type { NormalDay } from "./normals";
 import type { Point } from "./types";
 import type { ChartSeries } from "../components/TimeChart.svelte";
 
@@ -16,6 +18,25 @@ export const FORECAST_MS = 7 * 86_400_000;
 export async function loadForecast(ids: number[]): Promise<Map<number, Point[]>> {
   if (!ids.length) return new Map();
   try { return await api.seriesForecast(ids, Date.now() - 3_600_000, Date.now() + FORECAST_MS); } catch { return new Map(); }
+}
+
+/**
+ * Normales saisonnières déjà chargées, par série : elles ne changent pas ; une absence (capteur, ou
+ * station dont les normales ne sont pas encore calculées) est redemandée après 30 minutes
+ */
+const normalsCache = new Map<number, { days: NormalDay[]; at: number }>();
+
+/** Normales saisonnières de séries (seulement celles qui en ont) */
+export async function loadNormals(ids: number[]): Promise<Map<number, NormalDay[]>> {
+  const now = Date.now();
+  const missing = ids.filter((id) => { const c = normalsCache.get(id); return !c || (!c.days.length && now - c.at > 1_800_000); });
+  if (missing.length) {
+    try {
+      const got = await api.seriesNormals(missing);
+      for (const id of missing) normalsCache.set(id, { days: got.get(id) ?? [], at: now });
+    } catch { /* réessayé au prochain chargement */ }
+  }
+  return new Map(ids.map((id) => [id, normalsCache.get(id)?.days ?? []] as const).filter(([, v]) => v.length));
 }
 
 /**
@@ -65,7 +86,8 @@ export function weatherCurve(w: WeatherSeries | null, prop: string, shown: numbe
   const band = prop === "temperature" ? w?.bands?.temperature : prop === "humidity" ? w?.bands?.humidity : undefined;
   const st = primaryStation();
   if (!st || shown.includes(st.placeId)) return [];
-  const base = { id: `meteo-${prop}`, name: st.name, color: cssVar("--muted") };
+  const normal = prop === "temperature" ? w?.normals?.temperature : prop === "humidity" ? w?.normals?.humidity : undefined;
+  const base = { id: `meteo-${prop}`, name: st.name, color: cssVar("--muted"), ...(normal?.length ? { normal } : {}) };
   if (band?.length) return [{ ...base, dotted: true, points: points ?? [], band }];
   if (!points?.length) return [];
   const fc = prop === "temperature" ? w?.forecast?.temperature : prop === "humidity" ? w?.forecast?.humidity : undefined;
@@ -78,18 +100,21 @@ export async function loadWeather(enabled: boolean, from: number, to: number, wi
   const st = primaryStation();
   if (!enabled || !st) return null;
   const ids = [st.temperature, st.humidity].filter((x): x is number => x !== null);
+  const normals = await loadNormals(ids);   // (affichées ou non selon les préférences : bascule immédiate)
+  const nm = normals.size ? { normals: { temperature: st.temperature ? normals.get(st.temperature) ?? [] : [],
+                                         humidity: st.humidity ? normals.get(st.humidity) ?? [] : [] } } : {};
   try {
     if (view.band) {
       // Temps long : bandes min – max journalières, et mesures détaillées tant qu'elles restent en fond
       const [b, raw] = await Promise.all([api.seriesDaily(ids, from, to),
                                           view.raw ? api.seriesData(ids, from, to) : Promise.resolve(new Map<number, Point[]>())]);
       const get = (m: Map<number, Point[]>, id: number | null) => (id ? m.get(id) ?? [] : []);
-      return { temperature: get(raw, st.temperature), humidity: get(raw, st.humidity),
+      return { ...nm, temperature: get(raw, st.temperature), humidity: get(raw, st.humidity),
                bands: { temperature: st.temperature ? b.get(st.temperature) ?? [] : [], humidity: st.humidity ? b.get(st.humidity) ?? [] : [] } };
     }
     const [data, fc] = await Promise.all([api.seriesData(ids, from, to), withForecast ? loadForecast(ids) : new Map<number, Point[]>()]);
     const get = (m: Map<number, Point[]>, id: number | null) => (id ? m.get(id) ?? [] : []);
-    return { temperature: get(data, st.temperature), humidity: get(data, st.humidity),
+    return { ...nm, temperature: get(data, st.temperature), humidity: get(data, st.humidity),
              forecast: { temperature: get(fc, st.temperature), humidity: get(fc, st.humidity) } };
   } catch { return null; }
 }

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { dayNoon, type DayBand } from "./longview";
+import type { NormalDay } from "./normals";
 import { sortPlaces } from "./placetree";
 import type {
   Api, Channel, CollectResult, Context, Device, HomeRole, Member, Observation, Place, PlaceDeployment, Point,
@@ -159,6 +160,17 @@ export class SupabaseApi implements Api {
       return [id, rows.map((r) => ({ ts: dayNoon(r.day), min: r.vmin, max: r.vmax, avg: r.vavg }))] as const;
     }));
     return new Map<number, DayBand[]>(lists);
+  }
+
+  async seriesNormals(ids: number[]) {
+    const out = new Map<number, NormalDay[]>();
+    if (!ids.length) return out;
+    const { data, error } = await this.sb.rpc("series_normals", { p_series: ids });
+    if (error) return out;  // base pas encore à jour : pas de normales
+    for (const r of data as { series_id: number; md: number; vmin: number; vmax: number }[]) {
+      out.set(r.series_id, [...(out.get(r.series_id) ?? []), { md: r.md, min: r.vmin, max: r.vmax }]);
+    }
+    return out;
   }
 
   async seriesForecast(ids: number[], from: number, to: number) {

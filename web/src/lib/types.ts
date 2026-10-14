@@ -260,6 +260,8 @@ export interface Api {
   saveUserOptions(options: Record<string, unknown>): Promise<void>;
   /** Minimum, maximum et moyenne par jour (courbes sur le temps long), par série */
   seriesDaily(ids: number[], from: number, to: number): Promise<Map<number, import("./longview").DayBand[]>>;
+  /** Normales saisonnières (stations météo) : min et max de chaque jour de l'année, par série ; vide pour un capteur */
+  seriesNormals(ids: number[]): Promise<Map<number, import("./normals").NormalDay[]>>;
   /** Prévisions (stations météo) : heures à venir, par série ; vide pour un capteur */
   seriesForecast(ids: number[], from: number, to: number): Promise<Map<number, Point[]>>;
   seriesStats(id: number, from: number, to: number): Promise<SeriesStats>;

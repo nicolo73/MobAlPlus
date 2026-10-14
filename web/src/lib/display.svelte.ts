@@ -27,6 +27,8 @@ export const display = $state({
   weather: true,
   /** Prévision météo : prolongement des courbes des stations dans le futur */
   forecast: true,
+  /** Normales saisonnières : bande sous la courbe des stations météo */
+  normals: true,
   /** Page Maintenant : fiches masquées, par maison (identifiants d'emplacement) */
   nowHidden: {} as Record<string, number[]>,
   trend: structuredClone(TREND_DEFAULTS) as TrendOptions,
@@ -44,6 +46,7 @@ function applySaved(saved: any) {
   if (VALUE_STYLES.includes(saved.values)) display.values = saved.values;
   if (typeof saved.weather === "boolean") display.weather = saved.weather;
   if (typeof saved.forecast === "boolean") display.forecast = saved.forecast;
+  if (typeof saved.normals === "boolean") display.normals = saved.normals;
   if (saved.longview && typeof saved.longview === "object") display.longview = normLongView(saved.longview);
   if (saved.nowHidden && typeof saved.nowHidden === "object") display.nowHidden = saved.nowHidden;
   if (saved.trend && typeof saved.trend === "object") {
@@ -147,6 +150,11 @@ export function setLongView(patch: Partial<LongView> | null) {
 
 export function setForecast(on: boolean) {
   display.forecast = on;
+  save();
+}
+
+export function setNormals(on: boolean) {
+  display.normals = on;
   save();
 }
 

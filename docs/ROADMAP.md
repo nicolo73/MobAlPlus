@@ -219,6 +219,14 @@ de la station ; alertes « prévu au-dessus / en dessous de » dans les 24 h. Pi
 d'alerte réglable (12 h, 48 h), autres grandeurs prévues (pluie, vent, ensoleillement), alerte
 « écart prévu dehors / dedans », actions anticipées (voir 17).
 
+**Normales saisonnières (14/10/2026)** : minimum et maximum normaux de chaque jour de l'année
+(1991 – 2020, archives ERA5 à la position de la station, lissés sur 21 jours), calculés une fois par
+station (table `normal`) ; bande tiret-point-point sous la courbe de la station, infobulle, légende
+de la Synthèse, colonne du tableau des prévisions. Pistes : **écart à la normale** (« +3,2 °C ») sur
+Maintenant et dans les tableaux, alertes « au-dessus de la normale de plus de X » (vague de chaleur,
+froid inhabituel), normales officielles Météo-France d'une station proche (API à clé), autres
+grandeurs (pluie, ensoleillement).
+
 ## 8 bis. Lecture sur le temps long
 
 **Fait (10/10/2026)** : au-delà de 8 jours affichés, bandes min – max journalières calculées par la
@@ -231,7 +239,8 @@ la réduction à ~1000 points : deux points gardés pouvaient être à plus de 3
 - **carte de chaleur « jour × heure »** (carpet plot) : une ligne par jour, une colonne par heure,
   couleur = température ; montre d'un coup d'œil le cycle journalier sur des mois (chauffage,
   ensoleillement, canicule, effet d'une isolation) ;
-- **comparaison d'une année sur l'autre** (même période superposée) et **écart à la normale** ;
+- **comparaison d'une année sur l'autre** (même période superposée) ; **écart à la normale** (les
+  normales saisonnières sont tracées depuis le 14/10/2026, voir 8) ;
 - **degrés-jours** (DJU chauffage / climatisation) par mois, pour relier températures et consommation ;
 - **moyenne glissante 24 h** en surimpression des mesures brutes ;
 - **boîtes à moustaches** par mois (répartition des valeurs) ;

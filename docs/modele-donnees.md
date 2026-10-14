@@ -42,6 +42,7 @@ erDiagram
   device ||--o{ device_channel : "canaux"
   device ||--o| device_sync : "état de collecte"
   device_channel ||--o{ forecast : "prévision (station météo)"
+  device_channel ||--o{ normal : "normales saisonnières (station météo)"
   device_channel ||--o{ deployment : "affecté"
   series ||--o{ deployment : "alimentée par"
   device_channel ||--o{ reading : "mesures récentes"
@@ -199,6 +200,12 @@ erDiagram
     real value
     timestamptz issued_at "collecte qui l'a fournie"
   }
+  normal {
+    int channel_id PK, FK
+    smallint md PK "mois x 100 + jour"
+    real vmin "minimum normal du jour"
+    real vmax "maximum normal du jour"
+  }
   device_sync {
     int device_id PK, FK
     timestamptz last_ts "dernière mesure reçue"
@@ -269,6 +276,7 @@ erDiagram
 | `user_options` | options de chaque compte : un document JSON (synthèses de chaque maison, préférences d'affichage) | une ligne par compte, visible de lui seul ; évolutif sans changer la structure |
 | `device_sync` | avancement de la collecte par capteur | reprise incrémentale, dernière erreur |
 | `forecast` | prévision horaire des stations météo (7 jours), par canal | heures à venir remplacées à chaque collecte ; lue par `series_forecast()` |
+| `normal`, `normal_source` | normales saisonnières des stations météo (min / max de chaque jour de l'année, 1991 – 2020), par canal ; calcul fait (période, position) ou tenté | calculées une fois par station, recalculées si elle change de position ; lues par `series_normals()` |
 | `maintenance_log` | journal des tâches (compactage, simplification, remplacements à l'import) | consultable dans Admin › Maintenance |
 | `app_setting` | réglages (durées de conservation, fuseau, quota) | modifiables par l'administrateur |
 | `app_user` | administrateurs de la plateforme | rôle reconnu par l'e-mail du compte |
@@ -286,6 +294,7 @@ erDiagram
 | `collect_targets()`, `ingest_readings()`, `record_sync_error()` | collecteur |
 | `weather_targets()`, `add_weather_station()` | stations météo publiques : à collecter (Edge Function `weather`), création |
 | `store_forecast()`, `series_forecast()`, `evaluate_forecast_alerts()` | prévisions : enregistrement, lecture, alertes sur prévision |
+| `normals_targets()`, `store_normals()`, `series_normals()` | normales saisonnières : station à calculer, enregistrement, lecture |
 | `run_maintenance()`, `compact_readings()`, `simplify_old()` | maintenance nocturne |
 | `assign_channel()`, `retire_device()`, `reorder_places()` | administration |
 | `place_issues()` | emplacements parents ayant encore un capteur affecté (incohérence ancienne à corriger) |

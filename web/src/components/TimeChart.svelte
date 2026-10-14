@@ -13,6 +13,7 @@
   import { GAP, curveData, valueAt, type CurveMode } from "../lib/curve";
   import { WEEKLY_FROM, bandMain, ghostLevel, gridLines, scaleOf, weeklyBands, type DayBand } from "../lib/longview";
   import { display } from "../lib/display.svelte";
+  import { normalAt, normalBands, type NormalDay } from "../lib/normals";
 
   export interface ChartSeries {
     id: number | string;
@@ -27,6 +28,8 @@
     forecast?: boolean;
     /** Temps long : bande min – max par jour (à la place des points) */
     band?: DayBand[];
+    /** Normales saisonnières (stations météo) : bande en tiret-point-point, sous la courbe */
+    normal?: NormalDay[];
   }
 
   interface Props {
@@ -135,6 +138,7 @@
     const endLabels = measured >= 2 && measured <= 4 && (el?.clientWidth ?? 0) >= 500;
     const dashed = new Set(series.filter((s) => s.dashed || s.forecast).map((s) => s.name));
     const dotted = new Set(series.filter((s) => s.dotted).map((s) => s.name));
+    const withNormal = display.normals ? series.filter((s) => s.normal?.length && !s.forecast) : [];
     // Points tracés, gardés pour l'infobulle : valeur de chaque courbe à l'instant pointé
     const prepared = series.map((s) => ({ s, data: curveData(s.points, curve, cutAfter) }));
     const levelColor = (l: "info" | "warning") => cssVar(l === "warning" ? "--err" : "--hum");
@@ -205,7 +209,15 @@
               <span style="display:inline-block;width:14px;border-top:2px ${dotted.has(s.name) ? "dotted" : dashed.has(s.name) ? "dashed" : "solid"} ${s.color}"></span>
               <b style="min-width:4.5rem">${text} ${escapeHtml(unit)}</b>
               <span style="color:${muted}">${escapeHtml(s.name)}</span></div>`)
-            .join("");
+            .join("")
+            // Normale du jour, sous les valeurs
+            + withNormal.map((s) => {
+              const n = normalAt(s.normal, t);
+              return n ? `<div style="display:flex;align-items:center;gap:.5rem;color:${muted}">
+                <span style="display:inline-block;width:14px;height:8px;border-top:1.5px dashed ${s.color};border-bottom:1.5px dashed ${s.color}"></span>
+                <span style="min-width:4.5rem">${fmt(n.min)} – ${fmt(n.max)} ${escapeHtml(unit)}</span>
+                <span>normale${withNormal.length > 1 ? ` · ${escapeHtml(s.name)}` : ""}</span></div>` : "";
+            }).join("");
           const when = !banded ? fmtTime(t)
             : weekly ? `semaine du ${new Date(t - ((new Date(t).getDay() + 6) % 7) * 86_400_000).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} · moyennes des min et max`
             : `${new Date(t).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })} · min – max du jour`;
@@ -264,6 +276,8 @@
           },
         } : {}),
       }),
+      // Normales saisonnières, sous les courbes, sur toute la barre (on peut glisser sans nouveau calcul)
+      ...withNormal.flatMap((s) => normalSeries(s, bar[0], axisMax)),
       // Repères verticaux : minuits jusqu'à une semaine, puis lundis, 1ers du mois ou 1ers janvier
       {
         id: "jours", type: "line", data: [], silent: true,
@@ -294,6 +308,29 @@
         })),
       }] : [])],
     };
+  }
+
+  /** Tirets des normales : tiret-point-point (distinct de la prévision, tiret-point) */
+  const NORMAL_DASH = [10, 3, 2, 3, 2, 3];
+
+  /**
+   * Normales saisonnières d'une courbe : bande entre le minimum et le maximum normaux de chaque jour,
+   * contour en tiret-point-point, remplissage très léger ; décor sans interaction (valeurs dans l'infobulle)
+   */
+  function normalSeries(s: ChartSeries, from: number, to: number) {
+    const band = normalBands(s.normal, from, to);
+    const common = {
+      type: "line", stack: `normale-${s.id}`, stackStrategy: "all", showSymbol: false, smooth: 0.3,
+      silent: true, z: 1, emphasis: { disabled: true }, tooltip: { show: false },
+      blur: { lineStyle: { opacity: 0.2 }, areaStyle: { opacity: 0.02 } },
+      lineStyle: { width: 1.2, color: s.color, opacity: 0.75, type: NORMAL_DASH },
+      itemStyle: { color: s.color },
+    };
+    return [
+      { ...common, id: `${s.id}-normale-min`, name: `${s.name} (normale)`, data: band.map((b) => [b.ts, b.min]) },
+      { ...common, id: `${s.id}-normale-range`, name: `${s.name} (normale)`, data: band.map((b) => [b.ts, b.max - b.min]),
+        areaStyle: { color: s.color, opacity: 0.07 } },
+    ];
   }
 
   /** Trait vertical de l'instant choisi (mode curseur) */
@@ -369,7 +406,7 @@
     const n = ((chart.getOption() as { series?: unknown[] }).series ?? []).length;
     chart.dispatchAction({ type: "downplay", seriesIndex: [...Array(n).keys()] });
     // Une courbe en bande est faite de deux séries (minimum, écart jusqu'au maximum)
-    if (highlight.length) chart.dispatchAction({ type: "highlight", seriesId: highlight.flatMap((id) => [id, `${id}-min`, `${id}-range`]) });
+    if (highlight.length) chart.dispatchAction({ type: "highlight", seriesId: highlight.flatMap((id) => [id, `${id}-min`, `${id}-range`, `${id}-normale-min`, `${id}-normale-range`]) });
   }
   $effect(() => { void highlight; applyHighlight(); });
 
@@ -465,7 +502,7 @@
 
   // Données ou bornes changées : nouveau rendu complet
   $effect(() => {
-    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter; void scaleKey;
+    void series; void loaded; void unit; void curve; void thresholds; void alertPoints; void full; void gaps; void cutAfter; void scaleKey; void display.normals;
     render();
   });
 

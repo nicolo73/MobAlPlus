@@ -2,6 +2,7 @@
   // Synthèse (pensée pour le téléphone) : les courbes choisies dans la page Courbes, sans réglage,
   // et sous elles (ou à côté, en paysage) la légende avec les valeurs à l'instant du curseur, leur
   // tendance et les alertes. Le curseur est à « maintenant » par défaut : valeurs actuelles d'un coup d'œil.
+  import { normalAt, type NormalDay } from "../lib/normals";
   import { api } from "../lib/api";
   import { isDark } from "../lib/colors";
   import { loadRange, followsNow, needsReload, type Window } from "../lib/period";
@@ -14,7 +15,7 @@
   import { curveData, valueAt } from "../lib/curve";
   import { computeTrend } from "../lib/trend";
   import { describe, RECENT } from "../lib/alerts.svelte";
-  import { forecastCurve, homeWeather, loadForecast, loadWeather, primaryStation, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadNormals, loadWeather, primaryStation, weatherCurve } from "../lib/weather-state.svelte";
   import { rulesBySeries, trendTone, zoneOf } from "../lib/zones";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule, Place, Point, SeriesInfo } from "../lib/types";
@@ -196,6 +197,9 @@
     void data;
     loadForecast(ids).then((f) => (forecast = f));
   });
+  // … et leurs normales saisonnières
+  let normals = $state(new Map<number, NormalDay[]>());
+  $effect(() => { loadNormals(stationSeries).then((n) => (normals = n)); });
 
   /** Une courbe par grandeur affichée */
   const charts = $derived(shownProps.map((p) => {
@@ -205,9 +209,10 @@
       const band = bands.size ? sel.curveBand(c, p.code, seriesByPlace, bands) : null;
       const points = sel.curvePoints(c, p.code, seriesByPlace, data);
       if (!points && !band) continue;
-      curves.push({ ...base, points: points ?? [], ...(band ? { band } : {}), dashed: c.avg });
-      if (!points?.length) continue;
       const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === p.code)?.id;
+      const normal = sid !== undefined ? normals.get(sid) : undefined;
+      curves.push({ ...base, points: points ?? [], ...(band ? { band } : {}), ...(normal ? { normal } : {}), dashed: c.avg });
+      if (!points?.length) continue;
       if (sid !== undefined && forecast.has(sid)) curves.push(...forecastCurve(base, points, forecast.get(sid)));
     }
     if (curves.length) curves.push(...weatherCurve(weather, p.code, selected.map((x) => x.node.id)));
@@ -234,7 +239,7 @@
 
   /** Légende : une ligne par courbe, valeurs à l'instant choisi, tendance et alerte */
   const rows = $derived.by(() => {
-    const keys = new Map<string, { id: string | number; name: string; color: string; dashed?: boolean; dotted?: boolean;
+    const keys = new Map<string, { id: string | number; name: string; color: string; dashed?: boolean; dotted?: boolean; normal?: boolean;
                                    places: number[]; values: Map<string, { v: number | null; pts: Point[]; day?: DayBand }> }>();
     for (const c of charts) {
       for (const s of c.curves) {
@@ -243,6 +248,14 @@
         const sc = selected.find((x) => String(x.key) === k);
         if (!keys.has(k)) keys.set(k, { id: sc?.key ?? s.id, name: s.name, color: s.color, dashed: s.dashed, dotted: s.dotted,
                                          places: sc?.places ?? [], values: new Map() });
+        // Normales saisonnières (station météo) : ligne à part, minimum – maximum normaux du jour
+        const n = display.normals ? normalAt(s.normal, at) : null;
+        if (n) {
+          const nk = `normale-${k}`;
+          if (!keys.has(nk)) keys.set(nk, { id: nk, name: `Normale ${s.name.replace(/^Météo · /, "")}`, color: s.color,
+                                            normal: true, places: [], values: new Map() });
+          keys.get(nk)!.values.set(c.code, { v: null, pts: [], day: { ts: at, min: n.min, max: n.max, avg: (n.min + n.max) / 2 } });
+        }
         if (s.forecast && at <= now) continue;
         if (s.band && bandMode) {
           // Temps long : minimum et maximum du jour sous le curseur
@@ -261,7 +274,8 @@
       alert: alertAt(r.places),
       trends: new Map([...r.values].map(([prop, x]) =>
         [prop, x.v === null ? null : computeTrend(x.pts.filter((p) => p.ts <= at && p.ts > at - 25 * 3_600_000), prop, display.trend)])),
-    })).sort((a, b) => (b.values.get(first)?.v ?? -Infinity) - (a.values.get(first)?.v ?? -Infinity));
+    })).sort((a, b) => Number(!!a.normal) - Number(!!b.normal)   // normales en dernier
+      || (b.values.get(first)?.v ?? -Infinity) - (a.values.get(first)?.v ?? -Infinity));
   });
 
   /** Alerte la plus importante en cours à l'instant choisi, pour les emplacements d'une courbe */
@@ -358,7 +372,7 @@
             <li class:hl={hovered === key}
                 onpointerenter={(e) => { if (e.pointerType === "mouse") hovered = key; }}
                 onpointerleave={(e) => { if (e.pointerType === "mouse" && hovered === key) hovered = null; }}>
-              <span class="key" class:dashed={r.dashed} class:dotted={r.dotted} style="--c:{r.color}"></span>
+              <span class="key" class:dashed={r.dashed} class:dotted={r.dotted} class:normal={r.normal} style="--c:{r.color}"></span>
               {#if typeof r.id === "number"}
                 <a class="name" href="#/lieu/{Math.abs(r.id)}">{r.name}</a>
               {:else}
@@ -378,7 +392,9 @@
                 {@const v = x && x.v !== null ? Math.round(x.v * 10) / 10 : null}
                 {@const tone = trendTone(v, tr, rs, p.code)}
                 <span class="val {p.code}">
-                  {#if x?.day}
+                  {#if x?.day && r.normal}
+                    <span class="num range normal" title="normale saisonnière du jour (1991 – 2020) : minimum – maximum habituels">{numOnly(x.day.min, unitOf(p.code))}–{numOnly(x.day.max, unitOf(p.code))}</span>
+                  {:else if x?.day}
                     <!-- Temps long : minimum – maximum du jour (fond selon la valeur la plus à risque) -->
                     <span class="num range zv {zoneOf(x.day.max, rs) ?? zoneOf(x.day.min, rs) ?? ''}" title="minimum – maximum du jour">{numOnly(x.day.min, unitOf(p.code))}–{numOnly(x.day.max, unitOf(p.code))}</span>
                   {:else}
@@ -433,6 +449,7 @@
   .key { flex: none; width: 16px; height: 0; border-top: 3px solid var(--c); }
   .key.dashed { border-top-style: dashed; }
   .key.dotted { border-top: 2px dotted var(--c); }
+  .key.normal { height: 5px; border-top: 1.5px dashed var(--c); border-bottom: 1.5px dashed var(--c); opacity: 0.8; }
   .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
           text-decoration: none; font-size: 0.92rem; }
   .val { display: inline-flex; align-items: stretch; justify-content: flex-end; gap: 0.1rem; flex: none; }
@@ -442,6 +459,7 @@
   .val .num.range { font-size: 0.85rem; white-space: nowrap; }
   .val.temperature .num { color: var(--val-temp); }
   .val.humidity .num { color: var(--val-hum); min-width: 2.8rem; }
+  .val .num.normal { color: var(--muted); font-weight: 500; }
   .arrow { display: inline-flex; width: 1.2rem; justify-content: center; font-size: 0.9rem; }
   .alert { flex: none; width: 1rem; text-align: center; font-weight: 700; }
   .alert .warning { color: var(--err); }

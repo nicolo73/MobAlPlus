@@ -5,6 +5,12 @@
 -->
 
 
+## 14 octobre 2026
+- **Normales saisonnières** des stations météo : minimum et maximum habituels de chaque jour
+  (moyennes 1991 – 2020), en **bande tiret-point-point** sous la courbe de la station, dans
+  l'infobulle, dans la légende de la Synthèse (« Normale Paris ») et en colonne du tableau des
+  prévisions ; bouton **Normales** pour les masquer.
+
 ## 11 octobre 2026
 - **Barre de glissement plus intelligente** sous les courbes : quand une poignée arrive au bout, la
   barre s'élargit (on peut aller toujours plus loin dans le passé) ; quand la période est réduite,

@@ -9,4 +9,6 @@ export interface WeatherSeries {
   bands?: { temperature: import("./longview").DayBand[]; humidity: import("./longview").DayBand[] };
   /** Prévision des heures à venir */
   forecast?: { temperature: Point[]; humidity: Point[] };
+  /** Normales saisonnières (jour par jour de l'année) */
+  normals?: { temperature: import("./normals").NormalDay[]; humidity: import("./normals").NormalDay[] };
 }

@@ -6,7 +6,7 @@
 // SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { runWeather } from "./handler.ts";
+import { runNormals, runWeather } from "./handler.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const CORS = {
@@ -33,12 +33,15 @@ Deno.serve(async (req) => {
 
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
   try {
-    const results = await runWeather(db, async (url) => {
+    const fetchJson = async (url: string) => {
       const res = await fetch(url, { headers: { "User-Agent": "MobAlPlus (collecte météo)" } });
       if (!res.ok) throw new Error(`Open-Meteo ${res.status} : ${(await res.text()).slice(0, 200)}`);
       return res.json();
-    });
-    return json({ results });
+    };
+    const results = await runWeather(db, fetchJson);
+    // Normales saisonnières d'une station qui n'en a pas encore (une fois par station)
+    const normals = await runNormals(db, fetchJson).catch((e) => ({ station: "", normals: 0, error: String(e) }));
+    return json({ results, normals });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

@@ -868,6 +868,33 @@ def test_weather_forecast_and_alerts(conn):
     conn.commit()
 
 
+def test_weather_normals(conn):
+    home = conn.execute("SELECT default_home_id()").fetchone()[0]
+    place = conn.execute("SELECT add_weather_station(%s, 'Toulouse', 43.6045, 1.4440)", (home,)).fetchone()[0]
+    ma_id = conn.execute("SELECT ma_id FROM device WHERE vendor = 'open_meteo'").fetchone()[0]
+    temp = conn.execute("""SELECT s.id FROM series s JOIN observed_property op ON op.id = s.property_id
+                           WHERE s.place_id = %s AND op.code = 'temperature'""", (place,)).fetchone()[0]
+    now = datetime.now(UTC)
+    # Station sans normales : à calculer, une tentative par jour au plus
+    assert conn.execute("SELECT ma_id, lat, lon FROM normals_targets(%s)", (now,)).fetchall() == [(ma_id, 43.6045, 1.444)]
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(hours=1),)).fetchone()[0] == 0
+    rows = [{"md": 101, "min": [2.1, 70], "max": [9.4, 95]}, {"md": 715, "min": [17.0, 40], "max": [29.5, None]}]
+    assert conn.execute("SELECT store_normals(%s, %s)", (ma_id, Jsonb(rows))).fetchone()[0] == 3
+    assert conn.execute("SELECT md, vmin, vmax FROM series_normals(%s)", ([temp],)).fetchall() == [
+        (101, pytest.approx(2.1), pytest.approx(9.4)), (715, 17.0, 29.5)]
+    # Calculées : plus rien à faire, même le lendemain ; sauf si la station change de position
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(days=2),)).fetchone()[0] == 0
+    conn.execute("UPDATE device SET lat = 43.7 WHERE ma_id = %s", (ma_id,))
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(days=2),)).fetchone()[0] == 1
+    # Nouveau calcul : remplace les précédentes
+    conn.execute("SELECT store_normals(%s, %s)", (ma_id, Jsonb(rows[:1])))
+    assert conn.execute("SELECT count(*) FROM series_normals(%s)", ([temp],)).fetchone()[0] == 1
+    assert conn.execute("SELECT count(*) FROM normals_targets(%s)", (now + timedelta(days=4),)).fetchone()[0] == 0
+    # Capteur ordinaire : aucune normale
+    assert conn.execute("SELECT count(*) FROM series_normals(%s)", ([series_id(conn, "salon", "temperature")],)).fetchone()[0] == 0
+    conn.commit()
+
+
 def test_series_daily(conn):
     ch = channel_id(conn, "07AAAAAAAAAA", 1)
     sid = series_id(conn, "salon", "temperature")

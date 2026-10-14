@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { evaluateForecast, evaluateRule } from "./alerteval";
 import { dayNoon, type DayBand } from "./longview";
+import type { NormalDay } from "./normals";
 
 const PROPS: Property[] = [
   { id: 1, code: "temperature", name: "Température", unit: "°C", simplify_tolerance: 0.2 },
@@ -222,6 +223,25 @@ export class DemoApi implements Api {
       out.set(id, [...days].map(([day, vs]) => ({
         ts: dayNoon(day), min: Math.min(...vs), max: Math.max(...vs), avg: vs.reduce((t, v) => t + v, 0) / vs.length,
       })).sort((a, b) => a.ts - b.ts));
+    }
+    return delay(out);
+  }
+
+  /** Normales fictives des stations météo : saison d'Île-de-France, approximative */
+  async seriesNormals(ids: number[]) {
+    const out = new Map<number, NormalDay[]>();
+    const meteo = new Set(devices.filter((d) => d.vendor === "open_meteo" && d.active).flatMap((d) => d.channels.map((c) => c.id)));
+    for (const id of ids.filter((x) => meteo.has(x))) {
+      const rows: NormalDay[] = [];
+      for (let t = new Date(2000, 0, 1, 12).getTime(), i = 0; i < 366; t += 86_400_000, i++) {
+        const d = new Date(t);
+        const season = Math.cos(((i - 200) / 366) * 2 * Math.PI);   // 1 vers le 19 juillet, -1 en janvier
+        const r = (v: number) => Math.round(v * 10) / 10;
+        rows.push(id % 2
+          ? { md: (d.getMonth() + 1) * 100 + d.getDate(), min: r(8.5 + 6.5 * season), max: r(16 + 9 * season) }
+          : { md: (d.getMonth() + 1) * 100 + d.getDate(), min: r(62 - 14 * season), max: r(93 - 3 * season) });
+      }
+      out.set(id, rows);
     }
     return delay(out);
   }

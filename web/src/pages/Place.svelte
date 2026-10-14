@@ -5,6 +5,7 @@
   import { fmtAgo, fmtDate, fmtValue, isStale } from "../lib/format";
   import { DAY, loadRange, followsNow, needsReload, type Window } from "../lib/period";
   import { gapThreshold, bandMain, type DayBand } from "../lib/longview";
+  import { normalAt, type NormalDay } from "../lib/normals";
   import { loadCurves, otherView } from "../lib/curveload";
   import type { CurrentValue, Observation, PlaceDeployment, Point, SeriesInfo, SeriesStats } from "../lib/types";
   import PeriodBar from "../components/PeriodBar.svelte";
@@ -13,7 +14,7 @@
   import TrendArrow from "../components/TrendArrow.svelte";
   import ColorPicker from "../components/ColorPicker.svelte";
   import AlertRulesEditor from "../components/AlertRulesEditor.svelte";
-  import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadNormals, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import type { AlertEvent, AlertRule } from "../lib/types";
   import { canEdit } from "../lib/home.svelte";
@@ -168,6 +169,9 @@
   const isStation = $derived(homeWeather.stations.some((st) => st.placeId === placeId));
   const refreshForecast = () => series && loadForecast(series.map((x) => x.id)).then((f) => { forecast = f; forecastLoaded = true; });
   $effect(() => { if (isStation && series) refreshForecast(); });
+  // Station météo : normales saisonnières (bande sous ses courbes, colonne du tableau des prévisions)
+  let normals = $state(new Map<number, NormalDay[]>());
+  $effect(() => { if (isStation && series) loadNormals(series.map((x) => x.id)).then((n) => (normals = n)); });
   // Pas encore de prévision : collecte à la demande, avec son compte rendu (ou l'erreur)
   let collecting = $state(false);
   let collectInfo = $state("");
@@ -189,13 +193,13 @@
   }
   /** Prévision par jour : minimum et maximum de chaque grandeur */
   const forecastDays = $derived.by(() => {
-    const days = new Map<string, { label: string; values: Map<number, { min: number; max: number }> }>();
+    const days = new Map<string, { label: string; ts: number; values: Map<number, { min: number; max: number }> }>();
     for (const sr of sorted) {
       for (const p of forecast.get(sr.id) ?? []) {
         if (p.ts <= Date.now()) continue;
         const d = new Date(p.ts);
         const key = d.toDateString();
-        if (!days.has(key)) days.set(key, { label: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }), values: new Map() });
+        if (!days.has(key)) days.set(key, { label: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }), ts: p.ts, values: new Map() });
         const v = days.get(key)!.values;
         const cur = v.get(sr.id);
         v.set(sr.id, cur ? { min: Math.min(cur.min, p.value), max: Math.max(cur.max, p.value) } : { min: p.value, max: p.value });
@@ -203,6 +207,10 @@
     }
     return [...days.values()];
   });
+
+  /** Colonne « normale » du tableau des prévisions */
+  const withNormals = $derived(display.normals && normals.size > 0);
+  const fmtNum = (v: number, unit: string) => v.toLocaleString("fr-FR", { maximumFractionDigits: unit === "%" ? 0 : 1 });
 
   async function init() {
     try {
@@ -360,8 +368,9 @@
       <div class="table-wrap">
         <table class="forecast">
           <thead>
-            <tr><th rowspan="2">Jour</th>{#each sorted as sr (sr.id)}<th class="r" colspan="2">{sr.property_name}</th>{/each}</tr>
-            <tr>{#each sorted as sr (sr.id)}<th class="r sub">min</th><th class="r sub">max</th>{/each}</tr>
+            <tr><th rowspan="2">Jour</th>{#each sorted as sr (sr.id)}<th class="r" colspan={withNormals ? 3 : 2}>{sr.property_name}</th>{/each}</tr>
+            <tr>{#each sorted as sr (sr.id)}<th class="r sub">min</th><th class="r sub">max</th>
+              {#if withNormals}<th class="r sub" title="Normale saisonnière du jour (1991 – 2020) : minimum – maximum habituels">normale</th>{/if}{/each}</tr>
           </thead>
           <tbody>
             {#each forecastDays as d (d.label)}
@@ -372,6 +381,10 @@
                   {@const rs = rules.filter((r) => r.series_id === sr.id)}
                   <td class="r num zv {v ? zoneOf(v.min, rs) ?? '' : ''}">{v ? fmtValue(v.min, sr.unit) : "–"}</td>
                   <td class="r num zv {v ? zoneOf(v.max, rs) ?? '' : ''}">{v ? fmtValue(v.max, sr.unit) : "–"}</td>
+                  {#if withNormals}
+                    {@const n = normalAt(normals.get(sr.id), d.ts)}
+                    <td class="r num normal">{n ? `${fmtNum(n.min, sr.unit)} – ${fmtNum(n.max, sr.unit)}` : "–"}</td>
+                  {/if}
                 {/each}
               </tr>
             {/each}
@@ -379,7 +392,8 @@
         </table>
       </div>
       <small class="muted">Sur les courbes, la prévision prolonge la mesure en trait mixte : glisser la barre sous la
-        courbe vers la droite pour voir les jours à venir. Alertes « prévu au-dessus / en dessous » sous chaque courbe.</small>
+        courbe vers la droite pour voir les jours à venir. Alertes « prévu au-dessus / en dessous » sous chaque courbe.
+        {#if withNormals}Normale : minimum et maximum habituels du jour (moyennes 1991 – 2020), en bande tiret-point-point sur les courbes.{/if}</small>
     </section>
   {/if}
 
@@ -394,7 +408,8 @@
     <section class="card">
       <h2>{s.property_name} <small class="muted">({s.unit})</small></h2>
       <TimeChart series={[{ id: s.id, name: s.property_name, color: curveColor(s.property), points: data.get(s.id) ?? [],
-                            ...(bands.has(s.id) ? { band: bands.get(s.id) } : {}) },
+                            ...(bands.has(s.id) ? { band: bands.get(s.id) } : {}),
+                            ...(normals.has(s.id) ? { normal: normals.get(s.id) } : {}) },
                          ...(display.forecast ? forecastCurve({ id: s.id, name: s.property_name, color: curveColor(s.property) },
                                                               data.get(s.id) ?? [], forecast.get(s.id)) : []),
                          ...weatherCurve(weather, s.property, [s.place_id])]}
@@ -492,4 +507,5 @@
   .rejected { text-decoration: line-through; color: var(--muted); }
   .forecast th.sub { font-size: 0.75rem; font-weight: 500; padding-top: 0; }
   .forecast td { white-space: nowrap; }
+  .forecast td.normal { color: var(--muted); font-size: 0.85em; }
 </style>

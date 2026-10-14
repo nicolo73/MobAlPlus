@@ -138,6 +138,16 @@ d'historique dès sa création.
   franchissement dans les **24 heures** (forte chaleur, gel…), pour anticiper (fermer les fenêtres,
   plus tard commander les volets). L'alerte donne l'heure prévue et se ferme quand la prévision ne
   l'annonce plus.
+- **Normales saisonnières** : pour chaque jour de l'année, le **minimum et le maximum habituels**
+  (moyennes 1991 – 2020, période de référence des services météo) à la position de la station,
+  calculés une fois pour toutes par le serveur à partir des archives ERA5 (Open-Meteo), lissés sur
+  3 semaines. Sur les courbes de la station (et la courbe Météo des autres pages) : une **bande**
+  très légère bordée d'un **tiret-point-point** (– · · –), sous les mesures, non interactive ;
+  l'infobulle donne « normale 9,1 – 16,8 °C » du jour pointé. Dans la **Synthèse**, une ligne
+  « Normale Paris » sous la légende donne la normale du jour du curseur. Sur la page de la station,
+  colonne **normale** dans le tableau des prévisions. Bouton **Normales** (à côté de Prévisions)
+  pour les masquer. Une nouvelle station reçoit ses normales lors de la collecte suivante (dans
+  la demi-heure) ; si la station change de position, elles sont recalculées.
 
 ## Page d'un emplacement
 

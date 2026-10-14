@@ -169,6 +169,12 @@ affecté à un emplacement de type `weather`. Elle passe par le même chemin que
   courbe de la station dans le futur (trait mixte). Alertes `fc_above` / `fc_below` :
   `evaluate_forecast_alerts()`, franchissement prévu dans les 24 heures (heure prévue dans
   `alert_event.forecast_at`) ; destinées aussi à déclencher plus tard des actions (volets).
+- **Normales saisonnières** : à chaque passage, au plus une station sans normales
+  (`normals_targets()`, une tentative par jour en cas d'échec ; nouveau calcul si la station change
+  de position) : archives ERA5 journalières 1991 – 2020 (minimums et maximums de température et
+  d'humidité, une seule requête lourde par station), moyenne par jour de l'année lissée sur
+  21 jours, enregistrée dans `normal` (`store_normals()`, 366 lignes par canal). L'application les
+  lit avec `series_normals()` (une fois par session) et les déplie sur les jours affichés.
 
 ## Stockage en trois niveaux
 

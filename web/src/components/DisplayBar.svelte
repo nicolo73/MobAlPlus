@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { display, setCurve, setForecast, setWeather, toggleProp, visibleOf, visibleProps } from "../lib/display.svelte";
+  import { display, setCurve, setForecast, setNormals, setWeather, toggleProp, visibleOf, visibleProps } from "../lib/display.svelte";
   import { homeWeather } from "../lib/weather-state.svelte";
 
   /** Grandeurs présentes sur la page, dans l'ordre d'affichage */
@@ -64,6 +64,11 @@
               title="Prévision météo : la courbe des stations se prolonge dans le futur (glisser la barre sous la courbe vers la droite)">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 12h3M10 12h3M16 12h4M17 8l4 4-4 4" /></svg>
         Prévisions
+      </button>
+      <button class:active={display.normals} aria-pressed={display.normals} onclick={() => setNormals(!display.normals)}
+              title="Normales saisonnières (1991 – 2020) : bande entre le minimum et le maximum habituels du jour, sous la courbe des stations météo">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 9c4-3 8-3 9 0s5 3 9 0M3 17c4-3 8-3 9 0s5 3 9 0" stroke-dasharray="3 2.5" /></svg>
+        Normales
       </button>
     </div>
   {/if}

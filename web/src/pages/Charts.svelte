@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { NormalDay } from "../lib/normals";
   import { api } from "../lib/api";
   import { MAX_SERIES, isDark } from "../lib/colors";
   import { loadRange, followsNow, needsReload, type Window } from "../lib/period";
@@ -11,7 +12,7 @@
   import { bandMain, type DayBand } from "../lib/longview";
   import { loadCurves, otherView } from "../lib/curveload";
   import type { AlertEvent } from "../lib/types";
-  import { forecastCurve, homeWeather, loadForecast, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
+  import { forecastCurve, homeWeather, loadForecast, loadNormals, loadWeather, weatherCurve } from "../lib/weather-state.svelte";
   import type { WeatherSeries } from "../lib/weather-parse";
   import PeriodBar from "../components/PeriodBar.svelte";
   import TimeChart, { type ChartSeries } from "../components/TimeChart.svelte";
@@ -134,12 +135,16 @@
 
   // Prévision des stations météo choisies
   let forecast = $state(new Map<number, Point[]>());
+  const stationSeries = $derived(selected.filter((c) => !c.avg && homeWeather.stations.some((st) => st.placeId === c.node.id))
+    .flatMap((c) => (seriesByPlace.get(c.node.id) ?? []).map((x) => x.id)));
   $effect(() => {
-    const ids = display.forecast ? selected.filter((c) => !c.avg && homeWeather.stations.some((st) => st.placeId === c.node.id))
-      .flatMap((c) => (seriesByPlace.get(c.node.id) ?? []).map((x) => x.id)) : [];
+    const ids = display.forecast ? stationSeries : [];
     void data;
     loadForecast(ids).then((f) => (forecast = f));
   });
+  // … et leurs normales saisonnières
+  let normals = $state(new Map<number, NormalDay[]>());
+  $effect(() => { loadNormals(stationSeries).then((n) => (normals = n)); });
 
   // Alertes importantes de la période, marquées sur les courbes des emplacements eux-mêmes
   let events = $state<AlertEvent[]>([]);
@@ -206,10 +211,11 @@
         const band = bands.size ? sel.curveBand(c, prop, seriesByPlace, bands) : null;
         const points = curvePoints(c, prop);
         if (!points && !band) continue;
-        chart.series.push({ ...base, points: points ?? [], ...(band ? { band } : {}), dashed: c.avg });
-        if (!points?.length) continue;
-        // Station météo : sa prévision prolonge sa courbe
+        // Station météo : ses normales en bande, sa prévision prolonge sa courbe
         const sid = c.avg ? undefined : seriesByPlace.get(c.node.id)?.find((x) => x.property === prop)?.id;
+        const normal = sid !== undefined ? normals.get(sid) : undefined;
+        chart.series.push({ ...base, points: points ?? [], ...(band ? { band } : {}), ...(normal ? { normal } : {}), dashed: c.avg });
+        if (!points?.length) continue;
         if (sid !== undefined && forecast.has(sid)) chart.series.push(...forecastCurve(base, points, forecast.get(sid)));
       }
     }
